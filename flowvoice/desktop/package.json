@@ -6,6 +6,10 @@
   "main": "src/main/main.js",
   "author": "FlowVoice",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sergenikz1/vibrateeverysecondtgapp.git"
+  },
   "private": true,
   "scripts": {
     "start": "electron .",

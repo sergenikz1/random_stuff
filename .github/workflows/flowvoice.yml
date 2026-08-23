@@ -35,10 +35,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # No GH_TOKEN here on purpose: it would make electron-builder infer a
+      # GitHub publish target. Releases are published by the `publish` job.
       - name: Build installer and portable build
         run: npx electron-builder --win nsis portable --x64 --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Collect artifacts
         shell: bash

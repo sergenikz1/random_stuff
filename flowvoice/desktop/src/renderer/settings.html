@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; media-src 'self' blob:;" />
+<title>FlowVoice</title>
+<link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>FlowVoice</h1>
+        <p class="sub" data-i18n="tagline">Диктуйте — текст появится там, где стоит курсор</p>
+      </div>
+    </div>
+    <div class="head-actions">
+      <div class="lang-switch" role="group">
+        <button data-uilang="ru" class="chip">RU</button>
+        <button data-uilang="en" class="chip">EN</button>
+      </div>
+      <button id="dictate" class="primary"><span class="rec-dot"></span><span data-i18n="dictate">Диктовать</span></button>
+    </div>
+  </header>
+
+  <nav id="tabs">
+    <button class="tab active" data-tab="general" data-i18n="tab.general">Основное</button>
+    <button class="tab" data-tab="capture" data-i18n="tab.capture">Захват</button>
+    <button class="tab" data-tab="output" data-i18n="tab.output">Вставка</button>
+    <button class="tab" data-tab="dictionary" data-i18n="tab.dictionary">Словарь</button>
+    <button class="tab" data-tab="history" data-i18n="tab.history">История</button>
+    <button class="tab" data-tab="about" data-i18n="tab.about">О программе</button>
+  </nav>
+
+  <main>
+    <!-- ------------------------------------------------------------ general -->
+    <section data-panel="general" class="active">
+      <div class="card">
+        <h2 data-i18n="sec.engine">Движок распознавания</h2>
+        <p class="hint" data-i18n="sec.engine.hint">Подойдёт любой сервис с OpenAI-совместимым API транскрипции.</p>
+
+        <label data-i18n="f.preset">Готовые настройки</label>
+        <div class="presets">
+          <button class="chip" data-preset="openai">OpenAI Whisper</button>
+          <button class="chip" data-preset="groq">Groq (whisper-large-v3)</button>
+          <button class="chip" data-preset="local">whisper.cpp (локально)</button>
+        </div>
+
+        <label for="apiBaseUrl" data-i18n="f.baseUrl">Адрес API</label>
+        <input id="apiBaseUrl" type="text" spellcheck="false" placeholder="https://api.openai.com/v1" />
+
+        <label for="apiKey" data-i18n="f.apiKey">API-ключ</label>
+        <div class="row">
+          <input id="apiKey" type="password" spellcheck="false" placeholder="sk-..." />
+          <button id="toggleKey" class="ghost" data-i18n="f.show">Показать</button>
+          <button id="testConn" class="ghost" data-i18n="f.test">Проверить</button>
+        </div>
+        <p id="testResult" class="status"></p>
+
+        <label for="sttModel" data-i18n="f.sttModel">Модель распознавания</label>
+        <input id="sttModel" type="text" spellcheck="false" placeholder="whisper-1" />
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="sec.lang">Язык речи</h2>
+        <p class="hint" data-i18n="sec.lang.hint">«Авто» определяет язык сам — удобно, если вы переключаетесь между русским и английским.</p>
+        <div class="segmented" id="language">
+          <button data-value="auto" data-i18n="lang.auto">Авто</button>
+          <button data-value="ru">Русский</button>
+          <button data-value="en">English</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="sec.cleanup">Обработка текста</h2>
+        <label class="switch">
+          <input id="cleanup" type="checkbox" />
+          <span></span>
+          <div>
+            <strong data-i18n="f.cleanup">Причёсывать текст языковой моделью</strong>
+            <em data-i18n="f.cleanup.hint">Расставляет знаки препинания, убирает «эээ» и оговорки. Язык не меняется.</em>
+          </div>
+        </label>
+        <label for="cleanupModel" data-i18n="f.cleanupModel">Модель обработки</label>
+        <input id="cleanupModel" type="text" spellcheck="false" placeholder="gpt-4o-mini" />
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ capture -->
+    <section data-panel="capture">
+      <div class="card">
+        <h2 data-i18n="sec.hotkey">Горячая клавиша</h2>
+        <p class="hint" data-i18n="sec.hotkey.hint">Нажмите один раз, чтобы начать диктовать, и ещё раз — чтобы закончить. Esc отменяет запись.</p>
+        <div class="row">
+          <button id="hotkeyBtn" class="hotkey"></button>
+          <button id="hotkeyReset" class="ghost" data-i18n="f.reset">Сбросить</button>
+        </div>
+        <p class="hint" id="hotkeyHint"></p>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="sec.mic">Микрофон</h2>
+        <label for="inputDeviceId" data-i18n="f.device">Устройство ввода</label>
+        <select id="inputDeviceId"></select>
+
+        <label class="switch">
+          <input id="autoStopEnabled" type="checkbox" />
+          <span></span>
+          <div>
+            <strong data-i18n="f.autostop">Останавливать запись после паузы</strong>
+            <em data-i18n="f.autostop.hint">Не нужно тянуться к клавиатуре, чтобы закончить фразу.</em>
+          </div>
+        </label>
+
+        <label for="autoStopSilenceMs"><span data-i18n="f.silence">Длина паузы</span>: <b id="silenceVal"></b></label>
+        <input id="autoStopSilenceMs" type="range" min="600" max="4000" step="100" />
+
+        <label for="maxRecordSeconds"><span data-i18n="f.maxLen">Максимальная длина записи</span>: <b id="maxLenVal"></b></label>
+        <input id="maxRecordSeconds" type="range" min="15" max="300" step="5" />
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------- output -->
+    <section data-panel="output">
+      <div class="card">
+        <h2 data-i18n="sec.paste">Как вставлять текст</h2>
+        <div class="segmented" id="pasteMode">
+          <button data-value="auto" data-i18n="paste.auto">Вставить сразу</button>
+          <button data-value="clipboard" data-i18n="paste.clip">Только в буфер</button>
+        </div>
+        <p class="hint" data-i18n="sec.paste.hint">«Вставить сразу» копирует текст и нажимает Ctrl+V в активном окне.</p>
+
+        <label class="switch">
+          <input id="restoreClipboard" type="checkbox" />
+          <span></span>
+          <div><strong data-i18n="f.restoreClip">Возвращать прежнее содержимое буфера</strong></div>
+        </label>
+        <label class="switch">
+          <input id="trailingSpace" type="checkbox" />
+          <span></span>
+          <div><strong data-i18n="f.trailing">Добавлять пробел в конце</strong></div>
+        </label>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="sec.app">Приложение</h2>
+        <label class="switch">
+          <input id="launchAtLogin" type="checkbox" />
+          <span></span>
+          <div><strong data-i18n="f.autostart">Запускать при входе в систему</strong></div>
+        </label>
+        <label class="switch">
+          <input id="playSounds" type="checkbox" />
+          <span></span>
+          <div><strong data-i18n="f.sounds">Звуковые сигналы</strong></div>
+        </label>
+        <div class="row">
+          <button id="openData" class="ghost" data-i18n="f.dataFolder">Открыть папку данных</button>
+          <button id="resetAll" class="ghost danger" data-i18n="f.resetAll">Сбросить настройки</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- dictionary -->
+    <section data-panel="dictionary">
+      <div class="card">
+        <h2 data-i18n="sec.dict">Личный словарь</h2>
+        <p class="hint" data-i18n="sec.dict.hint">Имена, термины, названия продуктов — по одному в строке. Их будут писать правильно.</p>
+        <textarea id="dictionary" rows="14" spellcheck="false" placeholder="Anthropic&#10;Клод&#10;Kubernetes"></textarea>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ history -->
+    <section data-panel="history">
+      <div class="card">
+        <div class="row spread">
+          <h2 data-i18n="sec.history">Последние диктовки</h2>
+          <button id="clearHistory" class="ghost danger" data-i18n="f.clear">Очистить</button>
+        </div>
+        <div id="historyList" class="history"></div>
+      </div>
+    </section>
+
+    <!-- -------------------------------------------------------------- about -->
+    <section data-panel="about">
+      <div class="card">
+        <h2 data-i18n="sec.about">О программе</h2>
+        <p class="hint" id="aboutInfo"></p>
+        <ol class="steps">
+          <li data-i18n="about.s1">Вставьте API-ключ на вкладке «Основное».</li>
+          <li data-i18n="about.s2">Поставьте курсор в любое поле ввода в любой программе.</li>
+          <li data-i18n="about.s3">Нажмите горячую клавишу и говорите.</li>
+          <li data-i18n="about.s4">Нажмите её снова или просто замолчите — текст напечатается сам.</li>
+        </ol>
+        <p class="hint" data-i18n="about.privacy">Ключ и история хранятся только на этом компьютере, в папке данных приложения. Аудио отправляется на выбранный вами сервер распознавания.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <script src="i18n.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

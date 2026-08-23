@@ -1,0 +1,19 @@
+{
+  "name": "flowvoice-desktop",
+  "productName": "FlowVoice",
+  "version": "1.0.0",
+  "description": "FlowVoice — voice dictation that types for you. English & Russian.",
+  "main": "src/main/main.js",
+  "author": "FlowVoice",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable --x64",
+    "dist:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
+}

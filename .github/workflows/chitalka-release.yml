@@ -4,14 +4,11 @@ name: Читалка вслух — релиз APK
 # вместе с обоими APK. Модели синтеза речи подтягиваются задачей fetchTtsAssets.
 on:
   push:
+    branches:
+      - chitalka-vsluh
     tags:
       - 'chitalka-v*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Тег релиза, например chitalka-v1.0'
-        required: true
-        default: 'chitalka-v1.0'
 
 permissions:
   contents: write
@@ -44,7 +41,11 @@ jobs:
       - name: Собрать файлы релиза
         id: files
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # Пуш тега задаёт имя релиза сам, для обычного пуша берём versionName из сборки.
+          case "${{ github.ref_type }}" in
+            tag) TAG="${{ github.ref_name }}" ;;
+            *)   TAG="chitalka-v$(grep -m1 versionName android-reader/app/build.gradle.kts | cut -d'"' -f2)" ;;
+          esac
           VERSION="${TAG#chitalka-v}"
           mkdir -p release
           cp android-reader/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
@@ -63,6 +64,7 @@ jobs:
             gh release upload "$TAG" release/*.apk --clobber
           else
             gh release create "$TAG" release/*.apk \
+              --target "$GITHUB_SHA" \
               --title "Читалка вслух $TAG" \
               --notes-file .github/release-notes-chitalka.md
           fi

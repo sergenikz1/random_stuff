@@ -21,9 +21,11 @@ Android-приложение: читает электронные книги в�
 
 ## Установка
 
-APK собирается в CI: вкладка Actions → последний запуск **Android Reader APK** →
-артефакт `chitalka-vsluh-arm64`. Внутри репозитория APK не хранится — он весит около 250 МБ
-из-за встроенных моделей синтеза речи.
+Готовый APK лежит в [Releases](https://github.com/sergenikz1/random_stuff/releases).
+Внутри репозитория он не хранится: около 250 МБ из-за встроенных моделей синтеза речи.
+
+Сборки промежуточных коммитов можно забрать из артефактов CI:
+вкладка Actions → запуск **Android Reader APK** → артефакт `chitalka-vsluh-arm64`.
 
 Собираются два APK: `arm64-v8a` (все современные телефоны) и `armeabi-v7a` (старые 32-битные).
 На телефоне нужно разрешить установку из неизвестных источников, затем открыть файл.
@@ -59,6 +61,9 @@ export ANDROID_HOME=/путь/к/android-sdk
 ./gradlew :app:assembleDebug          # APK: app/build/outputs/apk/debug/
 ./gradlew :app:testDebugUnitTest      # тесты разборщиков форматов
 ```
+
+Новый релиз публикуется по тегу: `git tag chitalka-v1.1 && git push origin chitalka-v1.1` —
+workflow соберёт оба APK и выложит их в Releases.
 
 Требуется JDK 17+, Android SDK с platform 35 и build-tools 35.
 

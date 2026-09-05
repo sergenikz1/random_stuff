@@ -2,6 +2,8 @@ name: Android Reader APK
 
 on:
   push:
+    branches:
+      - '**'
     paths:
       - 'android-reader/**'
       - '.github/workflows/android-reader.yml'

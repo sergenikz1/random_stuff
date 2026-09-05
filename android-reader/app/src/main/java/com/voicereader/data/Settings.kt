@@ -2,6 +2,7 @@ package com.voicereader.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.voicereader.tts.VoiceKind
 import com.voicereader.tts.VoiceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +45,10 @@ object Settings {
         val profiles = VoiceProfile.DEFAULTS.mapIndexed { i, def ->
             VoiceProfile(
                 label = prefs.getString("voice_${i}_label", def.label) ?: def.label,
-                voiceName = prefs.getString("voice_${i}_name", null),
+                kind = runCatching { VoiceKind.valueOf(prefs.getString("voice_${i}_kind", def.kind.name)!!) }
+                    .getOrDefault(def.kind),
+                neuralVoiceId = prefs.getString("voice_${i}_neural", def.neuralVoiceId),
+                systemVoiceName = prefs.getString("voice_${i}_system", null),
                 pitch = prefs.getFloat("voice_${i}_pitch", def.pitch),
                 rate = prefs.getFloat("voice_${i}_rate", def.rate)
             )
@@ -65,7 +69,9 @@ object Settings {
         prefs.edit().apply {
             state.profiles.forEachIndexed { i, p ->
                 putString("voice_${i}_label", p.label)
-                putString("voice_${i}_name", p.voiceName)
+                putString("voice_${i}_kind", p.kind.name)
+                putString("voice_${i}_neural", p.neuralVoiceId)
+                putString("voice_${i}_system", p.systemVoiceName)
                 putFloat("voice_${i}_pitch", p.pitch)
                 putFloat("voice_${i}_rate", p.rate)
             }
@@ -88,15 +94,4 @@ object Settings {
         s.copy(profiles = s.profiles.mapIndexed { i, p -> if (i == slot) transform(p) else p })
     }
 
-    /** Первичная привязка трёх слотов к реально установленным голосам. */
-    fun assignDefaultVoicesOnce(names: List<String>) {
-        if (names.isEmpty()) return
-        if (prefs.getBoolean("voices_assigned", false)) return
-        update { s ->
-            s.copy(profiles = s.profiles.mapIndexed { i, p ->
-                p.copy(voiceName = names.getOrNull(i) ?: names.last())
-            })
-        }
-        prefs.edit().putBoolean("voices_assigned", true).apply()
-    }
 }

@@ -1,22 +1,29 @@
 package com.voicereader.tts
 
+enum class VoiceKind { NEURAL, SYSTEM }
+
 /**
  * Один из трёх пользовательских голосов.
- * Голос = системный голос движка + собственные высота тона и темп,
- * поэтому три разных варианта доступны даже там, где движок предлагает один голос.
+ * NEURAL — встроенная нейросетевая модель (звучит естественно, работает офлайн).
+ * SYSTEM — голос системного движка Android, запасной вариант и языки помимо русского.
  */
 data class VoiceProfile(
     val label: String,
-    /** Имя системного голоса (Voice.getName()), null — голос по умолчанию для языка. */
-    val voiceName: String?,
+    val kind: VoiceKind,
+    /** id встроенного голоса из [VoiceCatalog], если kind == NEURAL. */
+    val neuralVoiceId: String?,
+    /** Voice.getName() системного движка, если kind == SYSTEM. */
+    val systemVoiceName: String?,
+    /** Высота тона — только для системных голосов, нейросетевая модель её не поддерживает. */
     val pitch: Float,
+    /** Темп речи, множитель к нормальной скорости. */
     val rate: Float
 ) {
     companion object {
         val DEFAULTS = listOf(
-            VoiceProfile("Голос 1 · ровный", null, 1.00f, 1.00f),
-            VoiceProfile("Голос 2 · ниже и мягче", null, 0.88f, 0.95f),
-            VoiceProfile("Голос 3 · выше и живее", null, 1.12f, 1.06f)
+            VoiceProfile("Ирина", VoiceKind.NEURAL, "irina", null, 1.0f, 1.0f),
+            VoiceProfile("Денис", VoiceKind.NEURAL, "denis", null, 1.0f, 1.0f),
+            VoiceProfile("Руслан", VoiceKind.NEURAL, "ruslan", null, 1.0f, 1.0f)
         )
     }
 }
@@ -25,8 +32,7 @@ data class VoiceProfile(
 data class InstalledVoice(
     val name: String,
     val locale: String,
-    val quality: Int,
-    val offline: Boolean
+    val quality: Int
 ) {
     val displayName: String
         get() {

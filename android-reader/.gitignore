@@ -6,3 +6,8 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Скачиваются задачей fetchTtsAssets, в репозитории не хранятся
+app/libs/
+app/src/main/assets/tts/
+dist/

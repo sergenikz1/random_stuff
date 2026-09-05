@@ -34,7 +34,8 @@ import com.voicereader.data.Settings
 import com.voicereader.data.TextWindow
 import com.voicereader.player.PlayerEngine
 import com.voicereader.player.PlayerState
-import com.voicereader.player.TtsStatus
+import com.voicereader.tts.TtsStatus
+import com.voicereader.tts.VoiceKind
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,12 +118,20 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit) {
                 else -> BookText(state, settings.fontSizeSp, settings.lineHeightMult, settings.textWindow, settings.autoScroll)
             }
 
-            if (state.tts != TtsStatus.READY && !state.loading) {
+            val ttsStatus by PlayerEngine.systemTtsStatus.collectAsState()
+            // Предупреждение о системном движке нужно только тогда, когда читает именно он.
+            val usingSystemVoice = settings.activeProfile.kind != VoiceKind.NEURAL ||
+                !state.language.startsWith("ru", ignoreCase = true)
+            if (usingSystemVoice && ttsStatus != TtsStatus.READY && !state.loading) {
                 TtsWarning(
-                    status = state.tts,
+                    status = ttsStatus,
                     onOpenSettings = { context.startActivity(PlayerEngine.ttsSettingsIntent()) },
                     modifier = Modifier.align(Alignment.TopCenter).padding(12.dp)
                 )
+            }
+
+            state.installProgress?.let { progress ->
+                VoicePreparing(progress, Modifier.align(Alignment.Center))
             }
         }
     }
@@ -284,15 +293,23 @@ private fun ControlPanel(
                 ) {
                     Icon(Icons.Filled.FastRewind, contentDescription = "Предложение назад")
                 }
-                FilledIconButton(
-                    onClick = { PlayerEngine.toggle() },
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Icon(
-                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Пауза" else "Читать",
-                        modifier = Modifier.size(36.dp)
-                    )
+                Box(contentAlignment = Alignment.Center) {
+                    if (state.preparing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(72.dp),
+                            strokeWidth = 3.dp
+                        )
+                    }
+                    FilledIconButton(
+                        onClick = { PlayerEngine.toggle() },
+                        modifier = Modifier.size(64.dp)
+                    ) {
+                        Icon(
+                            if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Пауза" else "Читать",
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
                 FilledTonalIconButton(
                     onClick = { PlayerEngine.nextSentence() },
@@ -432,6 +449,29 @@ private fun TtsWarning(status: TtsStatus, onOpenSettings: () -> Unit, modifier: 
             if (status != TtsStatus.INITIALIZING) {
                 TextButton(onClick = onOpenSettings) { Text("Открыть настройки речи") }
             }
+        }
+    }
+}
+
+/** Первый запуск голоса: модель распаковывается из ассетов во внутреннюю память. */
+@Composable
+private fun VoicePreparing(progress: Float, modifier: Modifier = Modifier) {
+    Card(modifier.padding(24.dp)) {
+        Column(
+            Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Готовлю голос", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Это делается один раз для каждого голоса",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(14.dp))
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
         }
     }
 }

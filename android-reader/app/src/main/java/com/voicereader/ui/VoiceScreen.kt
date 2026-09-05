@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,24 +18,36 @@ import androidx.compose.ui.unit.dp
 import com.voicereader.data.Settings
 import com.voicereader.player.PlayerEngine
 import com.voicereader.tts.InstalledVoice
+import com.voicereader.tts.NeuralVoice
+import com.voicereader.tts.SystemTts
+import com.voicereader.tts.VoiceCatalog
+import com.voicereader.tts.VoiceInstaller
+import com.voicereader.tts.VoiceKind
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
- * Три голосовых профиля. Каждый — системный офлайн-голос плюс своя высота и скорость,
- * поэтому выбор из трёх есть даже на устройствах с единственным установленным голосом.
+ * Три голосовых профиля. Каждый — либо встроенная нейросетевая модель,
+ * либо голос системного движка (нужен для книг не на русском).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoiceScreen(onBack: () -> Unit) {
     val settings by Settings.state.collectAsState()
-    val allVoices by PlayerEngine.voices.collectAsState()
+    val systemVoices by SystemTts.voices.collectAsState()
+    val playerState by PlayerEngine.state.collectAsState()
     val context = LocalContext.current
-    var editing by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) { PlayerEngine.refreshVoices() }
+    var editing by remember { mutableStateOf(settings.activeVoice) }
+    var installing by remember { mutableStateOf<String?>(null) }
+    var installProgress by remember { mutableFloatStateOf(0f) }
+    // Меняется после установки/удаления голоса, чтобы список перечитал состояние с диска.
+    var installTick by remember { mutableIntStateOf(0) }
 
-    val voices = remember(allVoices, PlayerEngine.state.value.language) {
-        PlayerEngine.voicesForCurrentBook()
-    }
+    LaunchedEffect(Unit) { SystemTts.refreshVoices() }
+
+    val profile = settings.profiles[editing]
 
     Scaffold(
         topBar = {
@@ -59,7 +72,16 @@ fun VoiceScreen(onBack: () -> Unit) {
                         FilterChip(
                             selected = editing == i,
                             onClick = { editing = i },
-                            label = { Text("Голос ${i + 1}", maxLines = 1) },
+                            label = {
+                                Text(
+                                    p.label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            leadingIcon = if (i == settings.activeVoice) {
+                                { Icon(Icons.Filled.Check, contentDescription = "Активный") }
+                            } else null,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -67,15 +89,18 @@ fun VoiceScreen(onBack: () -> Unit) {
             }
 
             item {
-                val profile = settings.profiles[editing]
                 Card {
                     Column(Modifier.padding(16.dp)) {
-                        Text(profile.label, style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(4.dp))
+                        Text("Слот ${editing + 1}: ${profile.label}", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(2.dp))
                         Text(
-                            profile.voiceName?.let { name ->
-                                voices.firstOrNull { it.name == name }?.displayName ?: name
-                            } ?: "Голос движка по умолчанию",
+                            when (profile.kind) {
+                                VoiceKind.NEURAL -> VoiceCatalog.byId(profile.neuralVoiceId)?.description
+                                    ?: "встроенная нейросетевая модель"
+                                VoiceKind.SYSTEM -> profile.systemVoiceName?.let { name ->
+                                    systemVoices.firstOrNull { it.name == name }?.displayName ?: name
+                                } ?: "голос системного движка по умолчанию"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -90,26 +115,29 @@ fun VoiceScreen(onBack: () -> Unit) {
                             steps = 29
                         )
 
-                        Text("Высота тона: ${"%.2f".format(profile.pitch)}", style = MaterialTheme.typography.labelLarge)
-                        Slider(
-                            value = profile.pitch,
-                            onValueChange = { v -> Settings.updateProfile(editing) { it.copy(pitch = v) } },
-                            onValueChangeFinished = { PlayerEngine.applyVoiceSettingsNow() },
-                            valueRange = 0.6f..1.6f,
-                            steps = 19
-                        )
+                        if (profile.kind == VoiceKind.SYSTEM) {
+                            Text("Высота тона: ${"%.2f".format(profile.pitch)}", style = MaterialTheme.typography.labelLarge)
+                            Slider(
+                                value = profile.pitch,
+                                onValueChange = { v -> Settings.updateProfile(editing) { it.copy(pitch = v) } },
+                                onValueChangeFinished = { PlayerEngine.applyVoiceSettingsNow() },
+                                valueRange = 0.6f..1.6f,
+                                steps = 19
+                            )
+                        } else {
+                            Text(
+                                "Высота тона у нейросетевых голосов не регулируется — тембр задан самой моделью.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                PlayerEngine.selectVoice(editing)
-                            }) { Text("Сделать активным") }
-                            OutlinedButton(onClick = {
-                                Settings.updateProfile(editing) {
-                                    it.copy(pitch = 1f, rate = 1f)
-                                }
-                                PlayerEngine.applyVoiceSettingsNow()
-                            }) { Text("Сбросить") }
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { PlayerEngine.selectVoice(editing) },
+                            enabled = editing != settings.activeVoice
+                        ) {
+                            Text(if (editing == settings.activeVoice) "Уже активен" else "Сделать активным")
                         }
                     }
                 }
@@ -117,19 +145,77 @@ fun VoiceScreen(onBack: () -> Unit) {
 
             item {
                 Text(
-                    "Системный голос для профиля «Голос ${editing + 1}»",
+                    "Встроенные голоса",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
+                Text(
+                    "Работают полностью офлайн, звучат естественнее системного движка. " +
+                        "Рассчитаны на русский текст.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            if (voices.isEmpty()) {
+            items(VoiceCatalog.neural.size) { i ->
+                val voice = VoiceCatalog.neural[i]
+                val ready = remember(installTick, voice.id) { VoiceInstaller.isVoiceReady(context, voice) }
+                NeuralVoiceRow(
+                    voice = voice,
+                    selected = profile.kind == VoiceKind.NEURAL && profile.neuralVoiceId == voice.id,
+                    ready = ready,
+                    installing = installing == voice.id,
+                    progress = installProgress,
+                    onSelect = {
+                        Settings.updateProfile(editing) {
+                            it.copy(
+                                label = voice.title,
+                                kind = VoiceKind.NEURAL,
+                                neuralVoiceId = voice.id
+                            )
+                        }
+                        PlayerEngine.applyVoiceSettingsNow()
+                    },
+                    onInstall = {
+                        installing = voice.id
+                        installProgress = 0f
+                        scope.launch {
+                            runCatching {
+                                VoiceInstaller.installVoice(context, voice) { installProgress = it }
+                            }
+                            installing = null
+                            installTick++
+                        }
+                    },
+                    onDelete = {
+                        VoiceInstaller.uninstallVoice(context, voice)
+                        installTick++
+                    }
+                )
+            }
+
+            item {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Системные голоса",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Нужны для книг на других языках. Показаны только те, что не требуют интернета.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val relevant = SystemTts.voicesFor(playerState.language)
+            if (relevant.isEmpty()) {
                 item {
                     Card {
                         Column(Modifier.padding(16.dp)) {
                             Text(
-                                "Офлайн-голоса не найдены. Откройте системные настройки синтеза речи " +
-                                    "и скачайте языковой пакет — после этого голоса появятся здесь.",
+                                "Офлайн-голоса системного движка не найдены. Их можно скачать " +
+                                    "в системных настройках синтеза речи.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                             TextButton(onClick = { context.startActivity(PlayerEngine.ttsSettingsIntent()) }) {
@@ -140,53 +226,98 @@ fun VoiceScreen(onBack: () -> Unit) {
                 }
             }
 
-            items(voices.size) { i ->
-                val voice = voices[i]
-                VoiceRow(
+            items(relevant.size) { i ->
+                val voice = relevant[i]
+                SystemVoiceRow(
                     voice = voice,
-                    selected = settings.profiles[editing].voiceName == voice.name,
+                    selected = profile.kind == VoiceKind.SYSTEM && profile.systemVoiceName == voice.name,
                     onClick = {
-                        Settings.updateProfile(editing) { it.copy(voiceName = voice.name) }
+                        Settings.updateProfile(editing) {
+                            it.copy(
+                                label = voice.displayName.take(14),
+                                kind = VoiceKind.SYSTEM,
+                                systemVoiceName = voice.name
+                            )
+                        }
                         PlayerEngine.applyVoiceSettingsNow()
                     }
                 )
             }
 
             item {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { context.startActivity(PlayerEngine.ttsSettingsIntent()) }) {
                     Text("Системные настройки синтеза речи")
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Показаны только голоса, работающие без интернета. Качество звучания зависит от " +
-                        "движка: у Google TTS лучшие результаты дают голоса с пометкой высокого качества.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
 }
 
 @Composable
-private fun VoiceRow(voice: InstalledVoice, selected: Boolean, onClick: () -> Unit) {
+private fun NeuralVoiceRow(
+    voice: NeuralVoice,
+    selected: Boolean,
+    ready: Boolean,
+    installing: Boolean,
+    progress: Float,
+    onSelect: () -> Unit,
+    onInstall: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        colors = if (selected)
+            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        else CardDefaults.cardColors()
+    ) {
+        Column(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(voice.title, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        voice.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        if (ready) "готов к работе" else "${voice.approxBytes / 1_000_000} МБ · распакуется при первом запуске",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран")
+                else if (!ready) Icon(Icons.Filled.Download, contentDescription = null)
+            }
+
+            if (installing) {
+                Spacer(Modifier.height(10.dp))
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "распаковка ${(progress * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!ready) {
+                        TextButton(onClick = onInstall) { Text("Подготовить сейчас") }
+                    } else {
+                        TextButton(onClick = onDelete) { Text("Освободить место") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SystemVoiceRow(voice: InstalledVoice, selected: Boolean, onClick: () -> Unit) {
     ListItem(
-        headlineContent = {
-            Text(voice.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        supportingContent = {
-            Text("${voice.locale} · качество ${voice.quality} · офлайн")
-        },
-        trailingContent = {
-            if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран")
-        },
+        headlineContent = { Text(voice.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text("${voice.locale} · качество ${voice.quality} · офлайн") },
+        trailingContent = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран") },
         colors = if (selected)
             ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         else ListItemDefaults.colors(),
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(onClick = onClick)
     )
 }

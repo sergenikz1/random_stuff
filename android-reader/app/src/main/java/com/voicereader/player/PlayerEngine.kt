@@ -1,0 +1,307 @@
+package com.voicereader.player
+
+import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import com.voicereader.data.Book
+import com.voicereader.data.Chapter
+import com.voicereader.data.LibraryStore
+import com.voicereader.data.Settings
+import com.voicereader.tts.NeuralTtsBackend
+import com.voicereader.tts.NeuralVoice
+import com.voicereader.tts.SpeechBackend
+import com.voicereader.tts.SpeechListener
+import com.voicereader.tts.SystemTts
+import com.voicereader.tts.SystemTtsBackend
+import com.voicereader.tts.TtsStatus
+import com.voicereader.tts.VoiceCatalog
+import com.voicereader.tts.VoiceInstaller
+import com.voicereader.tts.VoiceKind
+import com.voicereader.tts.VoiceProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+data class PlayerState(
+    val bookId: String? = null,
+    val title: String = "",
+    val author: String = "",
+    val sentences: List<String> = emptyList(),
+    val chapters: List<Chapter> = emptyList(),
+    val language: String = "ru",
+    val index: Int = 0,
+    /** Диапазон произносимого сейчас слова внутри текущего предложения. */
+    val wordRange: IntRange? = null,
+    val isPlaying: Boolean = false,
+    val loading: Boolean = false,
+    /** Идёт загрузка модели или синтез первой фразы. */
+    val preparing: Boolean = false,
+    /** Прогресс распаковки нейросетевого голоса, null — распаковка не идёт. */
+    val installProgress: Float? = null,
+    val message: String? = null
+) {
+    val currentSentence: String get() = sentences.getOrElse(index) { "" }
+    val chapterTitle: String
+        get() = chapters.lastOrNull { it.startIndex <= index }?.title.orEmpty()
+}
+
+/**
+ * Ядро воспроизведения: хранит позицию в книге и управляет источником речи.
+ * Сам синтез делегируется движку — встроенной нейросетевой модели или системному TTS.
+ */
+object PlayerEngine {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val _state = MutableStateFlow(PlayerState())
+    val state: StateFlow<PlayerState> = _state
+
+    val systemTtsStatus: StateFlow<TtsStatus> get() = SystemTts.status
+
+    private lateinit var app: Context
+    private var audioManager: AudioManager? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var pausedByFocusLoss = false
+
+    private var backend: SpeechBackend? = null
+    /** Подпись текущего движка: если параметры голоса изменились, движок пересоздаётся. */
+    private var backendKey: String? = null
+
+    fun attach(context: Context) {
+        if (::app.isInitialized) return
+        app = context.applicationContext
+        audioManager = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        SystemTts.init(app)
+    }
+
+    fun openBook(book: Book) {
+        if (_state.value.bookId == book.id && _state.value.sentences.isNotEmpty()) return
+        stopBackend()
+        _state.value = PlayerState(bookId = book.id, title = book.title, author = book.author, loading = true)
+        scope.launch {
+            val content = withContext(Dispatchers.IO) { runCatching { LibraryStore.content(book) } }
+            content.onSuccess { c ->
+                _state.value = _state.value.copy(
+                    sentences = c.sentences,
+                    chapters = c.chapters,
+                    language = c.language,
+                    index = book.position.coerceIn(0, (c.sentences.size - 1).coerceAtLeast(0)),
+                    loading = false
+                )
+                SystemTts.applyLanguage(c.language)
+                LibraryStore.touch(book.id)
+            }.onFailure { e ->
+                _state.value = _state.value.copy(
+                    loading = false,
+                    message = "Не удалось открыть книгу: ${e.message ?: "ошибка чтения"}"
+                )
+            }
+        }
+    }
+
+    fun closeBook() {
+        pause()
+        releaseBackend()
+        _state.value = PlayerState()
+        app.stopService(Intent(app, PlaybackService::class.java))
+    }
+
+    fun toggle() = if (_state.value.isPlaying) pause() else play()
+
+    fun play() {
+        val snapshot = _state.value
+        if (snapshot.sentences.isEmpty()) return
+        scope.launch {
+            val profile = Settings.state.value.activeProfile
+            val neural = neuralVoiceFor(profile, snapshot.language)
+
+            if (neural != null && !VoiceInstaller.isVoiceReady(app, neural)) {
+                _state.value = _state.value.copy(installProgress = 0f)
+                val installed = runCatching {
+                    VoiceInstaller.installVoice(app, neural) { p ->
+                        _state.value = _state.value.copy(installProgress = p)
+                    }
+                }
+                _state.value = _state.value.copy(installProgress = null)
+                if (installed.isFailure) {
+                    _state.value = _state.value.copy(
+                        message = "Не удалось подготовить голос «${neural.title}»: не хватает места в памяти?"
+                    )
+                    return@launch
+                }
+            }
+
+            if (!requestFocus()) return@launch
+            val engine = ensureBackend(profile, neural, snapshot.language)
+            _state.value = _state.value.copy(isPlaying = true, message = null)
+            PlaybackService.start(app)
+            engine.start(_state.value.sentences, _state.value.index)
+        }
+    }
+
+    fun pause() {
+        stopBackend()
+        _state.value = _state.value.copy(isPlaying = false, wordRange = null, preparing = false)
+        savePosition()
+        abandonFocus()
+    }
+
+    fun seekTo(index: Int) {
+        val s = _state.value
+        if (s.sentences.isEmpty()) return
+        val target = index.coerceIn(0, s.sentences.size - 1)
+        val wasPlaying = s.isPlaying
+        stopBackend()
+        _state.value = s.copy(index = target, wordRange = null, isPlaying = false)
+        savePosition()
+        if (wasPlaying) play()
+    }
+
+    fun nextSentence() = seekTo(_state.value.index + 1)
+    fun prevSentence() = seekTo(_state.value.index - 1)
+
+    fun nextChapter() {
+        val s = _state.value
+        val next = s.chapters.firstOrNull { it.startIndex > s.index } ?: return
+        seekTo(next.startIndex)
+    }
+
+    fun prevChapter() {
+        val s = _state.value
+        val currentStart = s.chapters.lastOrNull { it.startIndex <= s.index }?.startIndex ?: 0
+        // Первое нажатие — к началу текущей главы, повторное — к предыдущей.
+        val target = if (s.index - currentStart > 2) currentStart
+        else s.chapters.lastOrNull { it.startIndex < currentStart }?.startIndex ?: 0
+        seekTo(target)
+    }
+
+    /** Смена голоса на лету: перечитываем текущее предложение выбранным голосом. */
+    fun selectVoice(slot: Int) {
+        Settings.update { it.copy(activeVoice = slot.coerceIn(0, 2)) }
+        applyVoiceSettingsNow()
+    }
+
+    fun applyVoiceSettingsNow() {
+        val wasPlaying = _state.value.isPlaying
+        stopBackend()
+        releaseBackend()
+        if (wasPlaying) play() else _state.value = _state.value.copy(isPlaying = false)
+    }
+
+    /** Нужный встроенный голос, если он подходит книге; иначе null — читает системный движок. */
+    private fun neuralVoiceFor(profile: VoiceProfile, language: String): NeuralVoice? {
+        if (profile.kind != VoiceKind.NEURAL) return null
+        val voice = VoiceCatalog.byId(profile.neuralVoiceId) ?: return null
+        return voice.takeIf { VoiceCatalog.matchesLanguage(it, language) }
+    }
+
+    private fun ensureBackend(profile: VoiceProfile, neural: NeuralVoice?, language: String): SpeechBackend {
+        val key = "${neural?.id ?: "system"}|${profile.systemVoiceName}|${profile.pitch}|${profile.rate}|$language"
+        backend?.let { if (key == backendKey) return it }
+        releaseBackend()
+        val created: SpeechBackend = if (neural != null) {
+            NeuralTtsBackend(app, neural, speechListener, profile.rate)
+        } else {
+            if (profile.kind == VoiceKind.NEURAL) {
+                _state.value = _state.value.copy(
+                    message = "Встроенные голоса рассчитаны на русский текст, эта книга на другом языке — читает системный движок."
+                )
+            }
+            SystemTtsBackend(speechListener, profile, language)
+        }
+        backend = created
+        backendKey = key
+        return created
+    }
+
+    private fun stopBackend() {
+        runCatching { backend?.stop() }
+    }
+
+    private fun releaseBackend() {
+        runCatching { backend?.release() }
+        backend = null
+        backendKey = null
+    }
+
+    private val speechListener = object : SpeechListener {
+        override fun onSentenceStart(index: Int) = post {
+            _state.value = _state.value.copy(index = index, wordRange = null, isPlaying = true)
+            savePosition()
+        }
+
+        override fun onWordRange(index: Int, range: IntRange) = post {
+            if (_state.value.index == index) _state.value = _state.value.copy(wordRange = range)
+        }
+
+        override fun onFinished() = post {
+            _state.value = _state.value.copy(isPlaying = false, wordRange = null, message = "Книга дочитана до конца")
+            abandonFocus()
+        }
+
+        override fun onPreparing(preparing: Boolean) = post {
+            _state.value = _state.value.copy(preparing = preparing)
+        }
+
+        override fun onError(message: String) = post {
+            _state.value = _state.value.copy(isPlaying = false, preparing = false, message = message)
+            abandonFocus()
+        }
+
+        private fun post(action: () -> Unit) {
+            scope.launch { action() }
+        }
+    }
+
+    private fun savePosition() {
+        val s = _state.value
+        s.bookId?.let { LibraryStore.savePosition(it, s.index) }
+    }
+
+    fun dismissMessage() {
+        _state.value = _state.value.copy(message = null)
+    }
+
+    // --- Аудиофокус: пауза на время звонка или чужого воспроизведения ---
+
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS -> pause()
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                if (_state.value.isPlaying) { pausedByFocusLoss = true; pause() }
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> if (pausedByFocusLoss) { pausedByFocusLoss = false; play() }
+        }
+    }
+
+    private fun requestFocus(): Boolean {
+        val am = audioManager ?: return true
+        // Фокус уже удержан (перемотка во время чтения) — повторный запрос не нужен.
+        if (focusRequest != null) return true
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(attrs)
+            .setOnAudioFocusChangeListener(focusListener)
+            .build()
+        focusRequest = request
+        return am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonFocus() {
+        val am = audioManager ?: return
+        focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        focusRequest = null
+    }
+
+    fun ttsSettingsIntent(): Intent = SystemTts.settingsIntent()
+}

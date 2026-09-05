@@ -1,0 +1,38 @@
+name: Android Reader APK
+
+on:
+  push:
+    paths:
+      - 'android-reader/**'
+      - '.github/workflows/android-reader.yml'
+  pull_request:
+    paths:
+      - 'android-reader/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-reader
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chitalka-vsluh-debug
+          path: android-reader/app/build/outputs/apk/debug/app-debug.apk

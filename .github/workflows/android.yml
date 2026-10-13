@@ -5,6 +5,15 @@ on:
   pull_request:
     paths: ['android/**', '.github/workflows/android.yml']
   workflow_dispatch:
+    inputs:
+      apk_base64:
+        description: Optional pre-signed Limit Pulse APK (base64); never a signing key or account token
+        required: false
+        type: string
+      apk_sha256:
+        description: SHA-256 of the pre-signed APK
+        required: false
+        type: string
 permissions:
   contents: read
 jobs:
@@ -20,6 +29,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Install SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
@@ -33,3 +45,54 @@ jobs:
             android/app/build/reports/
             android/app/build/test-results/
             android/app/build/outputs/apk/release/app-release-unsigned.apk
+  publish-signed-apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.apk_base64 != ''
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install signature verification tool
+        run: sdkmanager 'build-tools;35.0.0'
+      - name: Decode and verify pre-signed APK
+        env:
+          APK_BASE64: ${{ inputs.apk_base64 }}
+          APK_SHA256: ${{ inputs.apk_sha256 }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, os, pathlib, shutil
+          release_dir = pathlib.Path(os.environ['RUNNER_TEMP']) / 'limit-pulse-release'
+          release_dir.mkdir()
+          data = base64.b64decode(os.environ['APK_BASE64'], validate=True)
+          expected = os.environ['APK_SHA256']
+          if len(expected) != 64 or hashlib.sha256(data).hexdigest() != expected:
+              raise SystemExit('APK checksum mismatch')
+          (release_dir / 'limit-pulse-v0.1.0.apk').write_bytes(data)
+          cert = release_dir / 'signing-certificate.pem'
+          shutil.copyfile('android/release-signing-certificate.pem', cert)
+          (release_dir / 'SHA256SUMS').write_text(
+              expected + '  limit-pulse-v0.1.0.apk\n' + hashlib.sha256(cert.read_bytes()).hexdigest() + '  signing-certificate.pem\n')
+          PY
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
+            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v0.1.0.apk" > "$RUNNER_TEMP/limit-pulse-signature.txt"
+          grep -F 'Signer #1 certificate SHA-256 digest: 5757f2ef7a6a93a27884a39e3f265d705af9b61924ece6398ebe6749a8a95dde' "$RUNNER_TEMP/limit-pulse-signature.txt"
+      - name: Publish verified APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create limit-pulse-v0.1.0 \
+            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v0.1.0.apk" \
+            "$RUNNER_TEMP/limit-pulse-release/SHA256SUMS" \
+            "$RUNNER_TEMP/limit-pulse-release/signing-certificate.pem" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title 'Limit Pulse 0.1.0 — виджет лимитов Codex (Android)' \
+            --notes-file android/RELEASE_NOTES.md --prerelease

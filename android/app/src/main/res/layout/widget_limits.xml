@@ -1,0 +1,40 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/widget_title" android:textColor="#72E6C1" android:textSize="12sp" android:letterSpacing="0.12" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="wrap_content" android:layout_height="36dp"
+            android:gravity="center" android:text="@string/widget_refresh" android:textColor="#D9E6EB" android:textSize="12sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_account" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/widget_disconnected" android:textSize="12sp" android:textColor="#A0B5C0" android:maxLines="1" android:ellipsize="end" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:layout_marginBottom="4dp"
+        android:baselineAligned="false" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/widget_primary_label" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_primary" android:textSize="11sp" android:textColor="#A0B5C0" />
+            <TextView android:id="@+id/widget_primary" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_unknown" android:textColor="#72E6C1" android:textSize="26sp" android:textStyle="bold" />
+            <TextView android:id="@+id/widget_primary_reset" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="11sp" android:textColor="#A0B5C0" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/widget_secondary_label" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_secondary" android:textSize="11sp" android:textColor="#A0B5C0" />
+            <TextView android:id="@+id/widget_secondary" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_unknown" android:textColor="#8DCFF3" android:textSize="26sp" android:textStyle="bold" />
+            <TextView android:id="@+id/widget_secondary_reset" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="11sp" android:textColor="#A0B5C0" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/widget_chatgpt" android:textColor="#A0B5C0" android:textSize="11sp" />
+        <TextView android:id="@+id/widget_chatgpt" android:layout_width="wrap_content" android:layout_height="28dp"
+            android:gravity="center" android:text="@string/widget_chatgpt_open" android:textColor="#D9E6EB" android:textSize="11sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_updated" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/widget_not_updated" android:textColor="#A0B5C0" android:textSize="11sp" android:maxLines="2" />
+</LinearLayout>

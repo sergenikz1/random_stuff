@@ -1,0 +1,199 @@
+package dev.limitpulse.app;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.appwidget.AppWidgetManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.View;
+import android.view.WindowInsets;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+public final class MainActivity extends Activity {
+    private static final int BG = Color.rgb(16, 25, 34), CARD = Color.rgb(26, 40, 51);
+    private static final int TEXT = Color.rgb(231, 239, 242), MUTED = Color.rgb(160, 181, 192);
+    private static final int GREEN = Color.rgb(114, 230, 193), BLUE = Color.rgb(141, 207, 243), AMBER = Color.rgb(240, 187, 112);
+    private AccountRepository repository;
+    private LinearLayout content;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable observer = this::render;
+    private final Runnable clockTick = new Runnable() {
+        @Override public void run() { render(); handler.postDelayed(this, 60000); }
+    };
+
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        repository = PulseApplication.repository(this);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(BG); scroll.setFillViewport(true);
+        content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(24), dp(24), dp(24));
+        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top, bottom;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                top = bars.top; bottom = bars.bottom;
+            } else { top = insets.getSystemWindowInsetTop(); bottom = insets.getSystemWindowInsetBottom(); }
+            view.setPadding(0, top, 0, bottom); return insets;
+        });
+        setContentView(scroll);
+        render();
+    }
+    @Override protected void onStart() {
+        super.onStart(); repository.observe(observer); render(); handler.postDelayed(clockTick, 60000);
+        RefreshJob.schedule(this);
+        if (repository.connected()) repository.refresh(null);
+    }
+    @Override protected void onStop() {
+        repository.removeObserver(observer); handler.removeCallbacks(clockTick); super.onStop();
+    }
+    private void render() {
+        if (content == null) return;
+        content.removeAllViews();
+        TextView brand = text("▥  LIMIT PULSE", 14, GREEN, true);
+        brand.setLetterSpacing(0.13f); content.addView(brand);
+        space(content, 24);
+        content.addView(text("Лимиты\nпод рукой", 36, TEXT, true));
+        space(content, 10);
+        content.addView(text("Codex — в цифрах. На экране телефона.", 15, MUTED, false));
+        space(content, 24);
+        LinearLayout account = card();
+        account.addView(text(repository.connected() ? "АККАУНТ ПОДКЛЮЧЁН" : "НАЧНИТЕ С АККАУНТА", 11, GREEN, true));
+        space(account, 8);
+        account.addView(text(repository.accountLabel(), 17, TEXT, true));
+        space(account, 12);
+        if (repository.connected()) {
+            Button refresh = button(repository.loading ? "Обновление…" : "Обновить лимиты", R.id.refresh_button, true,
+                    () -> repository.refresh(null));
+            refresh.setEnabled(!repository.loading); account.addView(refresh);
+            account.addView(button("Отключить аккаунт", R.id.disconnect_button, false, () ->
+                    new AlertDialog.Builder(this).setTitle("Отключить аккаунт?")
+                            .setMessage("Токены входа и сохранённые лимиты будут удалены с этого телефона.")
+                            .setPositiveButton("Отключить", (dialog, which) -> repository.disconnect())
+                            .setNegativeButton("Отмена", null).show()));
+        } else if (repository.device != null) {
+            account.addView(text("1. Откройте OpenAI в браузере.\n2. Введите этот код.\n3. Вернитесь сюда после подтверждения.", 14, MUTED, false));
+            space(account, 12);
+            TextView code = text(repository.device.code, 30, GREEN, true); code.setTextIsSelectable(true); account.addView(code);
+            space(account, 8);
+            account.addView(button("Открыть OpenAI", 0, true, () -> open(OpenAiApi.VERIFY_URL)));
+            account.addView(button("Скопировать код", 0, false, () -> {
+                if (repository.device == null) return;
+                getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText("Одноразовый код OpenAI", repository.device.code));
+                Toast.makeText(this, "Код скопирован", Toast.LENGTH_SHORT).show();
+            }));
+            space(account, 8);
+            account.addView(text("Код действует 15 минут. Подтверждайте только вход, который вы начали здесь. Приложение использует вход Codex по коду устройства.", 12, MUTED, false));
+            account.addView(button("Отменить вход", 0, false, repository::cancelLogin));
+        } else {
+            Button login = button(repository.loading ? "Получаем код…" : "Войти через OpenAI", R.id.login_button, true, repository::beginLogin);
+            login.setEnabled(!repository.loading); account.addView(login);
+            space(account, 8);
+            account.addView(text("Пароль вводится только на auth.openai.com в вашем браузере. В настройках безопасности ChatGPT должен быть разрешён вход по коду устройства.", 12, MUTED, false));
+        }
+        content.addView(account);
+        if (!repository.error.isEmpty()) {
+            space(content, 12);
+            content.addView(text(repository.error, 14, AMBER, false));
+        }
+        space(content, 24);
+        LimitData data = repository.data;
+        long now = System.currentTimeMillis();
+        content.addView(text("CODEX  /  ОСТАЛОСЬ", 12, MUTED, true));
+        space(content, 10);
+        LinearLayout windows = new LinearLayout(this); windows.setOrientation(LinearLayout.HORIZONTAL);
+        boolean stale = data != null && (data.stale(now) || !repository.error.isEmpty());
+        LinearLayout primary = windowCard(data == null ? null : data.primary, "Основное окно", R.id.primary_percent, stale ? AMBER : GREEN, now);
+        LinearLayout secondary = windowCard(data == null ? null : data.secondary, "Дополнительное окно", R.id.secondary_percent, stale ? AMBER : BLUE, now);
+        LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(0, -1, 1); first.rightMargin = dp(6);
+        LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, -1, 1); second.leftMargin = dp(6);
+        windows.addView(primary, first); windows.addView(secondary, second); content.addView(windows);
+        space(content, 10);
+        content.addView(text(DisplayText.updated(data, !repository.error.isEmpty(), now), 12, stale ? AMBER : MUTED, false));
+        if (stale) content.addView(text("Это сохранённый остаток. После сброса лимита нужен новый запрос к OpenAI.", 12, AMBER, false));
+        if (data != null) {
+            content.addView(text("План: " + data.plan, 12, MUTED, false));
+            if (Boolean.FALSE.equals(data.allowed)) content.addView(text("OpenAI сообщает: доступ Codex приостановлен.", 14, AMBER, true));
+            if (data.credits != null) content.addView(text("Дополнительные кредиты: " + data.credits, 12, MUTED, false));
+            for (LimitData.Extra extra : data.extra) {
+                space(content, 12);
+                content.addView(text(extra.name + " · " + DisplayText.percent(extra.primary) + " / " + DisplayText.percent(extra.secondary), 14, TEXT, false));
+            }
+        } else content.addView(text(repository.connected() ? "Нажмите «Обновить лимиты», чтобы получить данные." : "Остаток появится после входа и первого обновления.", 12, MUTED, false));
+        space(content, 24);
+        LinearLayout chat = card();
+        chat.addView(text("ChatGPT", 20, TEXT, true)); space(chat, 8);
+        chat.addView(text("Точный остаток недоступен", 15, AMBER, true)); space(chat, 8);
+        chat.addView(text("OpenAI не предоставляет этому приложению счётчик оставшихся сообщений ChatGPT. Проверяйте доступность моделей и время сброса в самом ChatGPT.", 14, MUTED, false));
+        space(chat, 8); chat.addView(button("Открыть ChatGPT ↗", R.id.chatgpt_button, false, () -> open("https://chatgpt.com/"))); content.addView(chat);
+        space(content, 16);
+        content.addView(button("Добавить виджет на экран", R.id.pin_widget_button, true, this::pinWidget));
+        space(content, 8);
+        content.addView(text("Обновление примерно раз в 30 минут и по кнопке. Android может задерживать фоновые задачи для экономии батареи.", 12, MUTED, false));
+        space(content, 24);
+        content.addView(text("Независимое приложение · v0.1.0\nТокены зашифрованы Android Keystore. Без рекламы, аналитики и собственного сервера. Источник лимитов Codex может измениться.", 11, MUTED, false));
+    }
+    private LinearLayout windowCard(LimitData.Window window, String fallback, int id, int color, long now) {
+        LinearLayout card = card(); card.setPadding(dp(16), dp(20), dp(16), dp(20));
+        card.addView(text(window == null ? fallback : window.label(), 12, MUTED, true)); space(card, 10);
+        TextView value = text(DisplayText.percent(window), 34, color, true); value.setId(id); card.addView(value);
+        space(card, 12);
+        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(100); bar.setProgress(window == null ? 0 : window.remaining());
+        bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color));
+        card.addView(bar, new LinearLayout.LayoutParams(-1, dp(5))); space(card, 12);
+        card.addView(text(DisplayText.reset(window, now), 11, MUTED, false));
+        return card;
+    }
+    private void pinWidget() {
+        AppWidgetManager manager = getSystemService(AppWidgetManager.class);
+        if (manager.isRequestPinAppWidgetSupported()) manager.requestPinAppWidget(new ComponentName(this, LimitsWidget.class), null, null);
+        else new AlertDialog.Builder(this).setTitle("Добавить виджет")
+                .setMessage("Зажмите свободное место на главном экране → Виджеты → Limit Pulse. Перетащите виджет на экран.")
+                .setPositiveButton("Понятно", null).show();
+    }
+    private void open(String url) {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
+        catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Установите браузер, чтобы открыть OpenAI", Toast.LENGTH_LONG).show(); }
+    }
+    private LinearLayout card() {
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(20), dp(20), dp(20)); box.setBackground(background(CARD, 22));
+        return box;
+    }
+    private Button button(String label, int id, boolean primary, Runnable action) {
+        Button button = new Button(this); button.setText(label); button.setAllCaps(false); button.setTextSize(14);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        button.setTextColor(primary ? BG : TEXT); button.setBackground(background(primary ? GREEN : CARD, 14));
+        button.setMinHeight(dp(52)); button.setPadding(dp(12), dp(6), dp(12), dp(6));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(6); button.setLayoutParams(params);
+        if (id != 0) button.setId(id); button.setOnClickListener(view -> action.run()); return button;
+    }
+    private TextView text(String value, int size, int color, boolean bold) {
+        TextView text = new TextView(this); text.setText(value); text.setTextSize(size); text.setTextColor(color);
+        text.setTypeface(Typeface.create(bold ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
+        text.setGravity(Gravity.START); text.setLineSpacing(dp(2), 1); return text;
+    }
+    private GradientDrawable background(int color, int radius) {
+        GradientDrawable background = new GradientDrawable(); background.setColor(color); background.setCornerRadius(dp(radius)); return background;
+    }
+    private void space(LinearLayout parent, int height) { parent.addView(new View(this), new LinearLayout.LayoutParams(1, dp(height))); }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+}

@@ -97,6 +97,12 @@ jobs:
           badging = subprocess.check_output([os.environ['ANDROID_HOME'] + '/build-tools/35.0.0/aapt', 'dump', 'badging', str(apk)], text=True)
           if f"package: name='dev.limitpulse.app' versionCode='{version_code}' versionName='{version}' " not in badging:
               raise SystemExit('APK identity/version does not match source')
+          signature = subprocess.check_output([
+              os.environ['ANDROID_HOME'] + '/build-tools/35.0.0/apksigner',
+              'verify', '--verbose', '--print-certs', str(apk)], text=True)
+          if 'Signer #1 certificate SHA-256 digest: 5757f2ef7a6a93a27884a39e3f265d705af9b61924ece6398ebe6749a8a95dde' not in signature:
+              raise SystemExit('APK release signer mismatch')
+          print('Verified APK package, version, checksum and original release signer:', apk_name)
           with open(os.environ['GITHUB_ENV'], 'a') as output:
               output.write('LIMITPULSE_VERSION=' + version + '\n')
           cert = release_dir / 'signing-certificate.pem'
@@ -104,9 +110,6 @@ jobs:
           (release_dir / 'SHA256SUMS').write_text(
               expected + '  ' + apk_name + '\n' + hashlib.sha256(cert.read_bytes()).hexdigest() + '  signing-certificate.pem\n')
           PY
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
-            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v$LIMITPULSE_VERSION.apk" > "$RUNNER_TEMP/limit-pulse-signature.txt"
-          grep -F 'Signer #1 certificate SHA-256 digest: 5757f2ef7a6a93a27884a39e3f265d705af9b61924ece6398ebe6749a8a95dde' "$RUNNER_TEMP/limit-pulse-signature.txt"
       - name: Publish verified APK
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,5 +1,8 @@
 <resources>
     <item name="login_button" type="id" />
+    <item name="device_login_button" type="id" />
+    <item name="browser_open_button" type="id" />
+    <item name="cancel_login_button" type="id" />
     <item name="refresh_button" type="id" />
     <item name="disconnect_button" type="id" />
     <item name="pin_widget_button" type="id" />

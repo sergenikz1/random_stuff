@@ -27,6 +27,8 @@ final class AccountRepository {
     private volatile Credentials credentials;
     volatile LimitData data;
     volatile OpenAiApi.Device device;
+    volatile BrowserLogin browser;
+    private volatile boolean browserStarting;
     volatile String error = "";
     volatile boolean loading;
     private boolean refreshing;
@@ -62,8 +64,65 @@ final class AccountRepository {
         for (Runnable listener : listeners) listener.run();
         LimitsWidget.updateAll(context);
     }
+    boolean browserPending() { return browserStarting || browser != null; }
+    void beginBrowserLogin(java.util.function.Consumer<String> openBrowser) {
+        if (loading || device != null || browserPending()) return;
+        final long epoch = ++generation;
+        browserStarting = true; loading = true; error = ""; changed();
+        try { context.startForegroundService(new android.content.Intent(context, LoginService.class)); }
+        catch (Exception failure) {
+            browserStarting = false; loading = false;
+            error = "Не удалось начать вход. Откройте приложение и попробуйте ещё раз."; changed(); return;
+        }
+        worker.execute(() -> {
+            try (BrowserLogin session = BrowserLogin.start()) {
+                java.util.concurrent.FutureTask<Boolean> ready = new java.util.concurrent.FutureTask<>(() -> {
+                    if (generation != epoch) return false;
+                    browser = session; browserStarting = false; changed();
+                    openBrowser.accept(session.authorizationUrl); return true;
+                });
+                main.post(ready);
+                if (!ready.get()) return;
+                session.await(code -> {
+                    Credentials next = api.exchangeBrowserCode(session, code, System.currentTimeMillis());
+                    java.util.concurrent.FutureTask<Boolean> persist = new java.util.concurrent.FutureTask<>(() -> {
+                        if (generation != epoch) return false;
+                        secure.save(next); cache.edit().clear().apply();
+                        credentials = next; data = null; error = ""; lastAttemptElapsed = 0;
+                        return true;
+                    });
+                    main.post(persist);
+                    if (!persist.get()) throw new java.io.IOException("Login cancelled");
+                    return next;
+                });
+                main.post(() -> {
+                    if (generation != epoch) return;
+                    finishBrowserLogin(); changed();
+                    RefreshJob.schedule(context); refresh(null);
+                });
+            } catch (Exception failure) {
+                main.post(() -> {
+                    if (generation != epoch) return;
+                    finishBrowserLogin();
+                    if (failure instanceof java.net.BindException)
+                        error = "Вход уже выполняется в другом приложении. Закройте его и повторите вход.";
+                    else if (failure instanceof BrowserLogin.Denied)
+                        error = "Вы отменили вход в OpenAI. Можно попробовать снова.";
+                    else if (failure instanceof java.net.SocketTimeoutException)
+                        error = "Время ожидания входа истекло. Нажмите «Войти» ещё раз.";
+                    else error = message(failure, false);
+                    changed();
+                });
+            }
+        });
+    }
+    private void finishBrowserLogin() {
+        BrowserLogin session = browser; browser = null; browserStarting = false; loading = false;
+        if (session != null) session.close();
+        context.stopService(new android.content.Intent(context, LoginService.class));
+    }
     void beginLogin() {
-        if (loading || device != null) return;
+        if (loading || device != null || browserPending()) return;
         final long epoch = ++generation;
         loading = true; error = ""; changed();
         worker.execute(() -> {
@@ -111,13 +170,13 @@ final class AccountRepository {
         if (generation != epoch) return;
         device = null; loading = false; error = reason; changed();
     }
-    void cancelLogin() { generation++; device = null; loading = false; changed(); }
+    void cancelLogin() { generation++; device = null; finishBrowserLogin(); changed(); }
     void disconnect() {
         if (!secure.clear()) {
             error = "Не удалось удалить локальную сессию. Освободите место и попробуйте ещё раз.";
             changed(); return;
         }
-        generation++; device = null; credentials = null; data = null;
+        generation++; device = null; finishBrowserLogin(); credentials = null; data = null;
         loading = false; error = ""; lastAttemptElapsed = 0;
         cache.edit().clear().apply(); RefreshJob.cancel(context); changed();
     }
@@ -125,7 +184,7 @@ final class AccountRepository {
         if (Looper.myLooper() != Looper.getMainLooper()) { main.post(() -> refresh(completion)); return; }
         if (refreshing) { if (completion != null) refreshCompletions.add(completion); return; }
         long elapsed = SystemClock.elapsedRealtime();
-        if (credentials == null || device != null || (lastAttemptElapsed > 0 && elapsed - lastAttemptElapsed < 60000)) {
+        if (credentials == null || device != null || browserPending() || (lastAttemptElapsed > 0 && elapsed - lastAttemptElapsed < 60000)) {
             if (completion != null) completion.run(); return;
         }
         if (completion != null) refreshCompletions.add(completion);

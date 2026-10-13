@@ -7,11 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Passive usage reader following the open-source Codex device-login protocol. */
+/** Passive usage reader following the open-source Codex OAuth protocol. */
 public final class OpenAiApi {
     public static final String CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
     public static final String VERIFY_URL = "https://auth.openai.com/codex/device";
@@ -68,6 +69,13 @@ public final class OpenAiApi {
         requireSuccess(response);
         return Credentials.fromTokens(response.json, old, now);
     }
+    Credentials exchangeBrowserCode(BrowserLogin login, String code, long now) throws Exception {
+        Response response = post("/oauth/token", new JSONObject().put("grant_type", "authorization_code")
+                .put("client_id", CLIENT_ID).put("code", code)
+                .put("code_verifier", login.verifier).put("redirect_uri", login.redirectUri));
+        requireSuccess(response);
+        return Credentials.fromTokens(response.json, null, now);
+    }
     public JSONObject usage(Credentials credentials) throws Exception {
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + credentials.accessToken);
@@ -82,6 +90,26 @@ public final class OpenAiApi {
     private static void requireSuccess(Response response) throws ApiException {
         if (response.status < 200 || response.status >= 300) throw new ApiException(response.status);
     }
+    static final class EncodedBody {
+        final String contentType;
+        final byte[] bytes;
+        EncodedBody(String type, String body) { contentType = type; bytes = body.getBytes(StandardCharsets.UTF_8); }
+    }
+    static EncodedBody encodeBody(String url, JSONObject body) throws Exception {
+        // Codex sends authorization-code grants as form data and refresh grants as JSON.
+        if ((AUTH + "/oauth/token").equals(url) && "authorization_code".equals(body.optString("grant_type"))) {
+            StringBuilder form = new StringBuilder();
+            java.util.Iterator<String> names = body.keys();
+            while (names.hasNext()) {
+                String name = names.next();
+                if (form.length() > 0) form.append('&');
+                form.append(URLEncoder.encode(name, "UTF-8")).append('=')
+                        .append(URLEncoder.encode(body.getString(name), "UTF-8"));
+            }
+            return new EncodedBody("application/x-www-form-urlencoded", form.toString());
+        }
+        return new EncodedBody("application/json", body.toString());
+    }
     static final class HttpsTransport implements Transport {
         @Override public Response send(String method, String urlString, JSONObject body, Map<String, String> headers) throws Exception {
             URL url = new URL(urlString);
@@ -94,13 +122,14 @@ public final class OpenAiApi {
             connection.setReadTimeout(20000);
             connection.setRequestMethod(method);
             connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("User-Agent", "LimitPulse/0.1.0 Android");
+            connection.setRequestProperty("User-Agent", "LimitPulse/" + BuildConfig.VERSION_NAME + " Android");
             for (Map.Entry<String, String> header : headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
             try {
                 if (body != null) {
-                    byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+                    EncodedBody encoded = encodeBody(urlString, body);
+                    byte[] bytes = encoded.bytes;
                     connection.setDoOutput(true);
-                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty("Content-Type", encoded.contentType);
                     connection.setFixedLengthStreamingMode(bytes.length);
                     try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); }
                 }

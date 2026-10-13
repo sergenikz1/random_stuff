@@ -88,6 +88,13 @@ public final class MainActivity extends Activity {
                             .setMessage("Токены входа и сохранённые лимиты будут удалены с этого телефона.")
                             .setPositiveButton("Отключить", (dialog, which) -> repository.disconnect())
                             .setNegativeButton("Отмена", null).show()));
+        } else if (repository.browserPending()) {
+            account.addView(text("Завершите вход в браузере OpenAI", 17, TEXT, true));
+            space(account, 8);
+            account.addView(text("После подтверждения браузер вернёт вас сюда. Если возврат не открылся автоматически, нажмите «Вернуться в приложение» на странице браузера.", 14, MUTED, false));
+            if (repository.browser != null) account.addView(button("Открыть страницу входа", R.id.browser_open_button, true,
+                    () -> { if (repository.browser != null) open(repository.browser.authorizationUrl); }));
+            account.addView(button("Отменить вход", R.id.cancel_login_button, false, repository::cancelLogin));
         } else if (repository.device != null) {
             account.addView(text("1. Откройте OpenAI в браузере.\n2. Введите этот код.\n3. Вернитесь сюда после подтверждения.", 14, MUTED, false));
             space(account, 12);
@@ -103,10 +110,12 @@ public final class MainActivity extends Activity {
             account.addView(text("Код действует 15 минут. Подтверждайте только вход, который вы начали здесь. Приложение использует вход Codex по коду устройства.", 12, MUTED, false));
             account.addView(button("Отменить вход", 0, false, repository::cancelLogin));
         } else {
-            Button login = button(repository.loading ? "Получаем код…" : "Войти через OpenAI", R.id.login_button, true, repository::beginLogin);
+            Button login = button(repository.loading ? "Подготовка входа…" : "Войти через браузер", R.id.login_button, true,
+                    () -> repository.beginBrowserLogin(url -> { if (!open(url)) repository.cancelLogin(); }));
             login.setEnabled(!repository.loading); account.addView(login);
             space(account, 8);
-            account.addView(text("Пароль вводится только на auth.openai.com в вашем браузере. В настройках безопасности ChatGPT должен быть разрешён вход по коду устройства.", 12, MUTED, false));
+            account.addView(text("Откроется привычная страница входа OpenAI. Пароль и подтверждение входа остаются в браузере. Переписывать одноразовый код не нужно.", 12, MUTED, false));
+            account.addView(button("Запасной способ: код устройства", R.id.device_login_button, false, repository::beginLogin));
         }
         content.addView(account);
         if (!repository.error.isEmpty()) {
@@ -148,7 +157,7 @@ public final class MainActivity extends Activity {
         space(content, 8);
         content.addView(text("Обновление примерно раз в 30 минут и по кнопке. Android может задерживать фоновые задачи для экономии батареи.", 12, MUTED, false));
         space(content, 24);
-        content.addView(text("Независимое приложение · v0.1.0\nТокены зашифрованы Android Keystore. Без рекламы, аналитики и собственного сервера. Источник лимитов Codex может измениться.", 11, MUTED, false));
+        content.addView(text("Независимое приложение · v" + BuildConfig.VERSION_NAME + "\nТокены зашифрованы Android Keystore. Без рекламы, аналитики и собственного сервера. Источник лимитов Codex может измениться.", 11, MUTED, false));
     }
     private LinearLayout windowCard(LimitData.Window window, String fallback, int id, int color, long now) {
         LinearLayout card = card(); card.setPadding(dp(16), dp(20), dp(16), dp(20));
@@ -169,9 +178,9 @@ public final class MainActivity extends Activity {
                 .setMessage("Зажмите свободное место на главном экране → Виджеты → Limit Pulse. Перетащите виджет на экран.")
                 .setPositiveButton("Понятно", null).show();
     }
-    private void open(String url) {
-        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
-        catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Установите браузер, чтобы открыть OpenAI", Toast.LENGTH_LONG).show(); }
+    private boolean open(String url) {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true; }
+        catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Установите браузер, чтобы открыть OpenAI", Toast.LENGTH_LONG).show(); return false; }
     }
     private LinearLayout card() {
         LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);

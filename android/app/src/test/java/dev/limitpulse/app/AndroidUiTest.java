@@ -19,6 +19,36 @@ import static org.junit.Assert.*;
 @Config(sdk = 35, qualifiers = "w360dp-h800dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AndroidUiTest {
+    @Test public void browserLoginServiceDisplaysForegroundNotification() {
+        org.robolectric.android.controller.ServiceController<LoginService> controller = Robolectric.buildService(LoginService.class).create();
+        try {
+            android.app.Notification notification = Shadows.shadowOf(controller.get()).getLastForegroundNotification();
+            assertNotNull(notification);
+            assertEquals("Вход в OpenAI", notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString());
+        } finally { controller.destroy(); }
+    }
+    @Test public void pendingBrowserLoginOpensOfficialOauthWithoutAskingForDeviceCodeAndCanBeCancelled() throws Exception {
+        android.app.Application app = RuntimeEnvironment.getApplication(); AccountRepository repository = PulseApplication.repository(app);
+        try (BrowserLogin session = BrowserLogin.start(0, 2000)) {
+            repository.browser = session; repository.loading = true;
+            try (org.robolectric.android.controller.ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup()) {
+                MainActivity activity = controller.get();
+                assertNull(activity.findViewById(R.id.device_login_button));
+                activity.findViewById(R.id.browser_open_button).performClick();
+                Intent opened = Shadows.shadowOf(activity).getNextStartedActivity();
+                assertEquals("auth.openai.com", opened.getData().getHost()); assertEquals("/oauth/authorize", opened.getData().getPath());
+                activity.findViewById(R.id.cancel_login_button).performClick();
+                assertFalse(repository.browserPending()); assertNotNull(activity.findViewById(R.id.login_button));
+            }
+        }
+    }
+    @Test public void deepLinkOnlyReturnsToAppAndCannotInjectAuthorizationCode() {
+        Intent intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("limitpulse://login-complete?code=forged&state=forged"));
+        try (org.robolectric.android.controller.ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class, intent).setup()) {
+            assertFalse(PulseApplication.repository(controller.get()).connected());
+            assertNotNull(controller.get().findViewById(R.id.login_button));
+        }
+    }
     @Test @Config(sdk = 26) @GraphicsMode(GraphicsMode.Mode.LEGACY)
     public void minimumSupportedAndroidStartsActivityAndInflatesWidget() {
         try (org.robolectric.android.controller.ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup()) {

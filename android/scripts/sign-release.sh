@@ -11,7 +11,12 @@ build_tools="${sdk_dir}/build-tools/35.0.0"
 unsigned_apk="${android_dir}/app/build/outputs/apk/release/app-release-unsigned.apk"
 release_dir="${android_dir}/app/build/outputs/release"
 mkdir -p "${release_dir}"
-apk="${release_dir}/limit-pulse-v0.1.0.apk"
+apk_version=$("${build_tools}/aapt" dump badging "${unsigned_apk}" | sed -n "s/.*versionName='\([0-9][0-9.]*\)'.*/\1/p")
+if [[ ! "${apk_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo 'Unsupported APK version' >&2; exit 1
+fi
+apk_file="limit-pulse-v${apk_version}.apk"
+apk="${release_dir}/${apk_file}"
 "${build_tools}/zipalign" -c -v 4 "${unsigned_apk}" >/dev/null
 "${build_tools}/apksigner" sign --ks "${signing_store}" --ks-key-alias limitpulse \
     --ks-pass "file:${password_file}" \
@@ -20,5 +25,5 @@ apk="${release_dir}/limit-pulse-v0.1.0.apk"
 keytool -exportcert -rfc -alias limitpulse -keystore "${signing_store}" \
     -storepass:file "${password_file}" -file "${release_dir}/signing-certificate.pem"
 cd "${release_dir}"
-sha256sum limit-pulse-v0.1.0.apk signing-certificate.pem > SHA256SUMS
+sha256sum "${apk_file}" signing-certificate.pem > SHA256SUMS
 echo "Verified signed APK: ${apk}"

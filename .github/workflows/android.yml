@@ -14,6 +14,12 @@ on:
         description: SHA-256 of the pre-signed APK
         required: false
         type: string
+      apk_encoding:
+        description: Encoding of the pre-signed APK
+        required: false
+        default: base64
+        type: choice
+        options: [base64, gzip-base64]
 permissions:
   contents: read
 jobs:
@@ -67,32 +73,48 @@ jobs:
         env:
           APK_BASE64: ${{ inputs.apk_base64 }}
           APK_SHA256: ${{ inputs.apk_sha256 }}
+          APK_ENCODING: ${{ inputs.apk_encoding }}
         run: |
           python3 - <<'PY'
-          import base64, hashlib, os, pathlib, shutil
+          import base64, gzip, hashlib, io, os, pathlib, re, shutil, subprocess
           release_dir = pathlib.Path(os.environ['RUNNER_TEMP']) / 'limit-pulse-release'
           release_dir.mkdir()
           data = base64.b64decode(os.environ['APK_BASE64'], validate=True)
+          if os.environ.get('APK_ENCODING') == 'gzip-base64':
+              with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
+                  data = stream.read(2 * 1024 * 1024 + 1)
+          if len(data) > 2 * 1024 * 1024:
+              raise SystemExit('APK exceeds supported size')
           expected = os.environ['APK_SHA256']
           if len(expected) != 64 or hashlib.sha256(data).hexdigest() != expected:
               raise SystemExit('APK checksum mismatch')
-          (release_dir / 'limit-pulse-v0.1.0.apk').write_bytes(data)
+          gradle = pathlib.Path('android/app/build.gradle').read_text()
+          version = re.search(r"versionName '([0-9]+\.[0-9]+\.[0-9]+)'", gradle).group(1)
+          version_code = re.search(r'versionCode ([0-9]+)', gradle).group(1)
+          apk_name = f'limit-pulse-v{version}.apk'
+          apk = release_dir / apk_name
+          apk.write_bytes(data)
+          badging = subprocess.check_output([os.environ['ANDROID_HOME'] + '/build-tools/35.0.0/aapt', 'dump', 'badging', str(apk)], text=True)
+          if f"package: name='dev.limitpulse.app' versionCode='{version_code}' versionName='{version}' " not in badging:
+              raise SystemExit('APK identity/version does not match source')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('LIMITPULSE_VERSION=' + version + '\n')
           cert = release_dir / 'signing-certificate.pem'
           shutil.copyfile('android/release-signing-certificate.pem', cert)
           (release_dir / 'SHA256SUMS').write_text(
-              expected + '  limit-pulse-v0.1.0.apk\n' + hashlib.sha256(cert.read_bytes()).hexdigest() + '  signing-certificate.pem\n')
+              expected + '  ' + apk_name + '\n' + hashlib.sha256(cert.read_bytes()).hexdigest() + '  signing-certificate.pem\n')
           PY
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
-            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v0.1.0.apk" > "$RUNNER_TEMP/limit-pulse-signature.txt"
+            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v$LIMITPULSE_VERSION.apk" > "$RUNNER_TEMP/limit-pulse-signature.txt"
           grep -F 'Signer #1 certificate SHA-256 digest: 5757f2ef7a6a93a27884a39e3f265d705af9b61924ece6398ebe6749a8a95dde' "$RUNNER_TEMP/limit-pulse-signature.txt"
       - name: Publish verified APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create limit-pulse-v0.1.0 \
-            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v0.1.0.apk" \
+          gh release create "limit-pulse-v$LIMITPULSE_VERSION" \
+            "$RUNNER_TEMP/limit-pulse-release/limit-pulse-v$LIMITPULSE_VERSION.apk" \
             "$RUNNER_TEMP/limit-pulse-release/SHA256SUMS" \
             "$RUNNER_TEMP/limit-pulse-release/signing-certificate.pem" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title 'Limit Pulse 0.1.0 — виджет лимитов Codex (Android)' \
+            --title "Limit Pulse $LIMITPULSE_VERSION — вход через браузер (Android)" \
             --notes-file android/RELEASE_NOTES.md --prerelease

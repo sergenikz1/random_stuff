@@ -15,6 +15,7 @@ public final class LimitsWidget extends AppWidgetProvider {
     @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         updateAll(context); RefreshJob.schedule(context);
         RefreshJob.requestNow(context);
+        WidgetTicker.schedule(context);
     }
     @Override public void onReceive(Context context, Intent intent) {
         if (REFRESH.equals(intent.getAction())) {
@@ -22,6 +23,7 @@ public final class LimitsWidget extends AppWidgetProvider {
         } else super.onReceive(context, intent);
     }
     @Override public void onEnabled(Context context) { RefreshJob.schedule(context); }
+    @Override public void onDisabled(Context context) { WidgetTicker.cancel(context); }
     static void updateAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         AccountRepository repository = PulseApplication.repository(context);
@@ -37,15 +39,19 @@ public final class LimitsWidget extends AppWidgetProvider {
         view.setTextViewText(R.id.widget_secondary, DisplayText.percent(data == null ? null : data.secondary));
         view.setTextViewText(R.id.widget_primary_label, data == null || data.primary == null ? "Основное окно" : data.primary.label());
         view.setTextViewText(R.id.widget_secondary_label, data == null || data.secondary == null ? "Дополнительное окно" : data.secondary.label());
-        view.setTextViewText(R.id.widget_primary_reset, data == null ? "" : DisplayText.reset(data.primary, now));
-        view.setTextViewText(R.id.widget_secondary_reset, data == null ? "" : DisplayText.reset(data.secondary, now));
+        view.setTextViewText(R.id.widget_primary_reset, DisplayText.countdown(data == null ? null : data.primary, now));
+        view.setTextViewText(R.id.widget_secondary_reset, DisplayText.countdown(data == null ? null : data.secondary, now));
+        view.setTextViewTextSize(R.id.widget_primary_reset, android.util.TypedValue.COMPLEX_UNIT_SP,
+                data != null && data.primary != null && data.primary.resetAt > 0 && data.primary.resetAt * 1000 <= now ? 14 : 21);
+        view.setTextViewTextSize(R.id.widget_secondary_reset, android.util.TypedValue.COMPLEX_UNIT_SP,
+                data != null && data.secondary != null && data.secondary.resetAt > 0 && data.secondary.resetAt * 1000 <= now ? 14 : 21);
         String updated = repository.loading ? "Обновление…" : DisplayText.updated(data, !repository.error.isEmpty(), now);
         if (!repository.error.isEmpty()) updated = "Ошибка обновления · " + updated;
         if (data != null && Boolean.FALSE.equals(data.allowed)) updated = "Codex: доступ приостановлен · " + updated;
         view.setTextViewText(R.id.widget_updated, updated);
         boolean stale = data != null && (data.stale(now) || !repository.error.isEmpty());
-        view.setTextColor(R.id.widget_primary, Color.parseColor(stale ? "#F0BB70" : "#72E6C1"));
-        view.setTextColor(R.id.widget_secondary, Color.parseColor(stale ? "#F0BB70" : "#8DCFF3"));
+        view.setTextColor(R.id.widget_primary, Color.parseColor(stale ? "#FFD591" : "#AEFFD0"));
+        view.setTextColor(R.id.widget_secondary, Color.parseColor(stale ? "#FFD591" : "#B2DEFF"));
         PendingIntent open = PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         view.setOnClickPendingIntent(R.id.widget_root, open);
         PendingIntent refresh = PendingIntent.getBroadcast(context, 1, new Intent(context, LimitsWidget.class).setAction(REFRESH), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       apk_base64:
-        description: Optional pre-signed Limit Pulse APK (base64); never a signing key or account token
+        description: Optional encoded pre-signed APK; never a signing key or account token
         required: false
         type: string
       apk_sha256:
@@ -19,7 +19,7 @@ on:
         required: false
         default: base64
         type: choice
-        options: [base64, gzip-base64]
+        options: [base64, gzip-base64, gzip-base85]
 permissions:
   contents: read
 jobs:
@@ -79,8 +79,11 @@ jobs:
           import base64, gzip, hashlib, io, os, pathlib, re, shutil, subprocess
           release_dir = pathlib.Path(os.environ['RUNNER_TEMP']) / 'limit-pulse-release'
           release_dir.mkdir()
-          data = base64.b64decode(os.environ['APK_BASE64'], validate=True)
-          if os.environ.get('APK_ENCODING') == 'gzip-base64':
+          encoding = os.environ.get('APK_ENCODING', 'base64')
+          if encoding not in ('base64', 'gzip-base64', 'gzip-base85'):
+              raise SystemExit('Unsupported APK encoding')
+          data = base64.b85decode(os.environ['APK_BASE64']) if encoding == 'gzip-base85' else base64.b64decode(os.environ['APK_BASE64'], validate=True)
+          if encoding in ('gzip-base64', 'gzip-base85'):
               with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
                   data = stream.read(2 * 1024 * 1024 + 1)
           if len(data) > 2 * 1024 * 1024:
@@ -119,5 +122,5 @@ jobs:
             "$RUNNER_TEMP/limit-pulse-release/SHA256SUMS" \
             "$RUNNER_TEMP/limit-pulse-release/signing-certificate.pem" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Limit Pulse $LIMITPULSE_VERSION — вход через браузер (Android)" \
+            --title "Limit Pulse $LIMITPULSE_VERSION — лимиты Codex (Android)" \
             --notes-file android/RELEASE_NOTES.md --prerelease

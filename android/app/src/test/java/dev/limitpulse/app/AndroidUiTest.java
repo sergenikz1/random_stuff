@@ -19,6 +19,28 @@ import static org.junit.Assert.*;
 @Config(sdk = 35, qualifiers = "w360dp-h800dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AndroidUiTest {
+    @Test public void widgetShowsBrightPercentAndSeparateHourlyAndWeeklyCountdowns() throws Exception {
+        android.app.Application app = RuntimeEnvironment.getApplication(); AccountRepository repository = PulseApplication.repository(app);
+        long now = System.currentTimeMillis();
+        repository.data = LimitData.parse(new JSONObject("{\"plan_type\":\"plus\",\"rate_limit\":{\"primary_window\":{\"used_percent\":37,\"limit_window_seconds\":18000,\"reset_at\":" + (now / 1000 + 11820) + "},\"secondary_window\":{\"used_percent\":18,\"limit_window_seconds\":604800,\"reset_at\":" + (now / 1000 + 3 * 86400 + 5 * 3600) + "}}}"), now);
+        View view = LimitsWidget.views(app, repository, now).apply(app, null);
+        assertEquals("63%", ((TextView) view.findViewById(R.id.widget_primary)).getText().toString());
+        assertEquals("3 ч 17 мин", ((TextView) view.findViewById(R.id.widget_primary_reset)).getText().toString());
+        assertEquals("3 дн 5 ч", ((TextView) view.findViewById(R.id.widget_secondary_reset)).getText().toString());
+        assertEquals(android.graphics.Color.parseColor("#AEFFD0"), ((TextView) view.findViewById(R.id.widget_primary)).getCurrentTextColor());
+        screenshot(view, "widget-countdowns.png", 960, 660);
+        assertTrue("Update timestamp must remain visible", view.findViewById(R.id.widget_updated).getHeight() > 0);
+        assertTrue(view.findViewById(R.id.widget_updated).getBottom() <= view.getHeight() - view.getPaddingBottom());
+    }
+    @Test public void exactAlarmButtonOpensSystemAccessSettings() {
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false);
+        try (org.robolectric.android.controller.ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup()) {
+            controller.get().findViewById(R.id.exact_alarms_button).performClick();
+            Intent intent = Shadows.shadowOf(controller.get()).getNextStartedActivity();
+            assertEquals(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, intent.getAction());
+            assertEquals("package:dev.limitpulse.app", intent.getDataString());
+        }
+    }
     @Test public void browserLoginServiceDisplaysForegroundNotification() {
         org.robolectric.android.controller.ServiceController<LoginService> controller = Robolectric.buildService(LoginService.class).create();
         try {
@@ -85,7 +107,7 @@ public class AndroidUiTest {
         assertEquals("58%", ((TextView) view.findViewById(R.id.widget_primary)).getText().toString());
         assertEquals("—", ((TextView) view.findViewById(R.id.widget_secondary)).getText().toString());
         assertTrue(((TextView) view.findViewById(R.id.widget_updated)).getText().toString().contains("Сохранённые данные"));
-        assertTrue(((TextView) view.findViewById(R.id.widget_primary_reset)).getText().toString().contains("Нужно обновить"));
+        assertEquals("Сброс прошёл", ((TextView) view.findViewById(R.id.widget_primary_reset)).getText().toString());
         screenshot(view, "widget-sample-stale.png", 960, 660);
         View updated = view.findViewById(R.id.widget_updated);
         assertTrue("Widget status must fit inside its minimum height", updated.getBottom() <= view.getHeight() - view.getPaddingBottom());

@@ -63,6 +63,8 @@ final class AccountRepository {
     private void changed() {
         for (Runnable listener : listeners) listener.run();
         LimitsWidget.updateAll(context);
+        ResetReminders.reconcile(context, data, System.currentTimeMillis());
+        WidgetTicker.schedule(context);
     }
     boolean browserPending() { return browserStarting || browser != null; }
     void beginBrowserLogin(java.util.function.Consumer<String> openBrowser) {
@@ -178,7 +180,7 @@ final class AccountRepository {
         }
         generation++; device = null; finishBrowserLogin(); credentials = null; data = null;
         loading = false; error = ""; lastAttemptElapsed = 0;
-        cache.edit().clear().apply(); RefreshJob.cancel(context); changed();
+        cache.edit().clear().apply(); RefreshJob.cancel(context); ResetReminders.clearAccount(context); changed();
     }
     void refresh(Runnable completion) {
         if (Looper.myLooper() != Looper.getMainLooper()) { main.post(() -> refresh(completion)); return; }

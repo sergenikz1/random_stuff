@@ -8,5 +8,8 @@
     <item name="pin_widget_button" type="id" />
     <item name="chatgpt_button" type="id" />
     <item name="primary_percent" type="id" />
+    <item name="reminders_switch" type="id" />
+    <item name="notifications_button" type="id" />
+    <item name="exact_alarms_button" type="id" />
     <item name="secondary_percent" type="id" />
 </resources>

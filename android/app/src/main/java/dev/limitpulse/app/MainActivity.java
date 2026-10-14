@@ -24,6 +24,7 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Switch;
 
 public final class MainActivity extends Activity {
     private static final int BG = Color.rgb(16, 25, 34), CARD = Color.rgb(26, 40, 51);
@@ -63,6 +64,17 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onStop() {
         repository.removeObserver(observer); handler.removeCallbacks(clockTick); super.onStop();
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        ResetReminders.reconcile(this, repository.data, System.currentTimeMillis());
+        LimitsWidget.updateAll(this); WidgetTicker.schedule(this); render();
+    }
+    @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request == 7100) {
+            ResetReminders.reconcile(this, repository.data, System.currentTimeMillis()); render();
+        }
     }
     private void render() {
         if (content == null) return;
@@ -147,6 +159,30 @@ public final class MainActivity extends Activity {
             }
         } else content.addView(text(repository.connected() ? "Нажмите «Обновить лимиты», чтобы получить данные." : "Остаток появится после входа и первого обновления.", 12, MUTED, false));
         space(content, 24);
+        LinearLayout reminders = card();
+        reminders.addView(text("За час до сброса", 20, TEXT, true)); space(reminders, 8);
+        reminders.addView(text("Напомним отдельно о коротком и недельном лимитах: сколько процентов осталось и через сколько сброс. В уведомлении будет время получения данных.", 14, MUTED, false));
+        Switch enabled = new Switch(this); enabled.setId(R.id.reminders_switch);
+        enabled.setText("Напоминания о сбросе"); enabled.setTextColor(TEXT); enabled.setTextSize(14);
+        enabled.setMinHeight(dp(48)); enabled.setChecked(ResetReminders.enabled(this));
+        enabled.setOnCheckedChangeListener((view, checked) -> { ResetReminders.setEnabled(this, checked); render(); });
+        reminders.addView(enabled);
+        if (ResetReminders.enabled(this)) {
+            if (!ResetReminders.allowed(this)) {
+                reminders.addView(text("Разрешите уведомления, чтобы получать напоминания.", 13, AMBER, false));
+                reminders.addView(button("Разрешить уведомления", R.id.notifications_button, true, this::enableNotifications));
+            } else reminders.addView(text("Уведомления включены", 13, GREEN, true));
+            if (!ResetReminders.exact(this)) {
+                space(reminders, 8);
+                reminders.addView(text("Для отправки за час до сброса разрешите точные напоминания. Без разрешения Android может прислать их позже.", 13, MUTED, false));
+                reminders.addView(button("Разрешить точное время", R.id.exact_alarms_button, false, () -> {
+                    try { startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName()))); }
+                    catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Откройте системные настройки напоминаний приложения", Toast.LENGTH_LONG).show(); }
+                }));
+            } else reminders.addView(text("Точное время напоминаний разрешено", 12, MUTED, false));
+            if (!repository.connected()) { space(reminders, 8); reminders.addView(text("После входа и обновления лимитов напоминания настроятся автоматически.", 12, MUTED, false)); }
+        }
+        content.addView(reminders); space(content, 24);
         LinearLayout chat = card();
         chat.addView(text("ChatGPT", 20, TEXT, true)); space(chat, 8);
         chat.addView(text("Точный остаток недоступен", 15, AMBER, true)); space(chat, 8);
@@ -168,6 +204,7 @@ public final class MainActivity extends Activity {
         bar.setMax(100); bar.setProgress(window == null ? 0 : window.remaining());
         bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color));
         card.addView(bar, new LinearLayout.LayoutParams(-1, dp(5))); space(card, 12);
+        card.addView(text(DisplayText.countdown(window, now), 21, TEXT, true));
         card.addView(text(DisplayText.reset(window, now), 11, MUTED, false));
         return card;
     }
@@ -177,6 +214,17 @@ public final class MainActivity extends Activity {
         else new AlertDialog.Builder(this).setTitle("Добавить виджет")
                 .setMessage("Зажмите свободное место на главном экране → Виджеты → Limit Pulse. Перетащите виджет на экран.")
                 .setPositiveButton("Понятно", null).show();
+    }
+    private void enableNotifications() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                && !ResetReminders.prefs(this).getBoolean("permission_requested", false)) {
+            ResetReminders.prefs(this).edit().putBoolean("permission_requested", true).apply();
+            requestPermissions(new String[] { android.Manifest.permission.POST_NOTIFICATIONS }, 7100);
+        } else {
+            Intent settings = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+            try { startActivity(settings); }
+            catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Откройте настройки уведомлений приложения", Toast.LENGTH_LONG).show(); }
+        }
     }
     private boolean open(String url) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true; }

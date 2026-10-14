@@ -6,6 +6,7 @@
     <string name="widget_primary">Codex · основное окно</string>
     <string name="widget_secondary">Дополнительное окно</string>
     <string name="widget_unknown">—</string>
+    <string name="widget_reset_in">СБРОС ЧЕРЕЗ</string>
     <string name="widget_chatgpt">ChatGPT · остаток недоступен</string>
     <string name="widget_chatgpt_open">ChatGPT ↗</string>
     <string name="widget_refresh">Обновить ↻</string>

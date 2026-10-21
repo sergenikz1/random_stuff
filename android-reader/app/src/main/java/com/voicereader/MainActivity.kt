@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import com.voicereader.data.LibraryStore
 import com.voicereader.data.Settings
 import com.voicereader.player.PlayerEngine
+import com.voicereader.rewards.Rewards
 import com.voicereader.ui.App
 import com.voicereader.ui.VoiceReaderTheme
 
@@ -24,7 +25,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        AppText.init(this)
         Settings.init(this)
+        Rewards.init(this)
         LibraryStore.init(this)
         PlayerEngine.attach(this)
         requestNotificationPermissionIfNeeded()
@@ -49,5 +52,6 @@ class MainActivity : ComponentActivity() {
         PlayerEngine.state.value.let { s ->
             s.bookId?.let { LibraryStore.savePosition(it, s.index) }
         }
+        Rewards.save()
     }
 }

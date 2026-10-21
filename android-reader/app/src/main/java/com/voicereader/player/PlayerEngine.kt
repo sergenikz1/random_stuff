@@ -1,5 +1,8 @@
 package com.voicereader.player
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -10,6 +13,8 @@ import com.voicereader.data.Chapter
 import com.voicereader.data.LibraryStore
 import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
+import com.voicereader.rewards.Rewards
+import com.voicereader.rewards.VoiceManner
 import com.voicereader.tts.NeuralTtsBackend
 import com.voicereader.tts.NeuralVoice
 import com.voicereader.tts.SpeechBackend
@@ -100,7 +105,7 @@ object PlayerEngine {
             }.onFailure { e ->
                 _state.value = _state.value.copy(
                     loading = false,
-                    message = "Не удалось открыть книгу: ${e.message ?: "ошибка чтения"}"
+                    message = AppText.get(R.string.err_open_book, e.message ?: AppText.get(R.string.err_read))
                 )
             }
         }
@@ -132,15 +137,17 @@ object PlayerEngine {
                 _state.value = _state.value.copy(installProgress = null)
                 if (installed.isFailure) {
                     _state.value = _state.value.copy(
-                        message = "Не удалось подготовить голос «${neural.title}»: не хватает места в памяти?"
+                        message = AppText.get(R.string.err_prepare_voice, AppText.get(neural.titleRes))
                     )
                     return@launch
                 }
             }
 
             if (!requestFocus()) return@launch
+            stopPreview()
             val engine = ensureBackend(profile, neural, snapshot.language)
             _state.value = _state.value.copy(isPlaying = true, message = null)
+            Rewards.readingStarted("voice")
             PlaybackService.start(app)
             engine.start(_state.value.sentences, _state.value.index)
         }
@@ -148,6 +155,7 @@ object PlayerEngine {
 
     fun pause() {
         stopBackend()
+        if (_state.value.isPlaying) Rewards.readingStopped("voice")
         _state.value = _state.value.copy(isPlaying = false, wordRange = null, preparing = false)
         savePosition()
         abandonFocus()
@@ -203,18 +211,19 @@ object PlayerEngine {
     }
 
     private fun ensureBackend(profile: VoiceProfile, neural: NeuralVoice?, language: String): SpeechBackend {
-        val key = "${neural?.id ?: "system"}|${profile.systemVoiceName}|${profile.pitch}|${profile.rate}|$language"
+        val manner = Rewards.state.value.manner
+        val key = "${neural?.id ?: "system"}|${profile.systemVoiceName}|${profile.pitch}|${profile.rate}|$language|$manner"
         backend?.let { if (key == backendKey) return it }
         releaseBackend()
         val created: SpeechBackend = if (neural != null) {
-            NeuralTtsBackend(app, neural, speechListener, profile.rate)
+            NeuralTtsBackend(app, neural, speechListener, profile.rate * manner.rate, manner.pauseMs)
         } else {
             if (profile.kind == VoiceKind.NEURAL) {
                 _state.value = _state.value.copy(
-                    message = "Встроенные голоса рассчитаны на русский текст, эта книга на другом языке — читает системный движок."
+                    message = AppText.get(R.string.msg_neural_other_language)
                 )
             }
-            SystemTtsBackend(speechListener, profile, language)
+            SystemTtsBackend(speechListener, profile.copy(rate = profile.rate * manner.rate), language)
         }
         backend = created
         backendKey = key
@@ -233,6 +242,12 @@ object PlayerEngine {
 
     private val speechListener = object : SpeechListener {
         override fun onSentenceStart(index: Int) = post {
+            val before = _state.value
+            // Очки — за дочитанное предложение и за пройденную главу, перемотка не считается.
+            if (before.isPlaying && index == before.index + 1) {
+                Rewards.sentenceRead()
+                if (before.chapters.any { it.startIndex == index }) Rewards.chapterFinished()
+            }
             _state.value = _state.value.copy(index = index, wordRange = null, isPlaying = true)
             savePosition()
         }
@@ -242,7 +257,8 @@ object PlayerEngine {
         }
 
         override fun onFinished() = post {
-            _state.value = _state.value.copy(isPlaying = false, wordRange = null, message = "Книга дочитана до конца")
+            Rewards.sentenceRead(); Rewards.chapterFinished(); Rewards.readingStopped("voice")
+            _state.value = _state.value.copy(isPlaying = false, wordRange = null, message = AppText.get(R.string.msg_book_finished))
             abandonFocus()
         }
 
@@ -251,6 +267,7 @@ object PlayerEngine {
         }
 
         override fun onError(message: String) = post {
+            if (_state.value.isPlaying) Rewards.readingStopped("voice")
             _state.value = _state.value.copy(isPlaying = false, preparing = false, message = message)
             abandonFocus()
         }
@@ -317,6 +334,43 @@ object PlayerEngine {
         if (!_state.value.isPlaying) return
         abandonFocus()
         requestFocus()
+    }
+
+    // --- Прослушивание голоса на экране оформления ---
+
+    private var preview: NeuralTtsBackend? = null
+
+    /** Читает короткую фразу выбранным голосом и манерой, не трогая позицию в книге. */
+    fun previewVoice(voiceId: String?, manner: VoiceManner = Rewards.state.value.manner) {
+        val voice = com.voicereader.tts.VoiceCatalog.byId(voiceId) ?: return
+        if (_state.value.isPlaying) pause()
+        stopPreview()
+        scope.launch {
+            if (!VoiceInstaller.isVoiceReady(app, voice)) {
+                _state.value = _state.value.copy(installProgress = 0f)
+                val ok = runCatching {
+                    VoiceInstaller.installVoice(app, voice) { p -> _state.value = _state.value.copy(installProgress = p) }
+                }.isSuccess
+                _state.value = _state.value.copy(installProgress = null)
+                if (!ok) return@launch
+            }
+            val silent = object : SpeechListener {
+                override fun onSentenceStart(index: Int) {}
+                override fun onWordRange(index: Int, range: IntRange) {}
+                override fun onFinished() {}
+                override fun onPreparing(preparing: Boolean) {}
+                override fun onError(message: String) {}
+            }
+            val rate = Settings.state.value.activeProfile.rate * manner.rate
+            preview = NeuralTtsBackend(app, voice, silent, rate, manner.pauseMs).also {
+                it.start(listOf(AppText.get(R.string.preview_phrase), AppText.get(R.string.preview_phrase2)), 0)
+            }
+        }
+    }
+
+    private fun stopPreview() {
+        preview?.release()
+        preview = null
     }
 
     fun ttsSettingsIntent(): Intent = SystemTts.settingsIntent()

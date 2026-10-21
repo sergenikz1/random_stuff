@@ -1,5 +1,8 @@
 package com.voicereader.text
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import com.voicereader.data.BookContent
 import com.voicereader.data.Chapter
 import java.text.BreakIterator
@@ -25,7 +28,7 @@ object Segmenter {
             val start = sentences.size
             val parts = splitToSentences(chapter.text, locale)
             if (parts.isEmpty()) return@forEach
-            marks += Chapter(chapter.title.ifBlank { "Глава ${marks.size + 1}" }, start)
+            marks += Chapter(chapter.title.ifBlank { AppText.get(R.string.chapter_n, marks.size + 1) }, start)
             sentences += parts
         }
         return BookContent(sentences, marks, language)

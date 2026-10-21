@@ -1,5 +1,8 @@
 package com.voicereader.tts
 
+import androidx.annotation.StringRes
+import com.voicereader.R
+
 /**
  * Встроенные нейросетевые голоса (VITS, обученные в проекте Piper),
  * запускаются локально через sherpa-onnx. Модели лежат в assets и распаковываются
@@ -7,8 +10,8 @@ package com.voicereader.tts
  */
 data class NeuralVoice(
     val id: String,
-    val title: String,
-    val description: String,
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
     val locale: String,
     /** Папка внутри assets/ и внутри filesDir/tts/ */
     val dir: String,
@@ -28,8 +31,8 @@ object VoiceCatalog {
     val neural = listOf(
         NeuralVoice(
             id = "irina",
-            title = "Ирина",
-            description = "женский, спокойный — хорошо для художественной прозы",
+            titleRes = R.string.voice_irina,
+            descriptionRes = R.string.voice_irina_desc,
             locale = "ru",
             dir = "irina",
             modelFile = "ru_RU-irina-medium.onnx",
@@ -37,8 +40,8 @@ object VoiceCatalog {
         ),
         NeuralVoice(
             id = "denis",
-            title = "Денис",
-            description = "мужской, мягкий и негромкий",
+            titleRes = R.string.voice_denis,
+            descriptionRes = R.string.voice_denis_desc,
             locale = "ru",
             dir = "denis",
             modelFile = "ru_RU-denis-medium.onnx",
@@ -46,11 +49,21 @@ object VoiceCatalog {
         ),
         NeuralVoice(
             id = "ruslan",
-            title = "Руслан",
-            description = "мужской, более чёткий и собранный",
+            titleRes = R.string.voice_ruslan,
+            descriptionRes = R.string.voice_ruslan_desc,
             locale = "ru",
             dir = "ruslan",
             modelFile = "ru_RU-ruslan-medium.onnx",
+            approxBytes = 63_201_422L
+        ),
+        // Награда за звание: модель Piper «dmitri» под гендерно-нейтральным именем.
+        NeuralVoice(
+            id = "sima",
+            titleRes = R.string.voice_sima,
+            descriptionRes = R.string.voice_sima_desc,
+            locale = "ru",
+            dir = "sima",
+            modelFile = "ru_RU-dmitri-medium.onnx",
             approxBytes = 63_201_422L
         )
     )

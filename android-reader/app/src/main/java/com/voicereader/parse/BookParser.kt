@@ -1,5 +1,8 @@
 package com.voicereader.parse
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.content.Context
 import com.voicereader.data.BookContent
 import com.voicereader.text.Segmenter
@@ -60,7 +63,7 @@ object BookParser {
         )
         val chapters = ArrayList<Segmenter.RawChapter>()
         val buffer = StringBuilder()
-        var title = "Начало"
+        var title = AppText.get(R.string.chapter_start)
         text.split('\n').forEach { line ->
             if (headingRegex.matches(line) && buffer.isNotBlank()) {
                 chapters += Segmenter.RawChapter(title, buffer.toString())
@@ -71,6 +74,6 @@ object BookParser {
             }
         }
         if (buffer.isNotBlank()) chapters += Segmenter.RawChapter(title, buffer.toString())
-        return chapters.ifEmpty { listOf(Segmenter.RawChapter("Текст", text)) }
+        return chapters.ifEmpty { listOf(Segmenter.RawChapter(AppText.get(R.string.chapter_text), text)) }
     }
 }

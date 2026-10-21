@@ -1,5 +1,8 @@
 package com.voicereader.tts
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -28,7 +31,7 @@ class SystemTtsBackend(
         enqueuedUpTo = fromIndex - 1
         val engine = SystemTts.engine()
         if (engine == null) {
-            listener.onError("Системный движок синтеза речи недоступен")
+            listener.onError(AppText.get(R.string.err_system_tts))
             return
         }
         listener.onPreparing(true)
@@ -93,7 +96,7 @@ class SystemTtsBackend(
         override fun onError(utteranceId: String?, errorCode: Int) {
             val (gen, _) = parse(utteranceId) ?: return
             if (gen != generation) return
-            listener.onError("Системный движок вернул ошибку синтеза. Проверьте, что голос установлен и доступен офлайн.")
+            listener.onError(AppText.get(R.string.err_system_tts_synthesis))
         }
 
         override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {

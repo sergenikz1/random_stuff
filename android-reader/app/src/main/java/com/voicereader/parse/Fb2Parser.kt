@@ -1,5 +1,8 @@
 package com.voicereader.parse
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import com.voicereader.text.Segmenter
 import java.io.File
 import java.util.zip.ZipFile
@@ -18,7 +21,7 @@ object Fb2Parser {
     private fun unzipFirstFb2(file: File): ByteArray = ZipFile(file).use { zip ->
         val entry = zip.entries().asSequence().firstOrNull { !it.isDirectory && it.name.endsWith(".fb2", true) }
             ?: zip.entries().asSequence().firstOrNull { !it.isDirectory }
-            ?: throw IllegalArgumentException("Архив пуст")
+            ?: throw IllegalArgumentException(AppText.get(R.string.err_archive_empty))
         zip.getInputStream(entry).use { it.readBytes() }
     }
 
@@ -47,7 +50,7 @@ object Fb2Parser {
         collectSections(body, chapters, depth = 0)
         if (chapters.isEmpty()) {
             val text = Html.toText(body)
-            if (text.isNotBlank()) chapters += Segmenter.RawChapter(title ?: "Книга", text)
+            if (text.isNotBlank()) chapters += Segmenter.RawChapter(title ?: AppText.get(R.string.chapter_book), text)
         }
         return Result(title, author, language, chapters)
     }
@@ -83,14 +86,14 @@ object Fb2Parser {
         val nested = if (depth > 6) emptyList() else topLevelSections(xml)
         if (nested.isEmpty()) {
             val text = Html.toText(xml)
-            if (text.isNotBlank()) out += Segmenter.RawChapter(sectionTitle(xml) ?: "Глава ${out.size + 1}", text)
+            if (text.isNotBlank()) out += Segmenter.RawChapter(sectionTitle(xml) ?: AppText.get(R.string.chapter_n, out.size + 1), text)
             return
         }
         // Текст до первой вложенной секции — заголовок части, эпиграф, предисловие.
         val headEnd = SECTION_TAG.find(xml)?.range?.first ?: xml.length
         val head = Html.toText(xml.substring(0, headEnd))
         if (head.isNotBlank()) {
-            out += Segmenter.RawChapter(sectionTitle(xml) ?: "Часть ${out.size + 1}", head)
+            out += Segmenter.RawChapter(sectionTitle(xml) ?: AppText.get(R.string.chapter_part_n, out.size + 1), head)
         }
         nested.forEach { collectSections(it, out, depth + 1) }
     }

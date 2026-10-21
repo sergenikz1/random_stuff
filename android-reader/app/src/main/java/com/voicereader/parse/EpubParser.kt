@@ -1,5 +1,8 @@
 package com.voicereader.parse
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import com.voicereader.text.Segmenter
 import java.io.File
 import java.util.zip.ZipFile
@@ -11,11 +14,11 @@ object EpubParser {
 
     fun parse(file: File): Result = ZipFile(file).use { zip ->
         val container = zip.textOf("META-INF/container.xml")
-            ?: throw IllegalArgumentException("Повреждённый EPUB: нет META-INF/container.xml")
+            ?: throw IllegalArgumentException(AppText.get(R.string.err_epub_container))
         val opfPath = Regex("full-path=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
             .find(container)?.groupValues?.get(1)
-            ?: throw IllegalArgumentException("Повреждённый EPUB: не найден OPF")
-        val opf = zip.textOf(opfPath) ?: throw IllegalArgumentException("Повреждённый EPUB: OPF не читается")
+            ?: throw IllegalArgumentException(AppText.get(R.string.err_epub_opf))
+        val opf = zip.textOf(opfPath) ?: throw IllegalArgumentException(AppText.get(R.string.err_epub_opf_read))
         val baseDir = opfPath.substringBeforeLast('/', "")
 
         val title = tag(opf, "dc:title") ?: tag(opf, "title")
@@ -47,7 +50,7 @@ object EpubParser {
             if (text.isBlank()) return@forEach
             val chapterTitle = Html.title(markup)
                 ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.take(60)
-                ?: "Глава ${chapters.size + 1}"
+                ?: AppText.get(R.string.chapter_n, chapters.size + 1)
             chapters += Segmenter.RawChapter(chapterTitle, text)
         }
         Result(title, author, language, chapters)

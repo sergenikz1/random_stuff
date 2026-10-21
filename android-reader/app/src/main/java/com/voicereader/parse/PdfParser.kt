@@ -1,5 +1,8 @@
 package com.voicereader.parse
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.content.Context
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -28,10 +31,10 @@ object PdfParser {
                 stripper.endPage = page
                 val raw = runCatching { stripper.getText(doc) }.getOrNull().orEmpty()
                 val text = joinWrappedLines(raw)
-                if (text.isNotBlank()) chapters += Segmenter.RawChapter("Стр. $page", text)
+                if (text.isNotBlank()) chapters += Segmenter.RawChapter(AppText.get(R.string.chapter_page, page), text)
             }
             require(chapters.isNotEmpty()) {
-                "В PDF нет текстового слоя — вероятно, это скан страниц. Такой файл озвучить нельзя."
+                AppText.get(R.string.err_pdf_scan)
             }
             return Result(
                 info?.title?.takeIf { it.isNotBlank() },

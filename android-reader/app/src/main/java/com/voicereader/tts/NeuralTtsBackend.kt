@@ -1,5 +1,8 @@
 package com.voicereader.tts
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -35,7 +38,9 @@ class NeuralTtsBackend(
     private val context: Context,
     private val voice: NeuralVoice,
     private val listener: SpeechListener,
-    private val speed: Float
+    private val speed: Float,
+    /** Тишина после каждого предложения — для неторопливой манеры чтения. */
+    private val pauseMs: Int = 0
 ) : SpeechBackend {
 
     override val supportsPitch = false
@@ -58,7 +63,7 @@ class NeuralTtsBackend(
                 listener.onPreparing(true)
                 val engine = synthLock.withLock { ensureEngine() }
                 if (engine == null) {
-                    listener.onError("Не удалось загрузить голос «${voice.title}». Попробуйте распаковать его заново в разделе «Голоса».")
+                    listener.onError(AppText.get(R.string.err_load_voice, AppText.get(voice.titleRes)))
                     return@launch
                 }
 
@@ -70,10 +75,12 @@ class NeuralTtsBackend(
                 val producer = launch {
                     for (i in fromIndex until sentences.size) {
                         coroutineContext.ensureActive()
-                        val samples = synthLock.withLock {
+                        val speech = synthLock.withLock {
                             coroutineContext.ensureActive()
                             engine.generate(sentences[i], 0, speed).samples
                         }
+                        val samples = if (pauseMs <= 0) speech
+                        else speech.copyOf(speech.size + sampleRate * pauseMs / 1000)
                         channel.send(Piece(i, samples))
                     }
                     channel.close()
@@ -98,7 +105,7 @@ class NeuralTtsBackend(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                listener.onError("Ошибка синтеза речи: ${e.message ?: e::class.java.simpleName}")
+                listener.onError(AppText.get(R.string.err_synthesis, e.message ?: e::class.java.simpleName))
             } finally {
                 listener.onPreparing(false)
                 // Обнуляем ссылку только если она всё ещё указывает на наш трек:

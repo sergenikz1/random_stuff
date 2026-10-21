@@ -2,25 +2,27 @@ package com.voicereader.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
+import com.voicereader.R
 import com.voicereader.tts.VoiceKind
 import com.voicereader.tts.VoiceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Сколько текста показывать вокруг озвучиваемого предложения. */
-enum class TextWindow(val label: String, val before: Int, val after: Int) {
-    MINIMAL("Минимум", 1, 3),
-    COMPACT("Компактно", 3, 8),
-    NORMAL("Обычно", 8, 20),
-    WIDE("Много", 25, 60),
-    ALL("Вся книга", Int.MAX_VALUE, Int.MAX_VALUE)
+enum class TextWindow(@StringRes val label: Int, val before: Int, val after: Int) {
+    MINIMAL(R.string.window_minimal, 1, 3),
+    COMPACT(R.string.window_compact, 3, 8),
+    NORMAL(R.string.window_normal, 8, 20),
+    WIDE(R.string.window_wide, 25, 60),
+    ALL(R.string.window_all, Int.MAX_VALUE, Int.MAX_VALUE)
 }
 
 /** Как вести себя со сторонней музыкой, пока читает голос. */
-enum class MusicMode(val label: String, val hint: String) {
-    PAUSE("Ставить на паузу", "Другие плееры замолкают, пока звучит книга"),
-    DUCK("Приглушать", "Музыка играет тише, голос слышно лучше"),
-    MIX("Не трогать", "Музыка играет как обычно, вместе с голосом")
+enum class MusicMode(@StringRes val label: Int, @StringRes val hint: Int) {
+    PAUSE(R.string.music_pause, R.string.music_pause_hint),
+    DUCK(R.string.music_duck, R.string.music_duck_hint),
+    MIX(R.string.music_mix, R.string.music_mix_hint)
 }
 
 data class SettingsState(

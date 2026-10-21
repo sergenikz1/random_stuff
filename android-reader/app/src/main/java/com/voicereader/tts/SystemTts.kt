@@ -60,7 +60,8 @@ object SystemTts {
 
     /** Подпись голоса в интерфейсе: у системных — их имя, даже если слот сохранён до появления имён. */
     fun labelOf(profile: VoiceProfile): String {
-        if (profile.kind != VoiceKind.SYSTEM) return profile.label
+        if (profile.kind == VoiceKind.NEURAL)
+            return VoiceCatalog.byId(profile.neuralVoiceId)?.let { com.voicereader.AppText.get(it.titleRes) } ?: profile.label
         return _voices.value.firstOrNull { it.name == profile.systemVoiceName }?.title ?: profile.label
     }
 

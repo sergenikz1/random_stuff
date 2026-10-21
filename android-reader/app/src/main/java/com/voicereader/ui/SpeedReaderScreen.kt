@@ -39,6 +39,10 @@ import androidx.compose.ui.unit.sp
 import com.voicereader.data.Settings
 import com.voicereader.player.PlayerEngine
 import com.voicereader.text.SpeedWords
+import com.voicereader.R
+import com.voicereader.rewards.Rewards
+import com.voicereader.ui.rewards.MedalRibbon
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
 private val SpeedBackground = Color(0xFF000000)
@@ -77,8 +81,11 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
     val view = LocalView.current
     DisposableEffect(playing) {
         view.keepScreenOn = playing
-        onDispose { view.keepScreenOn = false }
+        // Быстрое чтение тоже идёт в зачёт серии «без перерыва» и дня.
+        if (playing) Rewards.readingStarted("speed") else Rewards.readingStopped("speed")
+        onDispose { view.keepScreenOn = false; Rewards.readingStopped("speed") }
     }
+    val rewards by Rewards.state.collectAsState()
 
     val words = remember(state.sentences, sentence) {
         SpeedWords.split(state.sentences.getOrElse(sentence) { "" })
@@ -97,6 +104,7 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
     fun advanceTo(next: Int) {
         moveToSentence(next)
         banner = state.chapters.firstOrNull { it.startIndex == next && next > 0 }?.title
+        if (banner != null) Rewards.chapterFinished()
     }
 
     LaunchedEffect(playing, sentence, word, banner) {
@@ -112,6 +120,7 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
         }
         delay(SpeedWords.durationMs(current, wpm, endOfSentence = word == words.size - 1))
         shownSinceStart++
+        Rewards.wordsRead(1)
         when {
             word + 1 < words.size -> word++
             sentence + 1 < state.sentences.size -> advanceTo(sentence + 1)
@@ -146,11 +155,15 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                "$wpm слов/мин",
+                stringResource(R.string.wpm, wpm),
                 color = SpeedLabel,
                 fontSize = 14.sp,
                 fontStyle = FontStyle.Italic
             )
+        }
+
+        if (playing && rewards.ribbonEnabled) {
+            MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding(), dim = true)
         }
 
         if (!playing) {
@@ -245,12 +258,12 @@ private fun PausedControls(
     Column(modifier.systemBarsPadding().padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = SpeedWord)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = SpeedWord)
             }
             Column(Modifier.weight(1f)) {
-                Text(title.ifBlank { "Книга" }, color = SpeedWord, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                Text(title.ifBlank { stringResource(R.string.untitled) }, color = SpeedWord, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium)
-                Text("Быстрое чтение · $position", color = SpeedLabel, style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(R.string.speed_reading_position, position), color = SpeedLabel, style = MaterialTheme.typography.labelSmall)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -266,13 +279,13 @@ private fun PausedControls(
         Surface(color = Color(0xFF141414), shape = MaterialTheme.shapes.large) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Скорость", color = SpeedWord, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.speed), color = SpeedWord, modifier = Modifier.weight(1f))
                     IconButton(onClick = { setSpeed(wpm - 25) }) {
-                        Icon(Icons.Filled.Remove, contentDescription = "Медленнее", tint = SpeedWord)
+                        Icon(Icons.Filled.Remove, contentDescription = stringResource(R.string.slower), tint = SpeedWord)
                     }
-                    Text("$wpm слов/мин", color = SpeedWord, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.wpm, wpm), color = SpeedWord, fontWeight = FontWeight.Medium)
                     IconButton(onClick = { setSpeed(wpm + 25) }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Быстрее", tint = SpeedWord)
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.faster), tint = SpeedWord)
                     }
                 }
                 Slider(
@@ -284,7 +297,7 @@ private fun PausedControls(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = ramp, onCheckedChange = { v -> Settings.update { it.copy(speedRamp = v) } })
                     Spacer(Modifier.width(12.dp))
-                    Text("Плавный разгон с половины скорости", color = SpeedWord, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.speed_ramp), color = SpeedWord, style = MaterialTheme.typography.bodyMedium)
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -293,18 +306,18 @@ private fun PausedControls(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilledTonalIconButton(onClick = onPrev, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Filled.FastRewind, contentDescription = "Предложение назад")
+                        Icon(Icons.Filled.FastRewind, contentDescription = stringResource(R.string.prev_sentence))
                     }
                     FilledIconButton(onClick = onPlay, modifier = Modifier.size(64.dp)) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Читать", modifier = Modifier.size(34.dp))
+                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.play), modifier = Modifier.size(34.dp))
                     }
                     FilledTonalIconButton(onClick = onNext, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Filled.FastForward, contentDescription = "Предложение вперёд")
+                        Icon(Icons.Filled.FastForward, contentDescription = stringResource(R.string.next_sentence))
                     }
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Нажмите на экран, чтобы поставить на паузу или продолжить",
+                    stringResource(R.string.speed_tap_hint),
                     color = SpeedLabel,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.CenterHorizontally)

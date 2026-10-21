@@ -16,8 +16,8 @@ android {
         applicationId = "com.voicereader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
         resourceConfigurations += listOf("ru", "en")
     }
 
@@ -93,12 +93,14 @@ dependencies {
 // На работу приложения это не влияет — всё уезжает внутрь APK и работает офлайн.
 // ---------------------------------------------------------------------------
 
-data class VoiceAsset(val dir: String, val repo: String, val model: String, val bytes: Long)
+data class VoiceAsset(val dir: String, val repo: String, val model: String, val bytes: Long?)
 
 val neuralVoices = listOf(
     VoiceAsset("irina", "csukuangfj/vits-piper-ru_RU-irina-medium", "ru_RU-irina-medium.onnx", 63_201_422L),
     VoiceAsset("denis", "csukuangfj/vits-piper-ru_RU-denis-medium", "ru_RU-denis-medium.onnx", 63_201_422L),
-    VoiceAsset("ruslan", "csukuangfj/vits-piper-ru_RU-ruslan-medium", "ru_RU-ruslan-medium.onnx", 63_201_422L)
+    VoiceAsset("ruslan", "csukuangfj/vits-piper-ru_RU-ruslan-medium", "ru_RU-ruslan-medium.onnx", 63_201_422L),
+    // «Сима» — награда за звание; в приложении голос открывается только по достижении звания.
+    VoiceAsset("sima", "csukuangfj/vits-piper-ru_RU-dmitri-medium", "ru_RU-dmitri-medium.onnx", null)
 )
 
 fun downloadIfNeeded(url: String, target: File, expectedBytes: Long?) {

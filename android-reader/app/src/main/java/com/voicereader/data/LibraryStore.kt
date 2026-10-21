@@ -1,5 +1,8 @@
 package com.voicereader.data
 
+import com.voicereader.AppText
+import com.voicereader.R
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -85,17 +88,17 @@ object LibraryStore {
         val displayName = queryName(uri) ?: "book"
         val ext = displayName.substringAfterLast('.', "").lowercase()
         require(BookParser.isSupported(ext)) {
-            "Формат .$ext пока не поддерживается. Доступны: ${BookParser.SUPPORTED.joinToString(", ")}"
+            AppText.get(R.string.err_format, ext, BookParser.SUPPORTED.joinToString(", "))
         }
         val id = UUID.randomUUID().toString()
         val target = File(booksDir(), "$id.$ext")
         appContext.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Не удалось открыть файл" }
+            requireNotNull(input) { AppText.get(R.string.err_open_file) }
             target.outputStream().use { input.copyTo(it) }
         }
 
         val parsed = BookParser.parse(appContext, target, ext)
-        require(parsed.sentences.isNotEmpty()) { "В файле не найдено текста для озвучивания" }
+        require(parsed.sentences.isNotEmpty()) { AppText.get(R.string.err_no_text) }
         writeCache(id, parsed)
 
         val now = System.currentTimeMillis()

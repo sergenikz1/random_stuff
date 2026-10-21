@@ -100,10 +100,10 @@ class PlaybackService : Service() {
     private fun createChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Озвучивание книги",
+            getString(R.string.notif_channel),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Управление чтением вслух"
+            description = getString(R.string.notif_channel_desc)
             setShowBadge(false)
         }
         notificationManager().createNotificationChannel(channel)
@@ -120,7 +120,7 @@ class PlaybackService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(state.title.ifBlank { "Читалка вслух" })
+            .setContentTitle(state.title.ifBlank { getString(R.string.app_name) })
             .setContentText(listOf(state.chapterTitle, progressText).filter { it.isNotBlank() }.joinToString(" · "))
             .setSubText(state.author.takeIf { it.isNotBlank() })
             .setContentIntent(open)
@@ -129,14 +129,14 @@ class PlaybackService : Service() {
             .setOngoing(state.isPlaying)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(R.drawable.ic_notification, "Назад", action(ACTION_PREV))
+            .addAction(R.drawable.ic_notification, getString(R.string.notif_prev), action(ACTION_PREV))
             .addAction(
                 R.drawable.ic_notification,
-                if (state.isPlaying) "Пауза" else "Играть",
+                getString(if (state.isPlaying) R.string.pause else R.string.play),
                 action(ACTION_TOGGLE)
             )
-            .addAction(R.drawable.ic_notification, "Вперёд", action(ACTION_NEXT))
-            .addAction(R.drawable.ic_notification, "Стоп", action(ACTION_STOP))
+            .addAction(R.drawable.ic_notification, getString(R.string.notif_next), action(ACTION_NEXT))
+            .addAction(R.drawable.ic_notification, getString(R.string.notif_stop), action(ACTION_STOP))
             .build()
     }
 

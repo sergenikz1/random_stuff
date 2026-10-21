@@ -1,5 +1,10 @@
 package com.voicereader.ui
 
+import androidx.compose.ui.res.stringResource
+import com.voicereader.R
+import com.voicereader.rewards.RanksCatalog
+import com.voicereader.rewards.Rewards
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +39,7 @@ import kotlin.math.roundToInt
 @Composable
 fun VoiceScreen(onBack: () -> Unit) {
     val settings by Settings.state.collectAsState()
+    val rewards by Rewards.state.collectAsState()
     val systemVoices by SystemTts.voices.collectAsState()
     val playerState by PlayerEngine.state.collectAsState()
     val context = LocalContext.current
@@ -54,10 +60,10 @@ fun VoiceScreen(onBack: () -> Unit) {
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
-                title = { Text("Голоса") }
+                title = { Text(stringResource(R.string.voices)) }
             )
         }
     ) { padding ->
@@ -80,7 +86,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                                 )
                             },
                             leadingIcon = if (i == settings.activeVoice) {
-                                { Icon(Icons.Filled.Check, contentDescription = "Активный") }
+                                { Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.active)) }
                             } else null,
                             modifier = Modifier.weight(1f)
                         )
@@ -91,23 +97,23 @@ fun VoiceScreen(onBack: () -> Unit) {
             item {
                 Card {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Слот ${editing + 1}: ${SystemTts.labelOf(profile)}", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.voice_slot, editing + 1, SystemTts.labelOf(profile)), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
                             when (profile.kind) {
-                                VoiceKind.NEURAL -> VoiceCatalog.byId(profile.neuralVoiceId)?.description
-                                    ?: "встроенная нейросетевая модель"
+                                VoiceKind.NEURAL -> VoiceCatalog.byId(profile.neuralVoiceId)?.let { stringResource(it.descriptionRes) }
+                                    ?: stringResource(R.string.voice_builtin_model)
                                 VoiceKind.SYSTEM -> profile.systemVoiceName?.let { name ->
                                     systemVoices.firstOrNull { it.name == name }
-                                        ?.let { "системный голос · ${it.displayName}" } ?: name
-                                } ?: "голос системного движка по умолчанию"
+                                        ?.let { stringResource(R.string.voice_system_named, it.displayName) } ?: name
+                                } ?: stringResource(R.string.voice_system_default)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(Modifier.height(14.dp))
-                        Text("Скорость: ${"%.2f".format(profile.rate)}×", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.voice_speed, "%.2f".format(profile.rate)), style = MaterialTheme.typography.labelLarge)
                         Slider(
                             value = profile.rate,
                             onValueChange = { v -> Settings.updateProfile(editing) { it.copy(rate = v) } },
@@ -117,7 +123,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                         )
 
                         if (profile.kind == VoiceKind.SYSTEM) {
-                            Text("Высота тона: ${"%.2f".format(profile.pitch)}", style = MaterialTheme.typography.labelLarge)
+                            Text(stringResource(R.string.voice_pitch, "%.2f".format(profile.pitch)), style = MaterialTheme.typography.labelLarge)
                             Slider(
                                 value = profile.pitch,
                                 onValueChange = { v -> Settings.updateProfile(editing) { it.copy(pitch = v) } },
@@ -127,7 +133,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                             )
                         } else {
                             Text(
-                                "Высота тона у нейросетевых голосов не регулируется — тембр задан самой моделью.",
+                                stringResource(R.string.voice_pitch_neural),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -138,7 +144,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                             onClick = { PlayerEngine.selectVoice(editing) },
                             enabled = editing != settings.activeVoice
                         ) {
-                            Text(if (editing == settings.activeVoice) "Уже активен" else "Сделать активным")
+                            Text(stringResource(if (editing == settings.activeVoice) R.string.voice_already_active else R.string.voice_make_active))
                         }
                     }
                 }
@@ -146,20 +152,23 @@ fun VoiceScreen(onBack: () -> Unit) {
 
             item {
                 Text(
-                    "Встроенные голоса",
+                    stringResource(R.string.voices_builtin),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "Работают полностью офлайн, звучат естественнее системного движка. " +
-                        "Рассчитаны на русский текст.",
+                    stringResource(R.string.voices_builtin_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            items(VoiceCatalog.neural.size) { i ->
-                val voice = VoiceCatalog.neural[i]
+            // «Сима» — награда за звание: до него голос в списке не показывается.
+            val available = VoiceCatalog.neural.filter { v ->
+                RanksCatalog.REWARDS.none { it.voiceId == v.id && !rewards.unlocked(it) }
+            }
+            items(available.size) { i ->
+                val voice = available[i]
                 val ready = remember(installTick, voice.id) { VoiceInstaller.isVoiceReady(context, voice) }
                 NeuralVoiceRow(
                     voice = voice,
@@ -170,7 +179,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                     onSelect = {
                         Settings.updateProfile(editing) {
                             it.copy(
-                                label = voice.title,
+                                label = voice.id,
                                 kind = VoiceKind.NEURAL,
                                 neuralVoiceId = voice.id
                             )
@@ -198,12 +207,12 @@ fun VoiceScreen(onBack: () -> Unit) {
             item {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Системные голоса",
+                    stringResource(R.string.voices_system),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "Нужны для книг на других языках. Показаны только те, что не требуют интернета.",
+                    stringResource(R.string.voices_system_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -215,12 +224,11 @@ fun VoiceScreen(onBack: () -> Unit) {
                     Card {
                         Column(Modifier.padding(16.dp)) {
                             Text(
-                                "Офлайн-голоса системного движка не найдены. Их можно скачать " +
-                                    "в системных настройках синтеза речи.",
+                                stringResource(R.string.voices_system_none),
                                 style = MaterialTheme.typography.bodySmall
                             )
                             TextButton(onClick = { context.startActivity(PlayerEngine.ttsSettingsIntent()) }) {
-                                Text("Настройки синтеза речи")
+                                Text(stringResource(R.string.tts_settings))
                             }
                         }
                     }
@@ -248,7 +256,7 @@ fun VoiceScreen(onBack: () -> Unit) {
             item {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { context.startActivity(PlayerEngine.ttsSettingsIntent()) }) {
-                    Text("Системные настройки синтеза речи")
+                    Text(stringResource(R.string.tts_settings_system))
                 }
             }
         }
@@ -274,19 +282,19 @@ private fun NeuralVoiceRow(
         Column(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(voice.title, style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(voice.titleRes), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        voice.description,
+                        stringResource(voice.descriptionRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        if (ready) "готов к работе" else "${voice.approxBytes / 1_000_000} МБ · распакуется при первом запуске",
+                        if (ready) stringResource(R.string.voice_ready) else stringResource(R.string.voice_unpack_size, voice.approxBytes / 1_000_000),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран")
+                if (selected) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.selected))
                 else if (!ready) Icon(Icons.Filled.Download, contentDescription = null)
             }
 
@@ -294,15 +302,15 @@ private fun NeuralVoiceRow(
                 Spacer(Modifier.height(10.dp))
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                 Text(
-                    "распаковка ${(progress * 100).roundToInt()}%",
+                    stringResource(R.string.voice_unpacking, (progress * 100).roundToInt()),
                     style = MaterialTheme.typography.labelSmall
                 )
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!ready) {
-                        TextButton(onClick = onInstall) { Text("Подготовить сейчас") }
+                        TextButton(onClick = onInstall) { Text(stringResource(R.string.voice_prepare)) }
                     } else {
-                        TextButton(onClick = onDelete) { Text("Освободить место") }
+                        TextButton(onClick = onDelete) { Text(stringResource(R.string.voice_free_space)) }
                     }
                 }
             }
@@ -316,12 +324,12 @@ private fun SystemVoiceRow(voice: InstalledVoice, selected: Boolean, onClick: ()
         headlineContent = { Text(voice.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Text(
-                "${voice.locale} · ${voice.displayName} · качество ${voice.quality} · офлайн",
+                stringResource(R.string.voice_system_row, voice.locale, voice.displayName, voice.quality),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         },
-        trailingContent = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран") },
+        trailingContent = { if (selected) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.selected)) },
         colors = if (selected)
             ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         else ListItemDefaults.colors(),

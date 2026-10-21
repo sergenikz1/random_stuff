@@ -8,12 +8,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.voicereader.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.voicereader.data.Book
@@ -28,13 +31,15 @@ import kotlin.math.roundToInt
 fun LibraryScreen(
     books: List<Book>,
     onOpen: (Book) -> Unit,
-    onVoices: () -> Unit
+    onVoices: () -> Unit,
+    onAwards: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var importing by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Book?>(null) }
 
+    val addFailed = stringResource(R.string.err_add_book)
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -44,7 +49,7 @@ fun LibraryScreen(
             val result = withContext(Dispatchers.IO) { LibraryStore.import(uri) }
             importing = false
             result.onFailure { e ->
-                snackbar.showSnackbar(e.message ?: "Не удалось добавить книгу")
+                snackbar.showSnackbar(e.message ?: addFailed)
             }
         }
     }
@@ -53,10 +58,13 @@ fun LibraryScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("Моя библиотека") },
+                title = { Text(stringResource(R.string.library_title)) },
                 actions = {
+                    IconButton(onClick = onAwards) {
+                        Icon(Icons.Filled.EmojiEvents, contentDescription = stringResource(R.string.my_rewards))
+                    }
                     IconButton(onClick = onVoices) {
-                        Icon(Icons.Filled.RecordVoiceOver, contentDescription = "Голоса")
+                        Icon(Icons.Filled.RecordVoiceOver, contentDescription = stringResource(R.string.voices))
                     }
                 }
             )
@@ -65,7 +73,7 @@ fun LibraryScreen(
             ExtendedFloatingActionButton(
                 onClick = { picker.launch(arrayOf("*/*")) },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text(if (importing) "Обработка…" else "Добавить книгу") }
+                text = { Text(stringResource(if (importing) R.string.importing else R.string.add_book)) }
             )
         }
     ) { padding ->
@@ -94,16 +102,16 @@ fun LibraryScreen(
     pendingDelete?.let { book ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Удалить книгу?") },
-            text = { Text("«${book.title}» будет удалена из библиотеки вместе с прогрессом чтения.") },
+            title = { Text(stringResource(R.string.delete_book_title)) },
+            text = { Text(stringResource(R.string.delete_book_text, book.title.ifBlank { stringResource(R.string.untitled) })) },
             confirmButton = {
                 TextButton(onClick = {
                     LibraryStore.delete(book.id)
                     pendingDelete = null
-                }) { Text("Удалить") }
+                }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("Отмена") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -118,7 +126,7 @@ private fun BookCard(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    book.title,
+                    book.title.ifBlank { stringResource(R.string.untitled) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
@@ -141,8 +149,7 @@ private fun BookCard(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "${book.format} · ${(book.progress * 100).roundToInt()}% · " +
-                        "предложение ${book.position + 1} из ${book.sentenceCount}",
+                    stringResource(R.string.book_progress, book.format, (book.progress * 100).roundToInt(), book.position + 1, book.sentenceCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -150,7 +157,7 @@ private fun BookCard(book: Book, onClick: () -> Unit, onDelete: () -> Unit) {
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "Удалить",
+                    contentDescription = stringResource(R.string.delete),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -165,12 +172,10 @@ private fun EmptyLibrary(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Библиотека пуста", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.library_empty), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(10.dp))
         Text(
-            "Нажмите «Добавить книгу» и выберите файл на устройстве.\n\n" +
-                "Поддерживаются EPUB, FB2, FB2.ZIP, PDF с текстовым слоем, TXT, HTML и Markdown.\n\n" +
-                "Приложение работает полностью офлайн: доступ в интернет ему не выдан.",
+            stringResource(R.string.library_empty_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

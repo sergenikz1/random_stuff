@@ -1,4 +1,357 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Читалка вслух</string>
+    <string name="app_name">Read Aloud</string>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="apply">Apply</string>
+    <string name="later">Later</string>
+    <string name="play">Read</string>
+    <string name="pause">Pause</string>
+    <string name="settings">Settings</string>
+    <string name="untitled">Untitled</string>
+    <string name="active">Active</string>
+    <string name="selected">Selected</string>
+    <string name="locked">Locked</string>
+    <string name="listen">Listen</string>
+    <string name="default_option">Default</string>
+    <string name="library_title">My library</string>
+    <string name="voices">Voices</string>
+    <string name="add_book">Add book</string>
+    <string name="importing">Processing…</string>
+    <string name="err_add_book">Could not add the book</string>
+    <string name="delete_book_title">Delete book?</string>
+    <string name="delete_book_text">“%1$s” will be removed from the library together with your reading progress.</string>
+    <string name="book_progress">%1$s · %2$d%% · sentence %3$d of %4$d</string>
+    <string name="library_empty">Your library is empty</string>
+    <string name="library_empty_hint">Tap “Add book” and choose a file on your device.\n\nSupported: EPUB, FB2, FB2.ZIP, PDF with a text layer, TXT, HTML and Markdown.\n\nThe app works fully offline: it has no internet access.</string>
+    <string name="contents">Contents</string>
+    <string name="contents_count">Contents · %1$d</string>
+    <string name="from_sentence">from sentence %1$d</string>
+    <string name="book_not_loaded">The book text is not loaded</string>
+    <string name="settings_position">Where I am in the book</string>
+    <string name="settings_mode">Reading mode</string>
+    <string name="speed_reading">Speed reading</string>
+    <string name="focus_mode_on">Text only</string>
+    <string name="focus_mode_off">Show panels</string>
+    <string name="focus_mode_hint">“Text only” hides the panels: tap the text to show the buttons for a moment, press Back to leave the mode.</string>
+    <string name="voice">Voice</string>
+    <string name="music_title">Music while reading</string>
+    <string name="music_pause">Pause it</string>
+    <string name="music_pause_hint">Other players go quiet while the book is read</string>
+    <string name="music_duck">Lower it</string>
+    <string name="music_duck_hint">Music plays quieter so the voice is easier to hear</string>
+    <string name="music_mix">Leave it</string>
+    <string name="music_mix_hint">Music plays as usual, together with the voice</string>
+    <string name="prev_chapter">Previous chapter</string>
+    <string name="next_chapter">Next chapter</string>
+    <string name="prev_sentence">Previous sentence</string>
+    <string name="next_sentence">Next sentence</string>
+    <string name="display_title">Text on screen</string>
+    <string name="display_window">How much text to show</string>
+    <string name="display_font_size">Font size: %1$d</string>
+    <string name="display_line_height">Line spacing: %1$s</string>
+    <string name="display_autoscroll">Scroll along with the voice</string>
+    <string name="display_keep_screen">Keep the screen on while reading</string>
+    <string name="window_minimal">Minimum</string>
+    <string name="window_compact">Compact</string>
+    <string name="window_normal">Normal</string>
+    <string name="window_wide">More</string>
+    <string name="window_all">Whole book</string>
+    <string name="tts_no_engine">No speech engine found. Install one in the system settings.</string>
+    <string name="tts_no_voice_data">No offline voices are installed for this language. Open the speech settings and download the language pack.</string>
+    <string name="tts_initializing">Starting speech synthesis…</string>
+    <string name="tts_open_settings">Open speech settings</string>
+    <string name="voice_preparing">Preparing the voice</string>
+    <string name="voice_preparing_hint">This happens once per voice</string>
+    <string name="wpm">%1$d words/min</string>
+    <string name="speed_reading_position">Speed reading · %1$s</string>
+    <string name="speed">Speed</string>
+    <string name="slower">Slower</string>
+    <string name="faster">Faster</string>
+    <string name="speed_ramp">Smooth ramp-up from half speed</string>
+    <string name="speed_tap_hint">Tap the screen to pause or continue</string>
+    <string name="voice_slot">Slot %1$d: %2$s</string>
+    <string name="voice_builtin_model">built-in neural model</string>
+    <string name="voice_system_named">system voice · %1$s</string>
+    <string name="voice_system_default">default system engine voice</string>
+    <string name="voice_speed">Speed: %1$s×</string>
+    <string name="voice_pitch">Pitch: %1$s</string>
+    <string name="voice_pitch_neural">Neural voices have no pitch control — the timbre is set by the model.</string>
+    <string name="voice_already_active">Already active</string>
+    <string name="voice_make_active">Make active</string>
+    <string name="voices_builtin">Built-in voices</string>
+    <string name="voices_builtin_hint">Fully offline and more natural than the system engine. Made for Russian text.</string>
+    <string name="voices_system">System voices</string>
+    <string name="voices_system_hint">Needed for books in other languages. Only voices that work without internet are shown.</string>
+    <string name="voices_system_none">No offline system voices found. You can download them in the system speech settings.</string>
+    <string name="tts_settings">Speech settings</string>
+    <string name="tts_settings_system">System speech settings</string>
+    <string name="voice_ready">ready</string>
+    <string name="voice_unpack_size">%1$d MB · unpacked on first use</string>
+    <string name="voice_unpacking">unpacking %1$d%%</string>
+    <string name="voice_prepare">Prepare now</string>
+    <string name="voice_free_space">Free up space</string>
+    <string name="voice_system_row">%1$s · %2$s · quality %3$d · offline</string>
+    <string name="voice_irina">Irina</string>
+    <string name="voice_irina_desc">female, calm — good for fiction</string>
+    <string name="voice_denis">Denis</string>
+    <string name="voice_denis_desc">male, soft and quiet</string>
+    <string name="voice_ruslan">Ruslan</string>
+    <string name="voice_ruslan_desc">male, clearer and more focused</string>
+    <string name="voice_sima">Avery</string>
+    <string name="voice_sima_desc">even and deep — a reward for the rank of Master of Words</string>
+    <string name="preview_phrase">Однажды весною, в час небывало жаркого заката, в Москве появились два гражданина.</string>
+    <string name="preview_phrase2">Так звучит выбранный голос.</string>
+    <string name="err_open_book">Could not open the book: %1$s</string>
+    <string name="err_read">read error</string>
+    <string name="err_prepare_voice">Could not prepare the voice “%1$s”: not enough storage?</string>
+    <string name="msg_book_finished">You reached the end of the book</string>
+    <string name="msg_neural_other_language">The built-in voices are made for Russian; this book is in another language, so the system engine reads it.</string>
+    <string name="err_format">The .%1$s format is not supported yet. Available: %2$s</string>
+    <string name="err_open_file">Could not open the file</string>
+    <string name="err_no_text">No readable text found in the file</string>
+    <string name="err_synthesis">Speech synthesis error: %1$s</string>
+    <string name="err_load_voice">Could not load the voice “%1$s”. Try unpacking it again in Voices.</string>
+    <string name="err_system_tts">The system speech engine is unavailable</string>
+    <string name="err_system_tts_synthesis">The system engine returned a synthesis error. Make sure the voice is installed and available offline.</string>
+    <string name="err_epub_container">Damaged EPUB: no META-INF/container.xml</string>
+    <string name="err_epub_opf">Damaged EPUB: OPF not found</string>
+    <string name="err_epub_opf_read">Damaged EPUB: OPF cannot be read</string>
+    <string name="err_archive_empty">The archive is empty</string>
+    <string name="err_pdf_scan">This PDF has no text layer — it is probably a scan. Such a file cannot be read aloud.</string>
+    <string name="chapter_start">Beginning</string>
+    <string name="chapter_text">Text</string>
+    <string name="chapter_book">Book</string>
+    <string name="chapter_n">Chapter %1$d</string>
+    <string name="chapter_part_n">Part %1$d</string>
+    <string name="chapter_page">Page %1$d</string>
+    <string name="notif_channel">Reading aloud</string>
+    <string name="notif_channel_desc">Read-aloud controls</string>
+    <string name="notif_prev">Back</string>
+    <string name="notif_next">Forward</string>
+    <string name="notif_stop">Stop</string>
+    <string name="my_rewards">My rewards</string>
+    <string name="appearance">Appearance</string>
+    <string name="appearance_sub">unlocked with ranks</string>
+    <string name="rewards_section">Rewards</string>
+    <string name="tab_focus">Unbroken</string>
+    <string name="tab_daily">Daily</string>
+    <string name="tab_ranks">Ranks</string>
+    <string name="medal_start">Start</string>
+    <string name="ribbon_pause">⏸ paused — the streak ends in %1$d s</string>
+    <string name="toast_record">New record: %1$d min without a break!</string>
+    <string name="toast_day">Day counted · %1$d in a row</string>
+    <string name="new_rank">New rank</string>
+    <string name="new_reward_unlocked">New reward unlocked</string>
+    <string name="reward_unlocked">unlocked</string>
+    <string name="reward_at_points">at %1$s ✦</string>
+    <string name="rarity_common">COMMON</string>
+    <string name="rarity_rare">RARE</string>
+    <string name="rarity_legendary">LEGENDARY</string>
+    <string name="kind_background">Background</string>
+    <string name="kind_text">Text color</string>
+    <string name="kind_font">Font</string>
+    <string name="kind_grow">What grows</string>
+    <string name="kind_grow_long">What grows every day</string>
+    <string name="kind_voice">Voice</string>
+    <string name="focus_no_record">No record yet</string>
+    <string name="focus_record">Record: %1$s</string>
+    <string name="focus_record_details">%1$d min without a break · %2$s</string>
+    <string name="focus_now">Now: %1$d:%2$02d without a break</string>
+    <string name="focus_rule">A pause longer than a minute ends the streak.</string>
+    <string name="focus_tier_minutes">%1$d–%2$d min</string>
+    <string name="tier_wood">Wood</string>
+    <string name="tier_stone">Stone</string>
+    <string name="tier_iron">Iron</string>
+    <string name="tier_bronze">Bronze</string>
+    <string name="tier_silver">Silver</string>
+    <string name="tier_gold">Gold</string>
+    <string name="tier_platinum">Platinum</string>
+    <string name="tier_sapphire">Sapphire</string>
+    <string name="tier_emerald">Emerald</string>
+    <string name="tier_ruby">Ruby</string>
+    <string name="tier_diamond">Diamond</string>
+    <string name="daily_title">%1$s · %2$d days in a row</string>
+    <string name="daily_today_done">Today is counted: %1$d min of the %2$d needed</string>
+    <string name="daily_today_left">Today: %1$d of %2$d min — read a bit more</string>
+    <string name="daily_next_stage">Until “%1$s”: %2$d days</string>
+    <string name="daily_drops">Water drops: %1$d — they save a missed day</string>
+    <string name="heatmap_title">Reading this year</string>
+    <string name="heatmap_days">days read: %1$d</string>
+    <string name="heatmap_saved">saved by a water drop</string>
+    <string name="heatmap_less">less</string>
+    <string name="heatmap_more">more</string>
+    <string name="stage_days">%1$d d</string>
+    <string name="grow_tree">Tree</string>
+    <string name="grow_mushroom">Mushroom</string>
+    <string name="grow_fire">Campfire</string>
+    <string name="grow_crystal">Crystal</string>
+    <string name="grow_garden">Flower garden</string>
+    <string name="grew_tree">Your tree has grown!</string>
+    <string name="grew_mushroom">Your mushroom has grown!</string>
+    <string name="grew_fire">Your fire burns brighter!</string>
+    <string name="grew_crystal">Your crystal has grown!</string>
+    <string name="grew_garden">Your garden is blooming!</string>
+    <string name="wilted_tree">Your tree is sad</string>
+    <string name="wilted_mushroom">Your mushroom is sad</string>
+    <string name="wilted_fire">Your fire is dying down</string>
+    <string name="wilted_crystal">Your crystal has dimmed</string>
+    <string name="wilted_garden">Your garden is sad</string>
+    <string name="welcome_kicker_day">Day %1$d in a row</string>
+    <string name="welcome_kicker_saved">A water drop helped</string>
+    <string name="welcome_kicker_missed">No reading yesterday</string>
+    <string name="welcome_saved">A drop saved your streak!</string>
+    <string name="welcome_next_stage">%1$d more days in a row — and it becomes “%2$s”</string>
+    <string name="welcome_max_stage">The highest stage — keep it up!</string>
+    <string name="welcome_wilted_text">It lost some leaves but it is alive. Read 10 minutes today and it will recover.</string>
+    <string name="welcome_wilted_warning">Skip one more day and it will shrink by one stage.</string>
+    <string name="welcome_read">Read</string>
+    <string name="welcome_water">Water it — start reading</string>
+    <string name="rank_progress">%1$s · ✦ %2$s / %3$s to “%4$s”</string>
+    <string name="rank_max">%1$s · the highest rank</string>
+    <string name="rank_from">from %1$s ✦</string>
+    <string name="rank_start_reward">Default look</string>
+    <string name="preview">Preview</string>
+    <string name="preview_text">It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness…</string>
+    <string name="text_white">White</string>
+    <string name="voice_listen_hint">▶ — listen</string>
+    <string name="manner_title">Manner of reading</string>
+    <string name="rewards_settings">Rewards</string>
+    <string name="toggle_ribbon">Medal ribbon while reading</string>
+    <string name="toggle_daily">Daily screen on first launch</string>
+    <string name="toggle_celebrations">Celebrate new ranks and records</string>
+    <string name="rewards_privacy">Everything is stored only on this phone.</string>
+    <string name="bg_sepia">Sepia</string>
+    <string name="bg_ocean">Night ocean</string>
+    <string name="bg_stars">Starry sky</string>
+    <string name="bg_parchment">Parchment</string>
+    <string name="bg_forest">Forest</string>
+    <string name="bg_wine">Burgundy</string>
+    <string name="bg_graphite">Graphite</string>
+    <string name="bg_aurora">Aurora</string>
+    <string name="text_amber">Amber</string>
+    <string name="text_mint">Mint</string>
+    <string name="text_lavender">Lavender</string>
+    <string name="text_coral">Coral</string>
+    <string name="text_sky">Sky</string>
+    <string name="text_rose">Rose</string>
+    <string name="text_platinum">Platinum</string>
+    <string name="text_gold">Gold</string>
+    <string name="font_default">Regular</string>
+    <string name="font_literary">Literary</string>
+    <string name="font_typewriter">Typewriter</string>
+    <string name="font_antique">Antique</string>
+    <string name="font_rounded">Rounded</string>
+    <string name="font_handwriting">Handwriting</string>
+    <string name="font_newspaper">Newspaper</string>
+    <string name="manner_normal">Normal</string>
+    <string name="manner_storyteller">Storyteller</string>
+    <string name="manner_announcer">Announcer</string>
+    <string-array name="ranks">
+        <item>Novice</item>
+        <item>Listener</item>
+        <item>Apprentice</item>
+        <item>Reader</item>
+        <item>Bookworm</item>
+        <item>Narrator</item>
+        <item>Book Lover</item>
+        <item>Bibliophile</item>
+        <item>Connoisseur</item>
+        <item>Bookman</item>
+        <item>Erudite</item>
+        <item>Interpreter</item>
+        <item>Scribe</item>
+        <item>Chronicler</item>
+        <item>Scroll Keeper</item>
+        <item>Storyteller</item>
+        <item>Bard</item>
+        <item>Man of Letters</item>
+        <item>Critic</item>
+        <item>Philologist</item>
+        <item>Librarian</item>
+        <item>Archivist</item>
+        <item>Sage</item>
+        <item>Academic</item>
+        <item>Master of Words</item>
+        <item>Wordsmith</item>
+        <item>Library Keeper</item>
+        <item>Keeper of Wisdom</item>
+        <item>Library Legend</item>
+        <item>Grand Librarian</item>
+    </string-array>
+    <string-array name="stages_tree">
+        <item>seed</item>
+        <item>sprout</item>
+        <item>sapling</item>
+        <item>young tree</item>
+        <item>tree</item>
+        <item>blossoming</item>
+        <item>fruiting</item>
+        <item>big tree</item>
+        <item>ancient oak</item>
+        <item>grove</item>
+        <item>forest</item>
+    </string-array>
+    <string-array name="stages_mushroom">
+        <item>spore</item>
+        <item>mycelium</item>
+        <item>mushroom</item>
+        <item>porcini</item>
+        <item>family</item>
+        <item>glade</item>
+        <item>fairy ring</item>
+        <item>glowing</item>
+        <item>old forest</item>
+        <item>thicket</item>
+        <item>enchanted forest</item>
+    </string-array>
+    <string-array name="stages_fire">
+        <item>spark</item>
+        <item>ember</item>
+        <item>flicker</item>
+        <item>flame</item>
+        <item>campfire</item>
+        <item>bonfire</item>
+        <item>hearth</item>
+        <item>stove</item>
+        <item>lighthouse</item>
+        <item>star</item>
+        <item>sun</item>
+    </string-array>
+    <string-array name="stages_crystal">
+        <item>grain</item>
+        <item>spark</item>
+        <item>shard</item>
+        <item>crystal</item>
+        <item>cluster</item>
+        <item>sparkling</item>
+        <item>glowing</item>
+        <item>grotto</item>
+        <item>cave</item>
+        <item>geode</item>
+        <item>heart of the mountain</item>
+    </string-array>
+    <string-array name="stages_garden">
+        <item>seed</item>
+        <item>shoot</item>
+        <item>bud</item>
+        <item>flower</item>
+        <item>flowerbed</item>
+        <item>blooming</item>
+        <item>bouquet</item>
+        <item>garden</item>
+        <item>greenhouse</item>
+        <item>meadow</item>
+        <item>garden of Eden</item>
+    </string-array>
+    <string-array name="weekdays_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
 </resources>

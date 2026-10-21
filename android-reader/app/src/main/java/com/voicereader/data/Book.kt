@@ -36,7 +36,7 @@ data class Book(
     companion object {
         fun fromJson(o: JSONObject) = Book(
             id = o.getString("id"),
-            title = o.optString("title", "Без названия"),
+            title = o.optString("title", ""),
             author = o.optString("author", ""),
             format = o.optString("format", ""),
             fileName = o.optString("fileName", ""),

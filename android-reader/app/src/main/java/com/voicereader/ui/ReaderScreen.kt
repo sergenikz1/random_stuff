@@ -14,6 +14,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -28,6 +30,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
@@ -35,7 +40,16 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.voicereader.R
+import com.voicereader.rewards.Reward
+import com.voicereader.rewards.RewardKind
+import com.voicereader.rewards.Rewards
+import com.voicereader.ui.rewards.MedalRibbon
+import com.voicereader.ui.rewards.ReaderLook
+import com.voicereader.ui.rewards.RewardCelebrations
+import com.voicereader.ui.rewards.lookOf
 import androidx.compose.ui.unit.sp
 import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
@@ -50,7 +64,15 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Unit) {
+fun ReaderScreen(
+    onBack: () -> Unit,
+    onVoices: () -> Unit,
+    onSpeedRead: () -> Unit,
+    onAwards: (tab: Int) -> Unit,
+    onAppearance: () -> Unit
+) {
+    val rewards by Rewards.state.collectAsState()
+    val look = lookOf(rewards)
     val state by PlayerEngine.state.collectAsState()
     val settings by Settings.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -83,13 +105,13 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Un
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = { PlayerEngine.pause(); onBack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
             },
             title = {
                 Column {
                     Text(
-                        state.title.ifBlank { "Книга" },
+                        state.title.ifBlank { stringResource(R.string.untitled) },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium
@@ -111,15 +133,15 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Un
                     IconButton(onClick = { PlayerEngine.toggle() }, enabled = state.sentences.isNotEmpty()) {
                         Icon(
                             if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Пауза" else "Читать"
+                            contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play)
                         )
                     }
                 }
                 IconButton(onClick = { showChapters = true }) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Оглавление")
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.contents))
                 }
                 IconButton(onClick = { showSettings = true }) {
-                    Icon(Icons.Filled.GearIcon, contentDescription = "Настройки")
+                    Icon(Icons.Filled.GearIcon, contentDescription = stringResource(R.string.settings))
                 }
             }
         )
@@ -131,19 +153,34 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Un
     ) { padding ->
         Box(
             Modifier
-                .padding(if (focusMode) PaddingValues(0.dp) else padding)
                 .fillMaxSize()
+                .then(if (look.background != null) Modifier.background(look.background) else Modifier)
+                .padding(if (focusMode) PaddingValues(0.dp) else padding)
                 .then(if (focusMode) Modifier.displayCutoutPadding() else Modifier)
         ) {
+            // В режиме «только текст» лента наград не показывается.
+            val ribbon = rewards.ribbonEnabled && !focusMode && state.sentences.isNotEmpty()
             when {
                 state.loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.sentences.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text("Текст книги не загружен", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.book_not_loaded), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> BookText(
                     state, settings.fontSizeSp, settings.lineHeightMult, settings.textWindow, settings.autoScroll,
+                    look = look,
+                    bottomPadding = if (ribbon) 150.dp else 12.dp,
                     onSentenceClick = if (focusMode) { _ -> barsVisible = !barsVisible } else PlayerEngine::seekTo
                 )
+            }
+
+            if (ribbon) {
+                // Плавный переход от текста к ленте, в цвет выбранного фона.
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp).background(
+                        Brush.verticalGradient(listOf(Color.Transparent, (look.backgroundColor ?: MaterialTheme.colorScheme.background).copy(alpha = 0.92f), (look.backgroundColor ?: MaterialTheme.colorScheme.background)))
+                    )
+                )
+                MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) { onAwards(0) }
             }
 
             if (focusMode && barsVisible) {
@@ -168,6 +205,8 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Un
         }
     }
 
+    RewardCelebrations(onApply = ::applyReward)
+
     if (showChapters) {
         ModalBottomSheet(onDismissRequest = { showChapters = false }) {
             ChapterList(state) { index ->
@@ -183,7 +222,9 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Un
                 state = state,
                 onSpeedRead = { showSettings = false; PlayerEngine.pause(); onSpeedRead() },
                 onFocusMode = { showSettings = false; barsVisible = false; Settings.update { it.copy(focusMode = !it.focusMode) } },
-                onOpenVoices = { showSettings = false; onVoices() }
+                onOpenVoices = { showSettings = false; onVoices() },
+                onAwards = { showSettings = false; onAwards(0) },
+                onAppearance = { showSettings = false; onAppearance() }
             )
         }
     }
@@ -197,6 +238,8 @@ private fun BookText(
     lineHeight: Float,
     window: TextWindow,
     autoScroll: Boolean,
+    look: ReaderLook,
+    bottomPadding: Dp,
     onSentenceClick: (Int) -> Unit
 ) {
     val size = state.sentences.size
@@ -221,7 +264,7 @@ private fun BookText(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(18.dp, 12.dp, 18.dp, bottomPadding),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(to - from) { offset ->
@@ -233,6 +276,7 @@ private fun BookText(
                 wordRange = if (index == state.index) state.wordRange else null,
                 fontSize = fontSize,
                 lineHeight = lineHeight,
+                look = look,
                 onClick = { onSentenceClick(index) }
             )
         }
@@ -247,9 +291,12 @@ private fun SentenceItem(
     wordRange: IntRange?,
     fontSize: Float,
     lineHeight: Float,
+    look: ReaderLook,
     onClick: () -> Unit
 ) {
+    // Цвет текста из наград: текущее предложение — в полную силу, остальное приглушено.
     val color = when {
+        look.text != null -> look.text.copy(alpha = if (isActive) 1f else if (isRead) 0.4f else 0.66f)
         isActive -> ReaderPalette.active
         isRead -> ReaderPalette.dim
         else -> ReaderPalette.upcoming
@@ -273,6 +320,7 @@ private fun SentenceItem(
         fontSize = fontSize.sp,
         lineHeight = (fontSize * lineHeight).sp,
         fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+        fontFamily = look.font,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
@@ -288,7 +336,9 @@ private fun ReaderSettings(
     state: PlayerState,
     onSpeedRead: () -> Unit,
     onFocusMode: () -> Unit,
-    onOpenVoices: () -> Unit
+    onOpenVoices: () -> Unit,
+    onAwards: () -> Unit,
+    onAppearance: () -> Unit
 ) {
     val settings by Settings.state.collectAsState()
     // Имена системных голосов появляются после загрузки списка движком — подписи обновятся сами.
@@ -299,18 +349,18 @@ private fun ReaderSettings(
             .verticalScroll(rememberScrollState())
             .padding(20.dp, 0.dp, 20.dp, 28.dp)
     ) {
-        Text("Где я в книге", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_position), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         PositionControls(state)
 
         Spacer(Modifier.height(18.dp))
-        Text("Режим чтения", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_mode), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = onSpeedRead, modifier = Modifier.weight(1f), enabled = state.sentences.isNotEmpty()) {
                 Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Быстрое чтение", maxLines = 1)
+                Text(stringResource(R.string.speed_reading), maxLines = 1)
             }
             FilledTonalButton(onClick = onFocusMode, modifier = Modifier.weight(1f)) {
                 Icon(
@@ -319,18 +369,34 @@ private fun ReaderSettings(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(if (settings.focusMode) "Показать панели" else "Только текст", maxLines = 1)
+                Text(stringResource(if (settings.focusMode) R.string.focus_mode_off else R.string.focus_mode_on), maxLines = 1)
             }
         }
         Text(
-            "«Только текст» прячет панели: нажмите на текст, чтобы на время показать кнопки, «Назад» — выйти из режима.",
+            stringResource(R.string.focus_mode_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
         )
 
         Spacer(Modifier.height(18.dp))
-        Text("Голос", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.rewards_section), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = onAwards, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.EmojiEvents, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.my_rewards), maxLines = 1)
+            }
+            FilledTonalButton(onClick = onAppearance, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Palette, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.appearance), maxLines = 1)
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Text(stringResource(R.string.voice), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             settings.profiles.forEachIndexed { i, profile ->
@@ -342,24 +408,24 @@ private fun ReaderSettings(
                 )
             }
             IconButton(onClick = onOpenVoices) {
-                Icon(Icons.Filled.RecordVoiceOver, contentDescription = "Настройка голосов")
+                Icon(Icons.Filled.RecordVoiceOver, contentDescription = stringResource(R.string.voices))
             }
         }
 
         Spacer(Modifier.height(18.dp))
-        Text("Музыка во время чтения", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.music_title), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MusicMode.entries.forEach { mode ->
                 FilterChip(
                     selected = settings.musicMode == mode,
                     onClick = { Settings.update { it.copy(musicMode = mode) }; PlayerEngine.applyMusicMode() },
-                    label = { Text(mode.label, maxLines = 1) }
+                    label = { Text(stringResource(mode.label), maxLines = 1) }
                 )
             }
         }
         Text(
-            settings.musicMode.hint,
+            stringResource(settings.musicMode.hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
@@ -402,23 +468,23 @@ private fun PositionControls(state: PlayerState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = { PlayerEngine.prevChapter() }) {
-            Icon(Icons.Filled.SkipPrevious, contentDescription = "Предыдущая глава")
+            Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.prev_chapter))
         }
         FilledTonalIconButton(onClick = { PlayerEngine.prevSentence() }, modifier = Modifier.size(52.dp)) {
-            Icon(Icons.Filled.FastRewind, contentDescription = "Предложение назад")
+            Icon(Icons.Filled.FastRewind, contentDescription = stringResource(R.string.prev_sentence))
         }
         FilledIconButton(onClick = { PlayerEngine.toggle() }, modifier = Modifier.size(60.dp)) {
             Icon(
                 if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (state.isPlaying) "Пауза" else "Читать",
+                contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                 modifier = Modifier.size(32.dp)
             )
         }
         FilledTonalIconButton(onClick = { PlayerEngine.nextSentence() }, modifier = Modifier.size(52.dp)) {
-            Icon(Icons.Filled.FastForward, contentDescription = "Предложение вперёд")
+            Icon(Icons.Filled.FastForward, contentDescription = stringResource(R.string.next_sentence))
         }
         IconButton(onClick = { PlayerEngine.nextChapter() }) {
-            Icon(Icons.Filled.SkipNext, contentDescription = "Следующая глава")
+            Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.next_chapter))
         }
     }
 }
@@ -428,7 +494,7 @@ private fun ChapterList(state: PlayerState, onSelect: (Int) -> Unit) {
     val current = state.chapters.indexOfLast { it.startIndex <= state.index }
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "Оглавление · ${state.chapters.size}",
+            stringResource(R.string.contents_count, state.chapters.size),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(16.dp, 4.dp, 16.dp, 8.dp)
         )
@@ -437,7 +503,7 @@ private fun ChapterList(state: PlayerState, onSelect: (Int) -> Unit) {
                 val ch = state.chapters[i]
                 ListItem(
                     headlineContent = { Text(ch.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = { Text("с предложения ${ch.startIndex + 1}") },
+                    supportingContent = { Text(stringResource(R.string.from_sentence, ch.startIndex + 1)) },
                     colors = if (i == current)
                         ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     else ListItemDefaults.colors(),
@@ -453,10 +519,10 @@ private fun ChapterList(state: PlayerState, onSelect: (Int) -> Unit) {
 private fun DisplaySettings() {
     val settings by Settings.state.collectAsState()
     Column(Modifier.fillMaxWidth()) {
-        Text("Текст на экране", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.display_title), style = MaterialTheme.typography.titleMedium)
 
         Spacer(Modifier.height(14.dp))
-        Text("Сколько текста показывать", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.display_window), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             TextWindow.entries.chunked(3).forEach { row ->
@@ -465,7 +531,7 @@ private fun DisplaySettings() {
                         FilterChip(
                             selected = settings.textWindow == w,
                             onClick = { Settings.update { s -> s.copy(textWindow = w) } },
-                            label = { Text(w.label) }
+                            label = { Text(stringResource(w.label)) }
                         )
                     }
                 }
@@ -473,7 +539,7 @@ private fun DisplaySettings() {
         }
 
         Spacer(Modifier.height(16.dp))
-        Text("Размер шрифта: ${settings.fontSizeSp.roundToInt()}", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.display_font_size, settings.fontSizeSp.roundToInt()), style = MaterialTheme.typography.labelLarge)
         Slider(
             value = settings.fontSizeSp,
             onValueChange = { v -> Settings.update { it.copy(fontSizeSp = v) } },
@@ -481,7 +547,7 @@ private fun DisplaySettings() {
             steps = 11
         )
 
-        Text("Межстрочный интервал: ${"%.1f".format(settings.lineHeightMult)}", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.display_line_height, "%.1f".format(settings.lineHeightMult)), style = MaterialTheme.typography.labelLarge)
         Slider(
             value = settings.lineHeightMult,
             onValueChange = { v -> Settings.update { it.copy(lineHeightMult = v) } },
@@ -495,7 +561,7 @@ private fun DisplaySettings() {
                 onCheckedChange = { v -> Settings.update { it.copy(autoScroll = v) } }
             )
             Spacer(Modifier.width(12.dp))
-            Text("Автопрокрутка за голосом")
+            Text(stringResource(R.string.display_autoscroll))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(
@@ -503,7 +569,7 @@ private fun DisplaySettings() {
                 onCheckedChange = { v -> Settings.update { it.copy(keepScreenOn = v) } }
             )
             Spacer(Modifier.width(12.dp))
-            Text("Не гасить экран при чтении")
+            Text(stringResource(R.string.display_keep_screen))
         }
     }
 }
@@ -511,16 +577,16 @@ private fun DisplaySettings() {
 @Composable
 private fun TtsWarning(status: TtsStatus, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
     val text = when (status) {
-        TtsStatus.NO_ENGINE -> "Не найден движок синтеза речи. Установите его в настройках системы."
-        TtsStatus.NO_VOICE_DATA -> "Для этого языка не загружены офлайн-голоса. Откройте настройки синтеза речи и скачайте пакет языка."
-        TtsStatus.INITIALIZING -> "Инициализация синтеза речи…"
+        TtsStatus.NO_ENGINE -> stringResource(R.string.tts_no_engine)
+        TtsStatus.NO_VOICE_DATA -> stringResource(R.string.tts_no_voice_data)
+        TtsStatus.INITIALIZING -> stringResource(R.string.tts_initializing)
         TtsStatus.READY -> return
     }
     Card(modifier) {
         Column(Modifier.padding(14.dp)) {
             Text(text, style = MaterialTheme.typography.bodySmall)
             if (status != TtsStatus.INITIALIZING) {
-                TextButton(onClick = onOpenSettings) { Text("Открыть настройки речи") }
+                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.tts_open_settings)) }
             }
         }
     }
@@ -534,10 +600,10 @@ private fun VoicePreparing(progress: Float, modifier: Modifier = Modifier) {
             Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Готовлю голос", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.voice_preparing), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Это делается один раз для каждого голоса",
+                stringResource(R.string.voice_preparing_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -545,6 +611,25 @@ private fun VoicePreparing(progress: Float, modifier: Modifier = Modifier) {
             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** «Применить» из окна нового звания: включает только что открытую награду. */
+fun applyReward(reward: Reward) {
+    when (reward.kind) {
+        RewardKind.BACKGROUND -> Rewards.edit { it.copy(backgroundId = reward.id) }
+        RewardKind.TEXT -> Rewards.edit { it.copy(textId = reward.id) }
+        RewardKind.FONT -> reward.font?.let { f -> Rewards.edit { it.copy(font = f) } }
+        RewardKind.GROW -> reward.grow?.let { g -> Rewards.edit { it.copy(growKind = g) } }
+        RewardKind.VOICE -> {
+            reward.manner?.let { m -> Rewards.edit { it.copy(manner = m) } }
+            reward.voiceId?.let { id ->
+                Settings.updateProfile(Settings.state.value.activeVoice) {
+                    it.copy(kind = VoiceKind.NEURAL, neuralVoiceId = id, label = id)
+                }
+            }
+            PlayerEngine.applyVoiceSettingsNow()
         }
     }
 }

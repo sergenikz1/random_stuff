@@ -97,7 +97,7 @@ public final class MainActivity extends Activity {
         content.addView(text("Codex и Claude — в цифрах. На экране телефона.", 15, MUTED, false));
         space(content, 24);
         LinearLayout account = card();
-        account.addView(text(repository.connected() ? "АККАУНТ ПОДКЛЮЧЁН" : "НАЧНИТЕ С АККАУНТА", 11, GREEN, true));
+        account.addView(text(repository.connected() ? "OPENAI · CODEX ПОДКЛЮЧЁН" : "OPENAI · CODEX", 11, GREEN, true));
         space(account, 8);
         account.addView(text(repository.accountLabel(), 17, TEXT, true));
         space(account, 12);
@@ -132,7 +132,7 @@ public final class MainActivity extends Activity {
             account.addView(text("Код действует 15 минут. Подтверждайте только вход, который вы начали здесь. Приложение использует вход Codex по коду устройства.", 12, MUTED, false));
             account.addView(button("Отменить вход", 0, false, repository::cancelLogin));
         } else {
-            Button login = button(repository.loading ? "Подготовка входа…" : "Войти через браузер", R.id.login_button, true,
+            Button login = button(repository.loading ? "Подготовка входа…" : "Войти в OpenAI через браузер", R.id.login_button, true,
                     () -> repository.beginBrowserLogin(url -> { if (!open(url)) repository.cancelLogin(); }));
             login.setEnabled(!repository.loading && !claude.browserPending()); account.addView(login);
             space(account, 8);

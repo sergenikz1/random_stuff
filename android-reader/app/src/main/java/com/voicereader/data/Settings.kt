@@ -16,6 +16,13 @@ enum class TextWindow(val label: String, val before: Int, val after: Int) {
     ALL("Вся книга", Int.MAX_VALUE, Int.MAX_VALUE)
 }
 
+/** Как вести себя со сторонней музыкой, пока читает голос. */
+enum class MusicMode(val label: String, val hint: String) {
+    PAUSE("Ставить на паузу", "Другие плееры замолкают, пока звучит книга"),
+    DUCK("Приглушать", "Музыка играет тише, голос слышно лучше"),
+    MIX("Не трогать", "Музыка играет как обычно, вместе с голосом")
+}
+
 data class SettingsState(
     val profiles: List<VoiceProfile> = VoiceProfile.DEFAULTS,
     val activeVoice: Int = 0,
@@ -23,13 +30,22 @@ data class SettingsState(
     val lineHeightMult: Float = 1.5f,
     val textWindow: TextWindow = TextWindow.NORMAL,
     val keepScreenOn: Boolean = true,
-    val autoScroll: Boolean = true
+    val autoScroll: Boolean = true,
+    val musicMode: MusicMode = MusicMode.MIX,
+    /** Режим «только текст»: без панелей и системных полос. */
+    val focusMode: Boolean = false,
+    /** Быстрое чтение: слов в минуту и плавный разгон до этой скорости. */
+    val speedWpm: Int = 300,
+    val speedRamp: Boolean = true
 ) {
     val activeProfile: VoiceProfile get() = profiles.getOrElse(activeVoice) { VoiceProfile.DEFAULTS[0] }
 }
 
 /** Настройки в SharedPreferences + StateFlow для Compose. */
 object Settings {
+
+    const val SPEED_MIN = 100
+    const val SPEED_MAX = 1000
 
     private lateinit var prefs: SharedPreferences
     private val _state = MutableStateFlow(SettingsState())
@@ -61,7 +77,12 @@ object Settings {
             textWindow = runCatching { TextWindow.valueOf(prefs.getString("text_window", "NORMAL")!!) }
                 .getOrDefault(TextWindow.NORMAL),
             keepScreenOn = prefs.getBoolean("keep_screen_on", true),
-            autoScroll = prefs.getBoolean("auto_scroll", true)
+            autoScroll = prefs.getBoolean("auto_scroll", true),
+            musicMode = runCatching { MusicMode.valueOf(prefs.getString("music_mode", "MIX")!!) }
+                .getOrDefault(MusicMode.MIX),
+            focusMode = prefs.getBoolean("focus_mode", false),
+            speedWpm = prefs.getInt("speed_wpm", 300).coerceIn(SPEED_MIN, SPEED_MAX),
+            speedRamp = prefs.getBoolean("speed_ramp", true)
         )
     }
 
@@ -81,6 +102,10 @@ object Settings {
             putString("text_window", state.textWindow.name)
             putBoolean("keep_screen_on", state.keepScreenOn)
             putBoolean("auto_scroll", state.autoScroll)
+            putString("music_mode", state.musicMode.name)
+            putBoolean("focus_mode", state.focusMode)
+            putInt("speed_wpm", state.speedWpm)
+            putBoolean("speed_ramp", state.speedRamp)
         }.apply()
     }
 

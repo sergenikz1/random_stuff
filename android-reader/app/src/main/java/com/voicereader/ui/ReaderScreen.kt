@@ -1,7 +1,10 @@
 package com.voicereader.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -10,10 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Settings as GearIcon
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
@@ -30,28 +37,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
 import com.voicereader.data.TextWindow
 import com.voicereader.player.PlayerEngine
 import com.voicereader.player.PlayerState
 import com.voicereader.tts.TtsStatus
 import com.voicereader.tts.VoiceKind
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit) {
+fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit, onSpeedRead: () -> Unit) {
     val state by PlayerEngine.state.collectAsState()
     val settings by Settings.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var showChapters by remember { mutableStateOf(false) }
-    var showDisplay by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    // В режиме «только текст» панель появляется по нажатию на текст и сама прячется.
+    var barsVisible by remember { mutableStateOf(false) }
+    val focusMode = settings.focusMode
     val context = LocalContext.current
 
     val view = LocalView.current
     DisposableEffect(settings.keepScreenOn, state.isPlaying) {
         view.keepScreenOn = settings.keepScreenOn && state.isPlaying
         onDispose { view.keepScreenOn = false }
+    }
+    SystemBarsHidden(focusMode)
+    BackHandler(enabled = focusMode) { Settings.update { it.copy(focusMode = false) } }
+    LaunchedEffect(focusMode, barsVisible) {
+        if (focusMode && barsVisible) { delay(4000); barsVisible = false }
     }
 
     LaunchedEffect(state.message) {
@@ -61,61 +78,75 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit) {
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = { PlayerEngine.pause(); onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
-                    }
-                },
-                title = {
-                    Column {
+    val topBar: @Composable () -> Unit = {
+        TopAppBar(
+            navigationIcon = {
+                IconButton(onClick = { PlayerEngine.pause(); onBack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                }
+            },
+            title = {
+                Column {
+                    Text(
+                        state.title.ifBlank { "Книга" },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (state.chapterTitle.isNotBlank()) {
                         Text(
-                            state.title.ifBlank { "Книга" },
+                            state.chapterTitle,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (state.chapterTitle.isNotBlank()) {
-                            Text(
-                                state.chapterTitle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showChapters = true }) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Оглавление")
-                    }
-                    IconButton(onClick = { showDisplay = true }) {
-                        Icon(Icons.Filled.FormatSize, contentDescription = "Вид текста")
                     }
                 }
-            )
-        },
-        bottomBar = {
-            ControlPanel(
-                state = state,
-                activeVoice = settings.activeVoice,
-                voiceLabels = settings.profiles.map { it.label },
-                onVoice = { PlayerEngine.selectVoice(it) },
-                onOpenVoices = onVoices
-            )
-        }
+            },
+            actions = {
+                Box(contentAlignment = Alignment.Center) {
+                    if (state.preparing) CircularProgressIndicator(Modifier.size(40.dp), strokeWidth = 2.dp)
+                    IconButton(onClick = { PlayerEngine.toggle() }, enabled = state.sentences.isNotEmpty()) {
+                        Icon(
+                            if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Пауза" else "Читать"
+                        )
+                    }
+                }
+                IconButton(onClick = { showChapters = true }) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Оглавление")
+                }
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(Icons.Filled.GearIcon, contentDescription = "Настройки")
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        topBar = { if (!focusMode) topBar() }
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Box(
+            Modifier
+                .padding(if (focusMode) PaddingValues(0.dp) else padding)
+                .fillMaxSize()
+                .then(if (focusMode) Modifier.displayCutoutPadding() else Modifier)
+        ) {
             when {
                 state.loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.sentences.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text("Текст книги не загружен", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                else -> BookText(state, settings.fontSizeSp, settings.lineHeightMult, settings.textWindow, settings.autoScroll)
+                else -> BookText(
+                    state, settings.fontSizeSp, settings.lineHeightMult, settings.textWindow, settings.autoScroll,
+                    onSentenceClick = if (focusMode) { _ -> barsVisible = !barsVisible } else PlayerEngine::seekTo
+                )
+            }
+
+            if (focusMode && barsVisible) {
+                Box(Modifier.align(Alignment.TopCenter)) { topBar() }
             }
 
             val ttsStatus by PlayerEngine.systemTtsStatus.collectAsState()
@@ -145,9 +176,14 @@ fun ReaderScreen(onBack: () -> Unit, onVoices: () -> Unit) {
         }
     }
 
-    if (showDisplay) {
-        ModalBottomSheet(onDismissRequest = { showDisplay = false }) {
-            DisplaySettings()
+    if (showSettings) {
+        ModalBottomSheet(onDismissRequest = { showSettings = false }) {
+            ReaderSettings(
+                state = state,
+                onSpeedRead = { showSettings = false; PlayerEngine.pause(); onSpeedRead() },
+                onFocusMode = { showSettings = false; barsVisible = false; Settings.update { it.copy(focusMode = !it.focusMode) } },
+                onOpenVoices = { showSettings = false; onVoices() }
+            )
         }
     }
 }
@@ -159,7 +195,8 @@ private fun BookText(
     fontSize: Float,
     lineHeight: Float,
     window: TextWindow,
-    autoScroll: Boolean
+    autoScroll: Boolean,
+    onSentenceClick: (Int) -> Unit
 ) {
     val size = state.sentences.size
     val from = if (window == TextWindow.ALL) 0
@@ -195,7 +232,7 @@ private fun BookText(
                 wordRange = if (index == state.index) state.wordRange else null,
                 fontSize = fontSize,
                 lineHeight = lineHeight,
-                onClick = { PlayerEngine.seekTo(index) }
+                onClick = { onSentenceClick(index) }
             )
         }
     }
@@ -244,108 +281,141 @@ private fun SentenceItem(
     )
 }
 
+/** Всё, что раньше было в нижней панели, плюс режимы чтения и вид текста — в одном листе настроек. */
 @Composable
-private fun ControlPanel(
+private fun ReaderSettings(
     state: PlayerState,
-    activeVoice: Int,
-    voiceLabels: List<String>,
-    onVoice: (Int) -> Unit,
+    onSpeedRead: () -> Unit,
+    onFocusMode: () -> Unit,
     onOpenVoices: () -> Unit
 ) {
-    Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+    val settings by Settings.state.collectAsState()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp, 0.dp, 20.dp, 28.dp)
+    ) {
+        Text("Где я в книге", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        PositionControls(state)
 
-            var dragging by remember { mutableStateOf(false) }
-            var dragValue by remember { mutableFloatStateOf(0f) }
-            val maxIndex = (state.sentences.size - 1).coerceAtLeast(0)
-            val value = if (dragging) dragValue else state.index.toFloat()
-
-            Slider(
-                value = value.coerceIn(0f, maxIndex.toFloat()),
-                onValueChange = { dragging = true; dragValue = it },
-                onValueChangeFinished = {
-                    dragging = false
-                    PlayerEngine.seekTo(dragValue.roundToInt())
-                },
-                valueRange = 0f..maxIndex.toFloat().coerceAtLeast(1f),
-                enabled = state.sentences.isNotEmpty()
-            )
-            Text(
-                "${value.roundToInt() + 1} / ${state.sentences.size}" +
-                    if (state.sentences.isEmpty()) "" else "  ·  ${((value / maxIndex.coerceAtLeast(1)) * 100).roundToInt()}%",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(Modifier.height(4.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { PlayerEngine.prevChapter() }) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Предыдущая глава")
-                }
-                FilledTonalIconButton(
-                    onClick = { PlayerEngine.prevSentence() },
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(Icons.Filled.FastRewind, contentDescription = "Предложение назад")
-                }
-                Box(contentAlignment = Alignment.Center) {
-                    if (state.preparing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(72.dp),
-                            strokeWidth = 3.dp
-                        )
-                    }
-                    FilledIconButton(
-                        onClick = { PlayerEngine.toggle() },
-                        modifier = Modifier.size(64.dp)
-                    ) {
-                        Icon(
-                            if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Пауза" else "Читать",
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-                }
-                FilledTonalIconButton(
-                    onClick = { PlayerEngine.nextSentence() },
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(Icons.Filled.FastForward, contentDescription = "Предложение вперёд")
-                }
-                IconButton(onClick = { PlayerEngine.nextChapter() }) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Следующая глава")
-                }
+        Spacer(Modifier.height(18.dp))
+        Text("Режим чтения", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = onSpeedRead, modifier = Modifier.weight(1f), enabled = state.sentences.isNotEmpty()) {
+                Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Быстрое чтение", maxLines = 1)
             }
-
-            Spacer(Modifier.height(6.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                voiceLabels.forEachIndexed { i, label ->
-                    FilterChip(
-                        selected = i == activeVoice,
-                        onClick = { onVoice(i) },
-                        label = {
-                            Text(
-                                label.substringBefore(" ·"),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                IconButton(onClick = onOpenVoices) {
-                    Icon(Icons.Filled.FormatSize, contentDescription = "Настройка голосов")
-                }
+            FilledTonalButton(onClick = onFocusMode, modifier = Modifier.weight(1f)) {
+                Icon(
+                    if (settings.focusMode) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(if (settings.focusMode) "Показать панели" else "Только текст", maxLines = 1)
             }
+        }
+        Text(
+            "«Только текст» прячет панели: нажмите на текст, чтобы на время показать кнопки, «Назад» — выйти из режима.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(18.dp))
+        Text("Голос", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            settings.profiles.forEachIndexed { i, profile ->
+                FilterChip(
+                    selected = i == settings.activeVoice,
+                    onClick = { PlayerEngine.selectVoice(i) },
+                    label = { Text(profile.label.substringBefore(" ·"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            IconButton(onClick = onOpenVoices) {
+                Icon(Icons.Filled.RecordVoiceOver, contentDescription = "Настройка голосов")
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Text("Музыка во время чтения", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MusicMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = settings.musicMode == mode,
+                    onClick = { Settings.update { it.copy(musicMode = mode) }; PlayerEngine.applyMusicMode() },
+                    label = { Text(mode.label, maxLines = 1) }
+                )
+            }
+        }
+        Text(
+            settings.musicMode.hint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        Spacer(Modifier.height(18.dp))
+        DisplaySettings()
+    }
+}
+
+@Composable
+private fun PositionControls(state: PlayerState) {
+    var dragging by remember { mutableStateOf(false) }
+    var dragValue by remember { mutableFloatStateOf(0f) }
+    val maxIndex = (state.sentences.size - 1).coerceAtLeast(0)
+    val value = if (dragging) dragValue else state.index.toFloat()
+
+    Slider(
+        value = value.coerceIn(0f, maxIndex.toFloat()),
+        onValueChange = { dragging = true; dragValue = it },
+        onValueChangeFinished = {
+            dragging = false
+            PlayerEngine.seekTo(dragValue.roundToInt())
+        },
+        valueRange = 0f..maxIndex.toFloat().coerceAtLeast(1f),
+        enabled = state.sentences.isNotEmpty()
+    )
+    Text(
+        "${value.roundToInt() + 1} / ${state.sentences.size}" +
+            if (state.sentences.isEmpty()) "" else "  ·  ${((value / maxIndex.coerceAtLeast(1)) * 100).roundToInt()}%",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+    Spacer(Modifier.height(4.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = { PlayerEngine.prevChapter() }) {
+            Icon(Icons.Filled.SkipPrevious, contentDescription = "Предыдущая глава")
+        }
+        FilledTonalIconButton(onClick = { PlayerEngine.prevSentence() }, modifier = Modifier.size(52.dp)) {
+            Icon(Icons.Filled.FastRewind, contentDescription = "Предложение назад")
+        }
+        FilledIconButton(onClick = { PlayerEngine.toggle() }, modifier = Modifier.size(60.dp)) {
+            Icon(
+                if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (state.isPlaying) "Пауза" else "Читать",
+                modifier = Modifier.size(32.dp)
+            )
+        }
+        FilledTonalIconButton(onClick = { PlayerEngine.nextSentence() }, modifier = Modifier.size(52.dp)) {
+            Icon(Icons.Filled.FastForward, contentDescription = "Предложение вперёд")
+        }
+        IconButton(onClick = { PlayerEngine.nextChapter() }) {
+            Icon(Icons.Filled.SkipNext, contentDescription = "Следующая глава")
         }
     }
 }
@@ -379,7 +449,7 @@ private fun ChapterList(state: PlayerState, onSelect: (Int) -> Unit) {
 @Composable
 private fun DisplaySettings() {
     val settings by Settings.state.collectAsState()
-    Column(Modifier.fillMaxWidth().padding(20.dp, 4.dp, 20.dp, 28.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         Text("Текст на экране", style = MaterialTheme.typography.titleMedium)
 
         Spacer(Modifier.height(14.dp))

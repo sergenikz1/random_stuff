@@ -8,6 +8,7 @@ import android.media.AudioManager
 import com.voicereader.data.Book
 import com.voicereader.data.Chapter
 import com.voicereader.data.LibraryStore
+import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
 import com.voicereader.tts.NeuralTtsBackend
 import com.voicereader.tts.NeuralVoice
@@ -269,10 +270,14 @@ object PlayerEngine {
     }
 
     // --- Аудиофокус: пауза на время звонка или чужого воспроизведения ---
+    // В режиме «Не трогать» фокус не берётся вовсе, поэтому музыка в другом плеере не встаёт на паузу.
+    // «Приглушать» берёт временный фокус с разрешением приглушения: система делает музыку тише.
 
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
-            AudioManager.AUDIOFOCUS_LOSS -> pause()
+            AudioManager.AUDIOFOCUS_LOSS ->
+                // Пользователь сам включил музыку — в режиме приглушения читаем дальше вместе с ней.
+                if (Settings.state.value.musicMode == MusicMode.DUCK) focusRequest = null else pause()
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 if (_state.value.isPlaying) { pausedByFocusLoss = true; pause() }
@@ -283,13 +288,17 @@ object PlayerEngine {
 
     private fun requestFocus(): Boolean {
         val am = audioManager ?: return true
+        val mode = Settings.state.value.musicMode
+        if (mode == MusicMode.MIX) return true
         // Фокус уже удержан (перемотка во время чтения) — повторный запрос не нужен.
         if (focusRequest != null) return true
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        val gain = if (mode == MusicMode.DUCK) AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+        else AudioManager.AUDIOFOCUS_GAIN
+        val request = AudioFocusRequest.Builder(gain)
             .setAudioAttributes(attrs)
             .setOnAudioFocusChangeListener(focusListener)
             .build()
@@ -301,6 +310,13 @@ object PlayerEngine {
         val am = audioManager ?: return
         focusRequest?.let { am.abandonAudioFocusRequest(it) }
         focusRequest = null
+    }
+
+    /** Режим музыки сменили во время чтения — перезахватываем фокус в новом виде. */
+    fun applyMusicMode() {
+        if (!_state.value.isPlaying) return
+        abandonFocus()
+        requestFocus()
     }
 
     fun ttsSettingsIntent(): Intent = SystemTts.settingsIntent()

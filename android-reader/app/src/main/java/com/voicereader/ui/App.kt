@@ -14,6 +14,7 @@ private sealed interface Screen {
     data object Library : Screen
     data class Reader(val bookId: String) : Screen
     data object Voices : Screen
+    data object Speed : Screen
 }
 
 @Composable
@@ -35,9 +36,14 @@ fun App() {
             BackHandler { screen = Screen.Library }
             ReaderScreen(
                 onBack = { screen = Screen.Library },
-                onVoices = { screen = Screen.Voices }
+                onVoices = { screen = Screen.Voices },
+                onSpeedRead = { screen = Screen.Speed }
             )
         }
+
+        is Screen.Speed -> SpeedReaderScreen(onBack = {
+            screen = PlayerEngine.state.value.bookId?.let { Screen.Reader(it) } ?: Screen.Library
+        })
 
         is Screen.Voices -> {
             BackHandler { screen = Screen.Library }

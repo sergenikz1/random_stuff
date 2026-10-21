@@ -17,7 +17,8 @@ import javax.crypto.spec.GCMParameterSpec;
 final class SecureStore {
     private static final String ALIAS = "limitpulse.account.v1";
     private final SharedPreferences preferences;
-    SecureStore(Context context) { preferences = context.getSharedPreferences("secure_account", Context.MODE_PRIVATE); }
+    SecureStore(Context context) { this(context, "secure_account"); }
+    SecureStore(Context context, String name) { preferences = context.getSharedPreferences(name, Context.MODE_PRIVATE); }
     private SecretKey key() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);

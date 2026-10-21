@@ -23,6 +23,7 @@ final class BrowserLogin implements AutoCloseable {
     static final long TIMEOUT_MS = 10 * 60 * 1000L;
     static final int PORT = 1455;
     final String verifier, state, redirectUri, authorizationUrl;
+    private final String callbackHost, callbackPath;
     private final ServerSocket server;
     private final long deadline;
     private volatile boolean closed;
@@ -31,38 +32,50 @@ final class BrowserLogin implements AutoCloseable {
     static final class Denied extends IOException { Denied() { super("Authorization declined"); } }
 
     static BrowserLogin start() throws Exception { return start(PORT, TIMEOUT_MS); }
-    static BrowserLogin start(int port, long timeoutMs) throws Exception {
+    static BrowserLogin start(int port, long timeoutMs) throws Exception { return start(port, timeoutMs, false); }
+    /** Claude Code registers {@code http://localhost:<any port>/callback}; an OS-assigned port avoids clashes. */
+    static BrowserLogin startClaude(long timeoutMs) throws Exception { return start(0, timeoutMs, true); }
+    private static BrowserLogin start(int port, long timeoutMs, boolean claude) throws Exception {
         ServerSocket socket = new ServerSocket();
         try {
             socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port));
             socket.setSoTimeout(1000);
-            return new BrowserLogin(socket, timeoutMs);
+            return new BrowserLogin(socket, timeoutMs, claude);
         } catch (Exception failure) { socket.close(); throw failure; }
     }
-    private BrowserLogin(ServerSocket socket, long timeoutMs) throws Exception {
+    private BrowserLogin(ServerSocket socket, long timeoutMs, boolean claude) throws Exception {
         server = socket;
         verifier = random(); state = random();
-        redirectUri = "http://127.0.0.1:" + server.getLocalPort() + "/auth/callback";
+        int port = server.getLocalPort();
+        callbackHost = (claude ? "localhost:" : "127.0.0.1:") + port;
+        callbackPath = claude ? "/callback" : "/auth/callback";
+        redirectUri = "http://" + callbackHost + callbackPath;
         deadline = System.nanoTime() + timeoutMs * 1000000L;
+        authorizationUrl = claude ? ClaudeApi.authorizationUrl(redirectUri, challenge(verifier), state) : openAiUrl();
+    }
+    private String openAiUrl() throws Exception {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("response_type", "code"); params.put("client_id", OpenAiApi.CLIENT_ID);
         params.put("redirect_uri", redirectUri); params.put("scope", "openid profile email offline_access");
         params.put("code_challenge", challenge(verifier)); params.put("code_challenge_method", "S256");
         params.put("state", state); params.put("id_token_add_organizations", "true");
         params.put("codex_cli_simplified_flow", "true"); params.put("originator", "codex_cli");
+        return OpenAiApi.AUTH + "/oauth/authorize?" + query(params);
+    }
+    static String query(Map<String, String> params) throws Exception {
         StringBuilder query = new StringBuilder();
         for (Map.Entry<String, String> param : params.entrySet()) {
             if (query.length() > 0) query.append('&');
             query.append(URLEncoder.encode(param.getKey(), "UTF-8")).append('=')
                     .append(URLEncoder.encode(param.getValue(), "UTF-8"));
         }
-        authorizationUrl = OpenAiApi.AUTH + "/oauth/authorize?" + query;
+        return query.toString();
     }
     static String challenge(String verifier) throws Exception {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
                 MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
     }
-    private static String random() {
+    static String random() {
         byte[] bytes = new byte[32]; new SecureRandom().nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
@@ -79,7 +92,7 @@ final class BrowserLogin implements AutoCloseable {
                 try { request = headers(socket.getInputStream()); }
                 catch (IOException malformed) { continue; }
                 Map<String, String> callback;
-                try { callback = callback(request, server.getLocalPort(), state); }
+                try { callback = callback(request, callbackHost, callbackPath, state); }
                 catch (IllegalArgumentException malformed) { respond(socket, 400, false); continue; }
                 if (callback == null) { respond(socket, 400, false); continue; }
                 if (callback.containsKey("error")) {
@@ -100,6 +113,9 @@ final class BrowserLogin implements AutoCloseable {
         throw new SocketTimeoutException(closed ? "Login cancelled" : "Login expired");
     }
     static Map<String, String> callback(String request, int port, String expectedState) {
+        return callback(request, "127.0.0.1:" + port, "/auth/callback", expectedState);
+    }
+    static Map<String, String> callback(String request, String host, String path, String expectedState) {
         String[] lines = request.split("\r\n");
         String[] first = lines[0].split(" ", -1);
         if (first.length != 3 || !"GET".equals(first[0]) || !"HTTP/1.1".equals(first[2])) return null;
@@ -107,14 +123,14 @@ final class BrowserLogin implements AutoCloseable {
         for (int i = 1; i < lines.length; i++) {
             int colon = lines[i].indexOf(':');
             if (colon > 0 && "host".equalsIgnoreCase(lines[i].substring(0, colon))) {
-                if (validHost || !("127.0.0.1:" + port).equals(lines[i].substring(colon + 1).trim())) return null;
+                if (validHost || !host.equals(lines[i].substring(colon + 1).trim())) return null;
                 validHost = true;
             }
         }
         if (!validHost) return null;
         URI uri;
         try { uri = new URI(first[1]); } catch (Exception malformed) { return null; }
-        if (uri.isAbsolute() || uri.getRawAuthority() != null || !"/auth/callback".equals(uri.getRawPath()) || uri.getRawFragment() != null || uri.getRawQuery() == null) return null;
+        if (uri.isAbsolute() || uri.getRawAuthority() != null || !path.equals(uri.getRawPath()) || uri.getRawFragment() != null || uri.getRawQuery() == null) return null;
         Map<String, String> params = new LinkedHashMap<>();
         String[] pairs = uri.getRawQuery().split("&");
         if (pairs.length > 20) return null;

@@ -16,12 +16,18 @@ public final class WidgetTicker extends BroadcastReceiver {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
     static void schedule(Context context) {
-        boolean hasWidgets = AppWidgetManager.getInstance(context).getAppWidgetIds(new ComponentName(context, LimitsWidget.class)).length > 0;
-        if (!hasWidgets || PulseApplication.repository(context).data == null) { cancel(context); return; }
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        boolean codex = manager.getAppWidgetIds(new ComponentName(context, LimitsWidget.class)).length > 0
+                && PulseApplication.repository(context).data != null;
+        boolean claude = manager.getAppWidgetIds(new ComponentName(context, ClaudeWidget.class)).length > 0
+                && PulseApplication.claude(context).data != null;
+        if (!codex && !claude) { cancel(context); return; }
         long nextMinute = 60000 - System.currentTimeMillis() % 60000;
         context.getSystemService(AlarmManager.class).set(AlarmManager.ELAPSED_REALTIME,
                 SystemClock.elapsedRealtime() + nextMinute, intent(context));
     }
     static void cancel(Context context) { context.getSystemService(AlarmManager.class).cancel(intent(context)); }
-    @Override public void onReceive(Context context, Intent intent) { LimitsWidget.updateAll(context); schedule(context); }
+    @Override public void onReceive(Context context, Intent intent) {
+        LimitsWidget.updateAll(context); ClaudeWidget.updateAll(context); schedule(context);
+    }
 }

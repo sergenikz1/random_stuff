@@ -19,6 +19,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -31,7 +32,10 @@ public final class MainActivity extends Activity {
     private static final int TEXT = Color.rgb(231, 239, 242), MUTED = Color.rgb(160, 181, 192);
     private static final int GREEN = Color.rgb(114, 230, 193), BLUE = Color.rgb(141, 207, 243), AMBER = Color.rgb(240, 187, 112);
     private AccountRepository repository;
+    private ClaudeRepository claude;
     private LinearLayout content;
+    // Kept across re-renders so a pasted Claude code survives the minute clock and status updates.
+    private EditText claudeCode;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable observer = this::render;
     private final Runnable clockTick = new Runnable() {
@@ -41,6 +45,11 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         repository = PulseApplication.repository(this);
+        claude = PulseApplication.claude(this);
+        claudeCode = new EditText(this); claudeCode.setId(R.id.claude_code_input);
+        claudeCode.setHint("Вставьте код со страницы Claude"); claudeCode.setSingleLine(true);
+        claudeCode.setTextColor(TEXT); claudeCode.setHintTextColor(MUTED); claudeCode.setTextSize(15);
+        claudeCode.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(BG); scroll.setFillViewport(true);
         content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
@@ -58,22 +67,23 @@ public final class MainActivity extends Activity {
         render();
     }
     @Override protected void onStart() {
-        super.onStart(); repository.observe(observer); render(); handler.postDelayed(clockTick, 60000);
+        super.onStart(); repository.observe(observer); claude.observe(observer); render(); handler.postDelayed(clockTick, 60000);
         RefreshJob.schedule(this);
         if (repository.connected()) repository.refresh(null);
+        if (claude.connected()) claude.refresh(null);
     }
     @Override protected void onStop() {
-        repository.removeObserver(observer); handler.removeCallbacks(clockTick); super.onStop();
+        repository.removeObserver(observer); claude.removeObserver(observer); handler.removeCallbacks(clockTick); super.onStop();
     }
     @Override protected void onResume() {
         super.onResume();
-        ResetReminders.reconcile(this, repository.data, System.currentTimeMillis());
-        LimitsWidget.updateAll(this); WidgetTicker.schedule(this); render();
+        ResetReminders.reconcileAll(this, System.currentTimeMillis());
+        LimitsWidget.updateAll(this); ClaudeWidget.updateAll(this); WidgetTicker.schedule(this); render();
     }
     @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
         if (request == 7100) {
-            ResetReminders.reconcile(this, repository.data, System.currentTimeMillis()); render();
+            ResetReminders.reconcileAll(this, System.currentTimeMillis()); render();
         }
     }
     private void render() {
@@ -84,7 +94,7 @@ public final class MainActivity extends Activity {
         space(content, 24);
         content.addView(text("Лимиты\nпод рукой", 36, TEXT, true));
         space(content, 10);
-        content.addView(text("Codex — в цифрах. На экране телефона.", 15, MUTED, false));
+        content.addView(text("Codex и Claude — в цифрах. На экране телефона.", 15, MUTED, false));
         space(content, 24);
         LinearLayout account = card();
         account.addView(text(repository.connected() ? "АККАУНТ ПОДКЛЮЧЁН" : "НАЧНИТЕ С АККАУНТА", 11, GREEN, true));
@@ -124,7 +134,7 @@ public final class MainActivity extends Activity {
         } else {
             Button login = button(repository.loading ? "Подготовка входа…" : "Войти через браузер", R.id.login_button, true,
                     () -> repository.beginBrowserLogin(url -> { if (!open(url)) repository.cancelLogin(); }));
-            login.setEnabled(!repository.loading); account.addView(login);
+            login.setEnabled(!repository.loading && !claude.browserPending()); account.addView(login);
             space(account, 8);
             account.addView(text("Откроется привычная страница входа OpenAI. Пароль и подтверждение входа остаются в браузере. Переписывать одноразовый код не нужно.", 12, MUTED, false));
             account.addView(button("Запасной способ: код устройства", R.id.device_login_button, false, repository::beginLogin));
@@ -155,13 +165,15 @@ public final class MainActivity extends Activity {
             if (data.credits != null) content.addView(text("Дополнительные кредиты: " + data.credits, 12, MUTED, false));
             for (LimitData.Extra extra : data.extra) {
                 space(content, 12);
-                content.addView(text(extra.name + " · " + DisplayText.percent(extra.primary) + " / " + DisplayText.percent(extra.secondary), 14, TEXT, false));
+                content.addView(text(extraLine(extra), 14, TEXT, false));
             }
         } else content.addView(text(repository.connected() ? "Нажмите «Обновить лимиты», чтобы получить данные." : "Остаток появится после входа и первого обновления.", 12, MUTED, false));
+        space(content, 32);
+        renderClaude(now);
         space(content, 24);
         LinearLayout reminders = card();
         reminders.addView(text("За час до сброса", 20, TEXT, true)); space(reminders, 8);
-        reminders.addView(text("Напомним отдельно о коротком и недельном лимитах: сколько процентов осталось и через сколько сброс. В уведомлении будет время получения данных.", 14, MUTED, false));
+        reminders.addView(text("Напомним отдельно о коротком и недельном лимитах Codex и Claude: сколько процентов осталось и через сколько сброс. В уведомлении будет время получения данных.", 14, MUTED, false));
         Switch enabled = new Switch(this); enabled.setId(R.id.reminders_switch);
         enabled.setText("Напоминания о сбросе"); enabled.setTextColor(TEXT); enabled.setTextSize(14);
         enabled.setMinHeight(dp(48)); enabled.setChecked(ResetReminders.enabled(this));
@@ -180,7 +192,7 @@ public final class MainActivity extends Activity {
                     catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Откройте системные настройки напоминаний приложения", Toast.LENGTH_LONG).show(); }
                 }));
             } else reminders.addView(text("Точное время напоминаний разрешено", 12, MUTED, false));
-            if (!repository.connected()) { space(reminders, 8); reminders.addView(text("После входа и обновления лимитов напоминания настроятся автоматически.", 12, MUTED, false)); }
+            if (!repository.connected() && !claude.connected()) { space(reminders, 8); reminders.addView(text("После входа и обновления лимитов напоминания настроятся автоматически.", 12, MUTED, false)); }
         }
         content.addView(reminders); space(content, 24);
         LinearLayout chat = card();
@@ -189,11 +201,12 @@ public final class MainActivity extends Activity {
         chat.addView(text("OpenAI не предоставляет этому приложению счётчик оставшихся сообщений ChatGPT. Проверяйте доступность моделей и время сброса в самом ChatGPT.", 14, MUTED, false));
         space(chat, 8); chat.addView(button("Открыть ChatGPT ↗", R.id.chatgpt_button, false, () -> open("https://chatgpt.com/"))); content.addView(chat);
         space(content, 16);
-        content.addView(button("Добавить виджет на экран", R.id.pin_widget_button, true, this::pinWidget));
+        content.addView(button("Добавить виджет Codex", R.id.pin_widget_button, true, () -> pinWidget(LimitsWidget.class)));
+        content.addView(button("Добавить виджет Claude", R.id.pin_claude_widget_button, true, () -> pinWidget(ClaudeWidget.class)));
         space(content, 8);
         content.addView(text("Обновление примерно раз в 30 минут и по кнопке. Android может задерживать фоновые задачи для экономии батареи.", 12, MUTED, false));
         space(content, 24);
-        content.addView(text("Независимое приложение · v" + BuildConfig.VERSION_NAME + "\nТокены зашифрованы Android Keystore. Без рекламы, аналитики и собственного сервера. Источник лимитов Codex может измениться.", 11, MUTED, false));
+        content.addView(text("Независимое приложение · v" + BuildConfig.VERSION_NAME + "\nТокены зашифрованы Android Keystore. Без рекламы, аналитики и собственного сервера. Источники лимитов Codex и Claude могут измениться.", 11, MUTED, false));
     }
     private LinearLayout windowCard(LimitData.Window window, String fallback, int id, int color, long now) {
         LinearLayout card = card(); card.setPadding(dp(16), dp(20), dp(16), dp(20));
@@ -208,11 +221,88 @@ public final class MainActivity extends Activity {
         card.addView(text(DisplayText.reset(window, now), 11, MUTED, false));
         return card;
     }
-    private void pinWidget() {
+    private void renderClaude(long now) {
+        content.addView(text("CLAUDE  /  ОСТАЛОСЬ", 12, MUTED, true));
+        space(content, 10);
+        LinearLayout account = card();
+        account.addView(text(claude.connected() ? "CLAUDE ПОДКЛЮЧЁН" : "ПОДПИСКА CLAUDE PRO / MAX", 11, GREEN, true));
+        space(account, 8);
+        account.addView(text(claude.accountLabel(), 17, TEXT, true));
+        space(account, 12);
+        if (claude.connected()) {
+            Button refresh = button(claude.loading ? "Обновление…" : "Обновить лимиты Claude", R.id.claude_refresh_button, true,
+                    () -> claude.refresh(null));
+            refresh.setEnabled(!claude.loading); account.addView(refresh);
+            account.addView(button("Отключить Claude", R.id.claude_disconnect_button, false, () ->
+                    new AlertDialog.Builder(this).setTitle("Отключить Claude?")
+                            .setMessage("Токены входа Claude и сохранённые лимиты будут удалены с этого телефона.")
+                            .setPositiveButton("Отключить", (dialog, which) -> claude.disconnect())
+                            .setNegativeButton("Отмена", null).show()));
+        } else if (claude.browserPending()) {
+            account.addView(text("Завершите вход в браузере Claude", 17, TEXT, true));
+            space(account, 8);
+            account.addView(text("После подтверждения браузер вернёт вас сюда. Если страница не открылась или не вернула в приложение, отмените вход и используйте вход по коду.", 14, MUTED, false));
+            if (claude.browser != null) account.addView(button("Открыть страницу входа", R.id.claude_browser_open_button, true,
+                    () -> { if (claude.browser != null) open(claude.browser.authorizationUrl); }));
+            account.addView(button("Отменить вход", R.id.claude_cancel_login_button, false, claude::cancelLogin));
+        } else if (claude.manual != null) {
+            account.addView(text("1. Войдите в Claude на открывшейся странице.\n2. Нажмите Authorize и скопируйте показанный код.\n3. Вставьте его сюда.", 14, MUTED, false));
+            space(account, 8);
+            if (claudeCode.getParent() != null) ((LinearLayout) claudeCode.getParent()).removeView(claudeCode);
+            account.addView(claudeCode, new LinearLayout.LayoutParams(-1, -2));
+            Button submit = button(claude.loading ? "Проверка кода…" : "Подтвердить код", R.id.claude_code_submit_button, true,
+                    () -> claude.submitManualCode(claudeCode.getText().toString()));
+            submit.setEnabled(!claude.loading); account.addView(submit);
+            account.addView(button("Открыть страницу входа снова", 0, false,
+                    () -> { if (claude.manual != null) open(claude.manual.authorizationUrl); }));
+            account.addView(button("Отменить вход", R.id.claude_cancel_login_button, false, () -> { claudeCode.setText(""); claude.cancelLogin(); }));
+        } else {
+            Button login = button(claude.loading ? "Подготовка входа…" : "Войти в Claude через браузер", R.id.claude_login_button, true,
+                    () -> claude.beginBrowserLogin(url -> { if (!open(url)) claude.cancelLogin(); }));
+            login.setEnabled(!claude.loading && !repository.browserPending()); account.addView(login);
+            space(account, 8);
+            account.addView(text("Вход как в Claude Code: страница claude.ai в браузере. Приложение запрашивает только доступ к профилю (user:profile) — без отправки сообщений и создания API-ключей.", 12, MUTED, false));
+            account.addView(button("Запасной способ: вход по коду", R.id.claude_code_login_button, false, () -> {
+                claudeCode.setText("");
+                String url = claude.beginManualLogin();
+                if (url != null && !open(url)) claude.cancelLogin();
+            }));
+        }
+        content.addView(account);
+        if (!claude.error.isEmpty()) {
+            space(content, 12);
+            content.addView(text(claude.error, 14, AMBER, false));
+        }
+        space(content, 16);
+        LimitData data = claude.data;
+        boolean stale = data != null && (data.stale(now) || !claude.error.isEmpty());
+        LinearLayout windows = new LinearLayout(this); windows.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(0, -1, 1); first.rightMargin = dp(6);
+        LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, -1, 1); second.leftMargin = dp(6);
+        windows.addView(windowCard(data == null ? null : data.primary, "За 5 часов", R.id.claude_primary_percent, stale ? AMBER : GREEN, now), first);
+        windows.addView(windowCard(data == null ? null : data.secondary, "За неделю", R.id.claude_secondary_percent, stale ? AMBER : BLUE, now), second);
+        content.addView(windows);
+        space(content, 10);
+        content.addView(text(DisplayText.updated(data, !claude.error.isEmpty(), now), 12, stale ? AMBER : MUTED, false));
+        if (stale) content.addView(text("Это сохранённый остаток. После сброса лимита нужен новый запрос к Claude.", 12, AMBER, false));
+        if (data != null) {
+            if (data.credits != null) content.addView(text("Дополнительное использование: " + data.credits, 12, MUTED, false));
+            for (LimitData.Extra extra : data.extra) {
+                space(content, 12);
+                content.addView(text(extraLine(extra), 14, TEXT, false));
+            }
+        } else content.addView(text(claude.connected() ? "Нажмите «Обновить лимиты Claude», чтобы получить данные." : "Остаток Claude появится после входа и первого обновления.", 12, MUTED, false));
+        space(content, 8);
+        content.addView(button("Открыть Claude ↗", R.id.claude_open_button, false, () -> open("https://claude.ai/")));
+    }
+    private static String extraLine(LimitData.Extra extra) {
+        return extra.name + " · " + DisplayText.percent(extra.primary) + (extra.secondary == null ? "" : " / " + DisplayText.percent(extra.secondary));
+    }
+    private void pinWidget(Class<?> provider) {
         AppWidgetManager manager = getSystemService(AppWidgetManager.class);
-        if (manager.isRequestPinAppWidgetSupported()) manager.requestPinAppWidget(new ComponentName(this, LimitsWidget.class), null, null);
+        if (manager.isRequestPinAppWidgetSupported()) manager.requestPinAppWidget(new ComponentName(this, provider), null, null);
         else new AlertDialog.Builder(this).setTitle("Добавить виджет")
-                .setMessage("Зажмите свободное место на главном экране → Виджеты → Limit Pulse. Перетащите виджет на экран.")
+                .setMessage("Зажмите свободное место на главном экране → Виджеты → Limit Pulse. Выберите виджет Codex или Claude и перетащите его на экран.")
                 .setPositiveButton("Понятно", null).show();
     }
     private void enableNotifications() {
@@ -228,7 +318,7 @@ public final class MainActivity extends Activity {
     }
     private boolean open(String url) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true; }
-        catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Установите браузер, чтобы открыть OpenAI", Toast.LENGTH_LONG).show(); return false; }
+        catch (android.content.ActivityNotFoundException ignored) { Toast.makeText(this, "Установите браузер, чтобы открыть страницу", Toast.LENGTH_LONG).show(); return false; }
     }
     private LinearLayout card() {
         LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);

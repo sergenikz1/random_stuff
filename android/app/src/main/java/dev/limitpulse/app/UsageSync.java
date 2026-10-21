@@ -5,7 +5,11 @@ import org.json.JSONObject;
 /** Rotating tokens are persisted before subsequent requests, including failure paths. */
 final class UsageSync {
     interface Persist { void save(Credentials credentials) throws Exception; }
-    static JSONObject fetch(OpenAiApi api, Credentials original, long now, Persist persist) throws Exception {
+    interface Source {
+        Credentials refresh(Credentials old, long now) throws Exception;
+        JSONObject usage(Credentials credentials) throws Exception;
+    }
+    static JSONObject fetch(Source api, Credentials original, long now, Persist persist) throws Exception {
         Credentials current = original;
         boolean refreshed = false;
         if (current.expiresAt <= now + 60000) {

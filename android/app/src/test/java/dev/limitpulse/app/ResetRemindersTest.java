@@ -88,6 +88,25 @@ public class ResetRemindersTest {
         assertEquals(0, Shadows.shadowOf(app.getSystemService(NotificationManager.class)).size());
         assertEquals(0, ResetReminders.prefs(app).getLong("delivered_0", 0));
     }
+    @Test public void claudeRemindersUseSeparateSlotsAndSurviveCodexLogout() throws Exception {
+        long now = System.currentTimeMillis();
+        LimitData claude = LimitData.claude(new JSONObject("{\"five_hour\":{\"utilization\":30,\"resets_at\":\"" + java.time.Instant.ofEpochSecond(now / 1000 + 1800) + "\"},"
+                + "\"seven_day\":{\"utilization\":50,\"resets_at\":\"" + java.time.Instant.ofEpochSecond(now / 1000 + 604800) + "\"}}"), now);
+        PulseApplication.claude(app).data = claude;
+        ResetReminders.reconcile(app, ResetReminders.CLAUDE, claude, now);
+        org.robolectric.shadows.ShadowNotificationManager manager = Shadows.shadowOf(app.getSystemService(NotificationManager.class));
+        Notification due = manager.getNotification(8402);
+        assertNotNull("Window resetting within the hour notifies immediately", due);
+        assertTrue(due.extras.getCharSequence(Notification.EXTRA_TITLE).toString().contains("Claude"));
+        assertTrue(due.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("70%"));
+        assertEquals(1, alarms().size());
+        assertEquals(claude.secondary.resetAt * 1000 - ReminderPlan.HOUR, alarms().get(0).getTriggerAtMs());
+        PulseApplication.repository(app).disconnect();
+        assertEquals(1, alarms().size()); assertNotNull(manager.getNotification(8402));
+        PulseApplication.claude(app).disconnect();
+        assertTrue(alarms().isEmpty()); assertNull(manager.getNotification(8402));
+        assertEquals(0, ResetReminders.prefs(app).getLong("delivered_2", 0));
+    }
     @Test public void disableCancelsAndBootRestoresEnabledFutureAlarms() throws Exception {
         long now = System.currentTimeMillis(); LimitData data = data(now, 18000, 604800);
         PulseApplication.repository(app).data = data; ResetReminders.reconcile(app, data, now);

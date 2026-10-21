@@ -46,7 +46,7 @@ public class AndroidUiTest {
         try {
             android.app.Notification notification = Shadows.shadowOf(controller.get()).getLastForegroundNotification();
             assertNotNull(notification);
-            assertEquals("Вход в OpenAI", notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString());
+            assertEquals("Вход через браузер", notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString());
         } finally { controller.destroy(); }
     }
     @Test public void pendingBrowserLoginOpensOfficialOauthWithoutAskingForDeviceCodeAndCanBeCancelled() throws Exception {
@@ -111,6 +111,49 @@ public class AndroidUiTest {
         screenshot(view, "widget-sample-stale.png", 960, 660);
         View updated = view.findViewById(R.id.widget_updated);
         assertTrue("Widget status must fit inside its minimum height", updated.getBottom() <= view.getHeight() - view.getPaddingBottom());
+    }
+    @Test public void claudeWidgetShowsFiveHourAndWeeklyRemainderWithClaudeLink() throws Exception {
+        android.app.Application app = RuntimeEnvironment.getApplication(); ClaudeRepository claude = PulseApplication.claude(app);
+        long now = System.currentTimeMillis();
+        String fiveHour = java.time.Instant.ofEpochSecond(now / 1000 + 7500).toString();
+        String weekly = java.time.Instant.ofEpochSecond(now / 1000 + 2 * 86400 + 4 * 3600).toString();
+        claude.data = LimitData.claude(new JSONObject("{\"five_hour\":{\"utilization\":28,\"resets_at\":\"" + fiveHour + "\"},\"seven_day\":{\"utilization\":54.4,\"resets_at\":\"" + weekly + "\"}}"), now);
+        View view = ClaudeWidget.views(app, claude, now).apply(app, null);
+        assertEquals("72%", ((TextView) view.findViewById(R.id.widget_primary)).getText().toString());
+        assertEquals("45%", ((TextView) view.findViewById(R.id.widget_secondary)).getText().toString());
+        assertEquals("2 ч 5 мин", ((TextView) view.findViewById(R.id.widget_primary_reset)).getText().toString());
+        assertEquals("2 дн 4 ч", ((TextView) view.findViewById(R.id.widget_secondary_reset)).getText().toString());
+        assertEquals("Claude · осталось", ((TextView) view.findViewById(R.id.widget_account)).getText().toString());
+        assertEquals("Claude ↗", ((TextView) view.findViewById(R.id.widget_chatgpt)).getText().toString());
+        screenshot(view, "widget-claude.png", 960, 660);
+        assertTrue(view.findViewById(R.id.widget_updated).getBottom() <= view.getHeight() - view.getPaddingBottom());
+    }
+    @Test public void claudeCodeLoginOpensClaudeAuthorizeAndKeepsPastedCodeAcrossRenders() {
+        android.app.Application app = RuntimeEnvironment.getApplication(); ClaudeRepository claude = PulseApplication.claude(app);
+        try (org.robolectric.android.controller.ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup()) {
+            MainActivity activity = controller.get();
+            assertNotNull(activity.findViewById(R.id.claude_login_button));
+            assertEquals("—", ((TextView) activity.findViewById(R.id.claude_primary_percent)).getText().toString());
+            activity.findViewById(R.id.claude_code_login_button).performClick();
+            Intent opened = Shadows.shadowOf(activity).getNextStartedActivity();
+            assertEquals("claude.com", opened.getData().getHost()); assertEquals("/cai/oauth/authorize", opened.getData().getPath());
+            assertEquals("user:profile", opened.getData().getQueryParameter("scope"));
+            // A code with a foreign state is rejected locally, before any network exchange.
+            ((TextView) activity.findViewById(R.id.claude_code_input)).setText("pasted#forged");
+            controller.pause().resume();
+            assertEquals("pasted#forged", ((TextView) activity.findViewById(R.id.claude_code_input)).getText().toString());
+            activity.findViewById(R.id.claude_code_submit_button).performClick();
+            assertTrue(claude.error.contains("Код не подходит")); assertFalse(claude.loading);
+            activity.findViewById(R.id.claude_cancel_login_button).performClick();
+            assertNull(claude.manual); assertNotNull(activity.findViewById(R.id.claude_login_button));
+            screenshot(activity.getWindow().getDecorView(), "app-claude.png", 1080, 2400);
+        }
+    }
+    @Test public void claudeWidgetShowsUnknownWhenDisconnected() {
+        android.app.Application app = RuntimeEnvironment.getApplication();
+        View view = ClaudeWidget.views(app, PulseApplication.claude(app), System.currentTimeMillis()).apply(app, null);
+        assertEquals("—", ((TextView) view.findViewById(R.id.widget_primary)).getText().toString());
+        assertEquals("Claude не подключён", ((TextView) view.findViewById(R.id.widget_account)).getText().toString());
     }
     private void screenshot(View view, String name, int width, int height) {
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));

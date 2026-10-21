@@ -20,6 +20,11 @@ on:
         default: base64
         type: choice
         options: [base64, gzip-base64, gzip-base85]
+      print_apk:
+        description: Print the unsigned release APK (gzip+base64) in the log for offline signing
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
@@ -43,6 +48,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Test, lint and build
         run: ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease
+      - name: Print unsigned APK for offline signing
+        if: github.event_name == 'workflow_dispatch' && inputs.print_apk
+        run: |
+          apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          sha256sum "$apk"
+          echo '--- BEGIN APK ---'
+          gzip -9nc "$apk" | base64 -w 120
+          echo '--- END APK ---'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

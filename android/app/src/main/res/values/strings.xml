@@ -11,4 +11,7 @@
     <string name="widget_chatgpt_open">ChatGPT ↗</string>
     <string name="widget_refresh">Обновить ↻</string>
     <string name="widget_not_updated">Ещё не обновлялось</string>
+    <string name="codex_widget_label">Limit Pulse · Codex</string>
+    <string name="claude_widget_label">Limit Pulse · Claude</string>
+    <string name="claude_widget_description">Остаток лимитов Claude и время до сброса</string>
 </resources>

@@ -17,11 +17,11 @@ public final class LoginService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         getSystemService(NotificationManager.class).createNotificationChannel(
-                new NotificationChannel(CHANNEL, "Вход в OpenAI", NotificationManager.IMPORTANCE_LOW));
+                new NotificationChannel(CHANNEL, "Вход через браузер", NotificationManager.IMPORTANCE_LOW));
         PendingIntent open = PendingIntent.getActivity(this, 10, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent cancel = PendingIntent.getService(this, 11, new Intent(this, LoginService.class).setAction(CANCEL), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification notification = new Notification.Builder(this, CHANNEL)
-                .setSmallIcon(R.drawable.ic_login_notification).setContentTitle("Вход в OpenAI")
+                .setSmallIcon(R.drawable.ic_login_notification).setContentTitle("Вход через браузер")
                 .setContentText("Завершите вход в браузере и вернитесь в Limit Pulse")
                 .setOngoing(true).setContentIntent(open)
                 .addAction(new Notification.Action.Builder(null, "Отменить", cancel).build()).build();
@@ -30,15 +30,21 @@ public final class LoginService extends Service {
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && CANCEL.equals(intent.getAction())) {
-            PulseApplication.repository(this).cancelLogin(); stopSelf();
+            cancelLogins(); stopSelf();
         }
         return START_NOT_STICKY;
     }
-    @Override public void onTimeout(int startId, int fgsType) { PulseApplication.repository(this).cancelLogin(); stopSelf(); }
+    @Override public void onTimeout(int startId, int fgsType) { cancelLogins(); stopSelf(); }
     @Override public void onDestroy() {
         AccountRepository repository = PulseApplication.repository(this);
         if (repository != null && repository.browserPending()) repository.cancelLogin();
+        ClaudeRepository claude = PulseApplication.claude(this);
+        if (claude != null && claude.browserPending()) claude.cancelLogin();
         super.onDestroy();
+    }
+    private void cancelLogins() {
+        if (PulseApplication.repository(this).browserPending()) PulseApplication.repository(this).cancelLogin();
+        if (PulseApplication.claude(this).browserPending()) PulseApplication.claude(this).cancelLogin();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
 }

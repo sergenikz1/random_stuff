@@ -68,7 +68,7 @@ final class AccountRepository {
     }
     boolean browserPending() { return browserStarting || browser != null; }
     void beginBrowserLogin(java.util.function.Consumer<String> openBrowser) {
-        if (loading || device != null || browserPending()) return;
+        if (loading || device != null || browserPending() || PulseApplication.claude(context).browserPending()) return;
         final long epoch = ++generation;
         browserStarting = true; loading = true; error = ""; changed();
         try { context.startForegroundService(new android.content.Intent(context, LoginService.class)); }
@@ -119,9 +119,11 @@ final class AccountRepository {
         });
     }
     private void finishBrowserLogin() {
-        BrowserLogin session = browser; browser = null; browserStarting = false; loading = false;
+        BrowserLogin session = browser; boolean pending = browserPending();
+        browser = null; browserStarting = false; loading = false;
         if (session != null) session.close();
-        context.stopService(new android.content.Intent(context, LoginService.class));
+        // The service may be keeping a Claude login alive instead.
+        if (pending) context.stopService(new android.content.Intent(context, LoginService.class));
     }
     void beginLogin() {
         if (loading || device != null || browserPending()) return;

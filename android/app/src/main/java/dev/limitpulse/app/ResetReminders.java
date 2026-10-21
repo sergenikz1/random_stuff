@@ -17,16 +17,22 @@ import java.util.Date;
 final class ResetReminders {
     static final String CHANNEL = "limit_reset_reminders";
     static final String SLOT = "slot", RESET = "reset_at";
+    /** Providers own two slots each: Codex 0–1, Claude 2–3 (short window, then weekly). */
+    static final int CODEX = 0, CLAUDE = 1, SLOTS = 4;
+    static LimitData data(Context context, int provider) {
+        return provider == CLAUDE ? PulseApplication.claude(context).data
+                : provider == CODEX ? PulseApplication.repository(context).data : null;
+    }
     static SharedPreferences prefs(Context context) { return context.getSharedPreferences("reset_reminders", Context.MODE_PRIVATE); }
     static boolean enabled(Context context) { return prefs(context).getBoolean("enabled", true); }
     static void setEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean("enabled", enabled).apply();
-        if (!enabled) for (int slot = 0; slot < 2; slot++) context.getSystemService(NotificationManager.class).cancel(8400 + slot);
-        reconcile(context, PulseApplication.repository(context).data, System.currentTimeMillis());
+        if (!enabled) for (int slot = 0; slot < SLOTS; slot++) context.getSystemService(NotificationManager.class).cancel(8400 + slot);
+        reconcileAll(context, System.currentTimeMillis());
     }
     static void channel(Context context) {
         NotificationChannel channel = new NotificationChannel(CHANNEL, "За час до сброса лимитов", NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription("Остаток процентов и время до сброса короткого и недельного лимитов Codex");
+        channel.setDescription("Остаток процентов и время до сброса короткого и недельного лимитов Codex и Claude");
         context.getSystemService(NotificationManager.class).createNotificationChannel(channel);
     }
     static boolean allowed(Context context) {
@@ -43,13 +49,18 @@ final class ResetReminders {
         Intent intent = new Intent(context, ResetReminderReceiver.class).putExtra(SLOT, slot).putExtra(RESET, reset);
         return PendingIntent.getBroadcast(context, 8200 + slot, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
-    static void reconcile(Context context, LimitData data, long now) {
+    static void reconcileAll(Context context, long now) {
+        reconcile(context, CODEX, data(context, CODEX), now);
+        reconcile(context, CLAUDE, data(context, CLAUDE), now);
+    }
+    static void reconcile(Context context, LimitData data, long now) { reconcile(context, CODEX, data, now); }
+    static void reconcile(Context context, int provider, LimitData data, long now) {
         boolean active = data != null && enabled(context) && allowed(context);
         AlarmManager alarms = context.getSystemService(AlarmManager.class);
-        for (int slot = 0; slot < 2; slot++) {
+        for (int slot = provider * 2; slot < provider * 2 + 2; slot++) {
             alarms.cancel(operation(context, slot, 0));
             if (!active) continue;
-            LimitData.Window window = ReminderPlan.window(data, slot);
+            LimitData.Window window = ReminderPlan.window(data, slot % 2);
             long delivered = prefs(context).getLong("delivered_" + slot, 0);
             long when = ReminderPlan.at(window, now, delivered);
             if (when < 0) continue;
@@ -64,10 +75,11 @@ final class ResetReminders {
         }
     }
     static boolean deliver(Context context, LimitData data, int slot, long expectedReset, long now) {
-        if (slot < 0 || slot > 1 || !enabled(context) || !allowed(context)) return false;
-        LimitData.Window window = ReminderPlan.window(data, slot);
+        if (slot < 0 || slot >= SLOTS || !enabled(context) || !allowed(context)) return false;
+        LimitData.Window window = ReminderPlan.window(data, slot % 2);
         if (!ReminderPlan.due(window, expectedReset, now, prefs(context).getLong("delivered_" + slot, 0))) return false;
-        String title = window.windowSeconds >= 604800 ? "Скоро сброс недельного лимита" : "Скоро сброс лимита Codex";
+        String product = slot / 2 == CLAUDE ? "Claude" : "Codex";
+        String title = window.windowSeconds >= 604800 ? "Скоро сброс недельного лимита " + product : "Скоро сброс лимита " + product;
         String body = body(data, window, now);
         PendingIntent open = PendingIntent.getActivity(context, 8300 + slot, new Intent(context, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
@@ -85,13 +97,16 @@ final class ResetReminders {
         String time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(data.fetchedAt));
         return "Осталось " + DisplayText.percent(window) + " по данным на " + time + ". До сброса — " + DisplayText.countdown(window, now) + ".";
     }
-    static void clearAccount(Context context) {
+    static void clearAccount(Context context) { clearAccount(context, CODEX); }
+    static void clearAccount(Context context, int provider) {
         AlarmManager alarms = context.getSystemService(AlarmManager.class);
-        for (int slot = 0; slot < 2; slot++) {
+        SharedPreferences.Editor editor = prefs(context).edit();
+        for (int slot = provider * 2; slot < provider * 2 + 2; slot++) {
             alarms.cancel(operation(context, slot, 0));
             context.getSystemService(NotificationManager.class).cancel(8400 + slot);
+            editor.remove("delivered_" + slot);
         }
-        prefs(context).edit().remove("delivered_0").remove("delivered_1").apply();
+        editor.apply();
     }
     private ResetReminders() { }
 }

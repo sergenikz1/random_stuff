@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** Passive usage reader following the open-source Codex OAuth protocol. */
-public final class OpenAiApi {
+public final class OpenAiApi implements UsageSync.Source {
     public static final String CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
     public static final String VERIFY_URL = "https://auth.openai.com/codex/device";
     static final String AUTH = "https://auth.openai.com";
@@ -62,7 +62,7 @@ public final class OpenAiApi {
         requireSuccess(tokens);
         return Credentials.fromTokens(tokens.json, null, now);
     }
-    public Credentials refresh(Credentials old, long now) throws Exception {
+    @Override public Credentials refresh(Credentials old, long now) throws Exception {
         if (old.refreshToken.isEmpty()) throw new ApiException(401);
         Response response = post("/oauth/token", new JSONObject().put("grant_type", "refresh_token")
                 .put("client_id", CLIENT_ID).put("refresh_token", old.refreshToken));
@@ -76,7 +76,7 @@ public final class OpenAiApi {
         requireSuccess(response);
         return Credentials.fromTokens(response.json, null, now);
     }
-    public JSONObject usage(Credentials credentials) throws Exception {
+    @Override public JSONObject usage(Credentials credentials) throws Exception {
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + credentials.accessToken);
         if (!credentials.accountId.isEmpty()) headers.put("ChatGPT-Account-Id", credentials.accountId);
@@ -110,10 +110,12 @@ public final class OpenAiApi {
         }
         return new EncodedBody("application/json", body.toString());
     }
+    static final java.util.Set<String> ALLOWED_HOSTS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "auth.openai.com", "chatgpt.com", "platform.claude.com", "api.anthropic.com"));
     static final class HttpsTransport implements Transport {
         @Override public Response send(String method, String urlString, JSONObject body, Map<String, String> headers) throws Exception {
             URL url = new URL(urlString);
-            if (!"https".equals(url.getProtocol()) || !("auth.openai.com".equals(url.getHost()) || "chatgpt.com".equals(url.getHost())))
+            if (!"https".equals(url.getProtocol()) || !ALLOWED_HOSTS.contains(url.getHost()))
                 throw new IOException("Unsupported destination");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             // Credentials must never be forwarded to a redirect target.

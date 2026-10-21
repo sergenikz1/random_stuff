@@ -70,6 +70,35 @@ public final class LimitData {
         return new LimitData(root.optString("plan_type", "Не указан"), window(rate, "primary_window", fetchedAt),
                 window(rate, "secondary_window", fetchedAt), extras, allowed, credits, fetchedAt);
     }
+    /** Claude usage: {@code utilization} is the used percent; {@code resets_at} is ISO-8601 or null. */
+    public static LimitData claude(JSONObject root, long fetchedAt) throws JSONException {
+        if (!root.has("five_hour") && !root.has("seven_day")) throw new JSONException("Unexpected Claude usage response");
+        List<Extra> extras = new ArrayList<>();
+        String[][] models = { { "seven_day_opus", "Opus · неделя" }, { "seven_day_sonnet", "Sonnet · неделя" } };
+        for (String[] model : models) {
+            Window weekly = claudeWindow(root, model[0], 604800);
+            if (weekly != null) extras.add(new Extra(model[1], weekly, null));
+        }
+        JSONObject extra = root.optJSONObject("extra_usage");
+        String credits = null;
+        if (extra != null && extra.optBoolean("is_enabled", false) && extra.opt("utilization") instanceof Number)
+            credits = (int) Math.floor(Math.max(0, extra.getDouble("utilization"))) + "% месячного лимита использовано";
+        return new LimitData("Claude", claudeWindow(root, "five_hour", 18000), claudeWindow(root, "seven_day", 604800),
+                extras, null, credits, fetchedAt);
+    }
+    private static Window claudeWindow(JSONObject root, String key, long windowSeconds) {
+        JSONObject w = root.optJSONObject(key);
+        if (w == null || !(w.opt("utilization") instanceof Number)) return null;
+        double used = w.optDouble("utilization", Double.NaN);
+        if (!Double.isFinite(used)) return null;
+        long reset = 0;
+        String resetsAt = w.optString("resets_at", "");
+        if (!w.isNull("resets_at") && !resetsAt.isEmpty()) {
+            try { reset = java.time.OffsetDateTime.parse(resetsAt).toEpochSecond(); }
+            catch (java.time.format.DateTimeParseException unknownFormat) { reset = 0; }
+        }
+        return new Window(used, windowSeconds, reset);
+    }
     private static Window window(JSONObject rate, String key, long fetchedAt) {
         if (rate == null) return null;
         JSONObject w = rate.optJSONObject(key);

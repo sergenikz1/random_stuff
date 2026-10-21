@@ -10,8 +10,8 @@ public final class BootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
                 || Intent.ACTION_TIME_CHANGED.equals(action) || Intent.ACTION_TIMEZONE_CHANGED.equals(action)
                 || "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED".equals(action)) {
-            RefreshJob.schedule(context); LimitsWidget.updateAll(context);
-            ResetReminders.reconcile(context, PulseApplication.repository(context).data, System.currentTimeMillis());
+            RefreshJob.schedule(context); LimitsWidget.updateAll(context); ClaudeWidget.updateAll(context);
+            ResetReminders.reconcileAll(context, System.currentTimeMillis());
             WidgetTicker.schedule(context);
         }
     }

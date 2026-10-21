@@ -6,10 +6,11 @@ import android.content.Intent;
 
 public final class ResetReminderReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        ResetReminders.deliver(context, PulseApplication.repository(context).data,
-                intent.getIntExtra(ResetReminders.SLOT, -1), intent.getLongExtra(ResetReminders.RESET, 0), System.currentTimeMillis());
-        ResetReminders.reconcile(context, PulseApplication.repository(context).data, System.currentTimeMillis());
-        LimitsWidget.updateAll(context);
+        int slot = intent.getIntExtra(ResetReminders.SLOT, -1);
+        ResetReminders.deliver(context, ResetReminders.data(context, slot / 2), slot,
+                intent.getLongExtra(ResetReminders.RESET, 0), System.currentTimeMillis());
+        ResetReminders.reconcileAll(context, System.currentTimeMillis());
+        LimitsWidget.updateAll(context); ClaudeWidget.updateAll(context);
         RefreshJob.requestNow(context);
     }
 }

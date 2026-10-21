@@ -1,6 +1,9 @@
 package com.voicereader.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
@@ -28,6 +32,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +50,11 @@ private val SpeedLabel = Color(0xFF8A8A8A)
 /** Доля ширины экрана, где стоит метка опорной буквы — чуть левее центра. */
 private const val FOCUS_X = 0.4f
 
+/** Заставка новой главы: 2 с проявление, 1 с на экране, 2 с исчезновение. */
+private const val BANNER_FADE_MS = 2000
+private const val BANNER_HOLD_MS = 1000
+private const val BANNER_TOTAL_MS = BANNER_FADE_MS * 2 + BANNER_HOLD_MS
+
 /**
  * Быстрое чтение: слова книги по одному в фиксированной точке, опорная буква — красная,
  * взгляд не бегает по строке. Нажатие на экран — пауза/продолжить.
@@ -58,6 +68,8 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
     var word by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(false) }
     var shownSinceStart by remember { mutableIntStateOf(0) }
+    // Название главы, которое сейчас проявляется на месте слова; null — заставки нет.
+    var banner by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { PlayerEngine.pause() }
     BackHandler { playing = false; onBack() }
@@ -77,20 +89,32 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
     fun moveToSentence(target: Int) {
         sentence = target.coerceIn(0, (state.sentences.size - 1).coerceAtLeast(0))
         word = 0
+        banner = null
         PlayerEngine.seekTo(sentence)
     }
 
-    LaunchedEffect(playing, sentence, word) {
+    /** Переход к следующему предложению по ходу чтения: на границе главы — заставка с её названием. */
+    fun advanceTo(next: Int) {
+        moveToSentence(next)
+        banner = state.chapters.firstOrNull { it.startIndex == next && next > 0 }?.title
+    }
+
+    LaunchedEffect(playing, sentence, word, banner) {
         if (!playing) return@LaunchedEffect
+        if (banner != null) {
+            delay(BANNER_TOTAL_MS.toLong())
+            banner = null
+            return@LaunchedEffect
+        }
         if (words.isEmpty()) {
-            if (sentence + 1 < state.sentences.size) moveToSentence(sentence + 1) else playing = false
+            if (sentence + 1 < state.sentences.size) advanceTo(sentence + 1) else playing = false
             return@LaunchedEffect
         }
         delay(SpeedWords.durationMs(current, wpm, endOfSentence = word == words.size - 1))
         shownSinceStart++
         when {
             word + 1 < words.size -> word++
-            sentence + 1 < state.sentences.size -> moveToSentence(sentence + 1)
+            sentence + 1 < state.sentences.size -> advanceTo(sentence + 1)
             else -> playing = false
         }
     }
@@ -113,7 +137,13 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
             Modifier.fillMaxWidth().align(Alignment.Center).offset(y = (-60).dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            WordFrame(current, Modifier.fillMaxWidth().height(110.dp))
+            Box(Modifier.fillMaxWidth().height(110.dp), contentAlignment = Alignment.Center) {
+                WordFrame(if (banner != null) "" else current, Modifier.fillMaxSize())
+                banner?.let { title ->
+                    // Пауза снимает заставку с экрана, после продолжения она проиграется заново.
+                    ChapterBanner(title, animate = playing)
+                }
+            }
             Spacer(Modifier.height(14.dp))
             Text(
                 "$wpm слов/мин",
@@ -138,6 +168,28 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
             )
         }
     }
+}
+
+/** Название новой главы: плавно проявляется, держится и так же плавно гаснет. */
+@Composable
+private fun ChapterBanner(title: String, animate: Boolean) {
+    val alpha = remember(title, animate) { Animatable(if (animate) 0f else 1f) }
+    LaunchedEffect(title, animate) {
+        if (!animate) return@LaunchedEffect
+        alpha.animateTo(1f, tween(BANNER_FADE_MS, easing = LinearEasing))
+        delay(BANNER_HOLD_MS.toLong())
+        alpha.animateTo(0f, tween(BANNER_FADE_MS, easing = LinearEasing))
+    }
+    Text(
+        title,
+        color = SpeedWord,
+        fontSize = 26.sp,
+        fontFamily = FontFamily.Serif,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).alpha(alpha.value)
+    )
 }
 
 /** Две горизонтальные направляющие с метками и слово, выровненное опорной буквой по метке. */

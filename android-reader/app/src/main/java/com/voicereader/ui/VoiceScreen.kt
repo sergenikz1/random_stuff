@@ -74,7 +74,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                             onClick = { editing = i },
                             label = {
                                 Text(
-                                    p.label,
+                                    SystemTts.labelOf(p),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -91,14 +91,15 @@ fun VoiceScreen(onBack: () -> Unit) {
             item {
                 Card {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Слот ${editing + 1}: ${profile.label}", style = MaterialTheme.typography.titleMedium)
+                        Text("Слот ${editing + 1}: ${SystemTts.labelOf(profile)}", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
                         Text(
                             when (profile.kind) {
                                 VoiceKind.NEURAL -> VoiceCatalog.byId(profile.neuralVoiceId)?.description
                                     ?: "встроенная нейросетевая модель"
                                 VoiceKind.SYSTEM -> profile.systemVoiceName?.let { name ->
-                                    systemVoices.firstOrNull { it.name == name }?.displayName ?: name
+                                    systemVoices.firstOrNull { it.name == name }
+                                        ?.let { "системный голос · ${it.displayName}" } ?: name
                                 } ?: "голос системного движка по умолчанию"
                             },
                             style = MaterialTheme.typography.bodySmall,
@@ -234,7 +235,7 @@ fun VoiceScreen(onBack: () -> Unit) {
                     onClick = {
                         Settings.updateProfile(editing) {
                             it.copy(
-                                label = voice.displayName.take(14),
+                                label = voice.title,
                                 kind = VoiceKind.SYSTEM,
                                 systemVoiceName = voice.name
                             )
@@ -312,8 +313,14 @@ private fun NeuralVoiceRow(
 @Composable
 private fun SystemVoiceRow(voice: InstalledVoice, selected: Boolean, onClick: () -> Unit) {
     ListItem(
-        headlineContent = { Text(voice.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text("${voice.locale} · качество ${voice.quality} · офлайн") },
+        headlineContent = { Text(voice.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            Text(
+                "${voice.locale} · ${voice.displayName} · качество ${voice.quality} · офлайн",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
         trailingContent = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Выбран") },
         colors = if (selected)
             ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant)

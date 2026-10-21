@@ -42,6 +42,7 @@ import com.voicereader.data.Settings
 import com.voicereader.data.TextWindow
 import com.voicereader.player.PlayerEngine
 import com.voicereader.player.PlayerState
+import com.voicereader.tts.SystemTts
 import com.voicereader.tts.TtsStatus
 import com.voicereader.tts.VoiceKind
 import kotlinx.coroutines.delay
@@ -290,6 +291,8 @@ private fun ReaderSettings(
     onOpenVoices: () -> Unit
 ) {
     val settings by Settings.state.collectAsState()
+    // Имена системных голосов появляются после загрузки списка движком — подписи обновятся сами.
+    SystemTts.voices.collectAsState().value
     Column(
         Modifier
             .fillMaxWidth()
@@ -334,7 +337,7 @@ private fun ReaderSettings(
                 FilterChip(
                     selected = i == settings.activeVoice,
                     onClick = { PlayerEngine.selectVoice(i) },
-                    label = { Text(profile.label.substringBefore(" ·"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text(SystemTts.labelOf(profile).substringBefore(" ·"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.weight(1f)
                 )
             }

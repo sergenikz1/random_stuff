@@ -47,13 +47,21 @@ object SystemTts {
 
     fun refreshVoices() {
         val engine = tts ?: return
-        _voices.value = runCatching { engine.voices }.getOrNull().orEmpty()
+        val offline = runCatching { engine.voices }.getOrNull().orEmpty()
             .filter { v ->
                 !v.isNetworkConnectionRequired &&
                     v.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true
             }
-            .map { InstalledVoice(it.name, it.locale.toLanguageTag(), it.quality) }
+        val titles = SystemVoiceNames.assign(offline.map { it.name to it.locale.toLanguageTag() })
+        _voices.value = offline
+            .map { InstalledVoice(it.name, it.locale.toLanguageTag(), it.quality, titles[it.name] ?: it.name) }
             .sortedWith(compareByDescending<InstalledVoice> { it.quality }.thenBy { it.name })
+    }
+
+    /** Подпись голоса в интерфейсе: у системных — их имя, даже если слот сохранён до появления имён. */
+    fun labelOf(profile: VoiceProfile): String {
+        if (profile.kind != VoiceKind.SYSTEM) return profile.label
+        return _voices.value.firstOrNull { it.name == profile.systemVoiceName }?.title ?: profile.label
     }
 
     fun applyLanguage(language: String) {

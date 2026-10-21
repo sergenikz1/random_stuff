@@ -32,7 +32,9 @@ data class VoiceProfile(
 data class InstalledVoice(
     val name: String,
     val locale: String,
-    val quality: Int
+    val quality: Int,
+    /** Имя для интерфейса, см. [SystemVoiceNames]. */
+    val title: String = name
 ) {
     val displayName: String
         get() {

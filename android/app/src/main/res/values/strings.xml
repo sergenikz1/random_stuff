@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Limit Pulse</string>
+    <string name="widget_description">Остаток лимитов Codex и время обновления</string>
+    <string name="widget_title">LIMIT PULSE</string>
+    <string name="widget_disconnected">Подключите аккаунт</string>
+    <string name="widget_primary">Codex · основное окно</string>
+    <string name="widget_secondary">Дополнительное окно</string>
+    <string name="widget_unknown">—</string>
+    <string name="widget_reset_in">СБРОС ЧЕРЕЗ</string>
+    <string name="widget_chatgpt">ChatGPT · остаток недоступен</string>
+    <string name="widget_chatgpt_open">ChatGPT ↗</string>
+    <string name="widget_refresh">Обновить ↻</string>
+    <string name="widget_not_updated">Ещё не обновлялось</string>
+    <string name="codex_widget_label">Limit Pulse · Codex</string>
+    <string name="claude_widget_label">Limit Pulse · Claude</string>
+    <string name="claude_widget_description">Остаток лимитов Claude и время до сброса</string>
+</resources>

@@ -11,3 +11,4 @@ captures/
 app/libs/
 app/src/main/assets/tts/
 dist/
+.kotlin/

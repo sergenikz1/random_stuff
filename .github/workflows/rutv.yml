@@ -1,14 +1,14 @@
-name: Build Android TV APK
+name: RuTV — сборка APK
 
 on:
   push:
     paths:
-      - "android/**"
-      - ".github/workflows/android.yml"
+      - "rutv/**"
+      - ".github/workflows/rutv.yml"
   pull_request:
     paths:
-      - "android/**"
-      - ".github/workflows/android.yml"
+      - "rutv/**"
+      - ".github/workflows/rutv.yml"
   workflow_dispatch:
 
 jobs:
@@ -44,11 +44,11 @@ jobs:
           echo "RUTV_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Build APK
-        working-directory: android
+        working-directory: rutv
         run: ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Rename APK
-        working-directory: android
+        working-directory: rutv
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/*.apk "out/RuTV-$(git rev-parse --short HEAD).apk"
@@ -61,14 +61,14 @@ jobs:
         continue-on-error: true
         with:
           name: RuTV-apk
-          path: android/out/*.apk
+          path: rutv/out/*.apk
           if-no-files-found: error
           retention-days: 30
 
       # Основной канал доставки, пока исчерпана квота на артефакты Actions:
-      # push и ручной запуск обновляют предрелиз apk-latest свежим APK.
+      # push в main и ручной запуск из main обновляют предрелиз apk-latest свежим APK.
       - name: Publish APK to apk-latest release
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -76,4 +76,4 @@ jobs:
             --title "RuTV APK" \
             --notes "Автосборка клиента Rutube для ТВ. Обновляется ручным запуском workflow." \
             --prerelease
-          gh release upload apk-latest android/out/*.apk --clobber
+          gh release upload apk-latest rutv/out/*.apk --clobber

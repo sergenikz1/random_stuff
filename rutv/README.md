@@ -5,7 +5,7 @@ Android TV приложение (APK) для просмотра Rutube на те
 адрес контентного HLS-потока и отдаёт его в ExoPlayer, рекламный слой
 веб-плеера при этом вообще не задействован.
 
-Проект живёт в каталоге `android/` и никак не связан с остальным содержимым
+Проект живёт в каталоге `rutv/` и никак не связан с остальным содержимым
 репозитория.
 
 ## Что умеет
@@ -24,14 +24,14 @@ Android TV приложение (APK) для просмотра Rutube на те
 
 ### Через GitHub Actions (ничего ставить не нужно)
 
-Workflow `.github/workflows/android.yml` собирает APK на каждый push в
-каталог `android/`. Готовый файл лежит в артефактах запуска (`RuTV-apk`):
+Workflow `.github/workflows/rutv.yml` собирает APK на каждый push в
+каталог `rutv/`. Готовый файл лежит в артефактах запуска (`RuTV-apk`):
 **Actions → нужный запуск → Artifacts**.
 
-Запустить вручную: **Actions → Build Android TV APK → Run workflow**.
+Запустить вручную: **Actions → RuTV — сборка APK → Run workflow**.
 
 Свежий APK всегда лежит в предрелизе **`apk-latest`** (раздел Releases) —
-его обновляет каждая сборка из ветки. Это основной способ забрать файл,
+его обновляет каждая сборка из ветки `main`. Это основной способ забрать файл,
 пока в аккаунте исчерпана квота на артефакты Actions: шаг с артефактом в
 этом случае падает, но сборку не валит.
 
@@ -41,7 +41,7 @@ Workflow `.github/workflows/android.yml` собирает APK на каждый 
 Maven Central:
 
 ```bash
-cd android
+cd rutv
 ./gradlew assembleRelease
 # APK: app/build/outputs/apk/release/app-release.apk
 ```
@@ -79,7 +79,7 @@ base64 -w0 release.jks   # значение для секрета RUTV_KEYSTORE_
 ## Структура
 
 ```
-android/app/src/main/java/org/rutv/client/
+rutv/app/src/main/java/org/rutv/client/
 ├── data/        RutubeApi (JSON-API), Repository, модели, локальное хранилище
 ├── ui/          главный экран, поиск, карточка видео, канал, настройки
 ├── player/      PlayerActivity на Media3/ExoPlayer

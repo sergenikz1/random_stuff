@@ -1,0 +1,39 @@
+name: Чистка релизов
+
+# Оставляет в релизах только последнюю версию каждого продукта, старые удаляет вместе с тегами.
+# Продукт определяется по тегу без номера версии: chitalka-v1.3 → chitalka,
+# limit-pulse-v0.3.0 → limit-pulse. Запускается при изменении этого файла и вручную.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/releases-cleanup.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Удалить всё, кроме последней версии каждого продукта
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release list --limit 200 --json tagName,publishedAt,isDraft \
+            --jq '.[] | select(.isDraft | not) | [.tagName, .publishedAt] | @tsv' |
+          while IFS=$'\t' read -r tag published; do
+            product=$(echo "$tag" | sed -E 's/-v[0-9][0-9A-Za-z.\-]*$//')
+            printf '%s\t%s\t%s\n' "$product" "$published" "$tag"
+          done | sort -t$'\t' -k1,1 -k2,2r |
+          awk -F'\t' '$1 == prev { print $3 } { prev = $1 }' > old.txt
+
+          if [ ! -s old.txt ]; then
+            echo "Старых версий нет"
+            exit 0
+          fi
+          while read -r tag; do
+            echo "Удаляю $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          done < old.txt

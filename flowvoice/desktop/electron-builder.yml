@@ -1,0 +1,52 @@
+appId: com.flowvoice.app
+productName: FlowVoice
+copyright: MIT Licensed
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+
+asar: true
+
+# FlowVoice ships no auto-updater, so no update metadata is generated. Without
+# this, a GH_TOKEN in the environment makes electron-builder infer a GitHub
+# publish target and crash when it cannot detect the repository.
+publish: null
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: assets/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FlowVoice
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerLanguages:
+    - en_US
+    - ru_RU
+  displayLanguageSelector: true
+  runAfterFinish: true
+  artifactName: FlowVoice-Setup-${version}-x64.${ext}
+
+portable:
+  artifactName: FlowVoice-Portable-${version}-x64.${ext}
+
+linux:
+  target:
+    - AppImage
+  icon: assets/icon.png
+  category: Utility

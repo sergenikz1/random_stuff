@@ -1,0 +1,46 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="8dp" android:background="@drawable/widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/widget_title" android:textColor="#72E6C1" android:textSize="12sp" android:letterSpacing="0.12" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="wrap_content" android:layout_height="28dp"
+            android:gravity="center" android:text="@string/widget_refresh" android:textColor="#D9E6EB" android:textSize="12sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_account" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/widget_disconnected" android:textSize="12sp" android:textColor="#A0B5C0" android:maxLines="1" android:ellipsize="end" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" android:layout_marginBottom="2dp"
+        android:baselineAligned="false" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:paddingTop="6dp" android:paddingBottom="6dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_primary_card">
+            <TextView android:id="@+id/widget_primary_label" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_primary" android:textSize="11sp" android:textColor="#D9F3E6" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_primary" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_unknown" android:textColor="#AEFFD0" android:textSize="34sp" android:fontFamily="sans-serif-black" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_reset_in" android:textSize="11sp" android:textColor="#D9F3E6" />
+            <TextView android:id="@+id/widget_primary_reset" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="21sp" android:textColor="#FFFFFF" android:fontFamily="sans-serif-medium" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:paddingTop="6dp" android:paddingBottom="6dp" android:layout_marginStart="4dp" android:background="@drawable/widget_weekly_card">
+            <TextView android:id="@+id/widget_secondary_label" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_secondary" android:textSize="11sp" android:textColor="#DAE9FF" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_secondary" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_unknown" android:textColor="#B2DEFF" android:textSize="34sp" android:fontFamily="sans-serif-black" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/widget_reset_in" android:textSize="11sp" android:textColor="#DAE9FF" />
+            <TextView android:id="@+id/widget_secondary_reset" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="21sp" android:textColor="#FFFFFF" android:fontFamily="sans-serif-medium" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_chat_label" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/widget_chatgpt" android:textColor="#A0B5C0" android:textSize="11sp" />
+        <TextView android:id="@+id/widget_chatgpt" android:layout_width="wrap_content" android:layout_height="24dp"
+            android:gravity="center" android:text="@string/widget_chatgpt_open" android:textColor="#D9E6EB" android:textSize="11sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_updated" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/widget_not_updated" android:textColor="#A0B5C0" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

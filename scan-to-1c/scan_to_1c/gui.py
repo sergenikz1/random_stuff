@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__
+from . import __version__, updater
 from .exporter import export_to_folder
 from .extract import ExtractedData, extract, parse_amount, parse_date
 from .loader import SUPPORTED_EXTENSIONS, configure_tesseract, is_supported, load_document, tesseract_available
@@ -57,6 +57,7 @@ class App:
         self.items: list[DocItem] = []
         self.events: queue.Queue = queue.Queue()
         self.busy = False
+        self.updating = False
         self.current: DocItem | None = None
 
         root.title(f"Сканы → 1С  {__version__}")
@@ -81,6 +82,10 @@ class App:
         if files:
             self.add_paths([Path(f) for f in files])
             self.recognize()
+
+        updater.cleanup_old()
+        if self.settings.auto_update:
+            root.after(1500, self.check_updates)
 
     # ---------- интерфейс ----------
 
@@ -352,6 +357,17 @@ class App:
                     self.progress.configure(value=index)
                 elif event[0] == "status":
                     self._set_status(event[1])
+                elif event[0] == "update_ready":
+                    self._on_update_ready(event[1])
+                elif event[0] == "update_none":
+                    self.updating = False
+                    if event[1]:
+                        self._set_status(f"У вас последняя версия {__version__}")
+                elif event[0] == "update_failed":
+                    self.updating = False
+                    self._set_status(event[1])
+                    if event[2]:
+                        messagebox.showwarning("Обновление", event[1])
                 elif event[0] == "done":
                     self.busy = False
                     errors = sum(1 for i in self.items if i.status == ST_ERROR)
@@ -418,10 +434,70 @@ class App:
 
         self._run_background("Загрузка в 1С…", items, work)
 
+    # ---------- автообновление ----------
+
+    def check_updates(self, manual: bool = False):
+        """Ищет новую версию на GitHub и сразу её скачивает и ставит — в фоне, не мешая работе."""
+        exe = updater.current_exe()
+        if self.updating:
+            return
+        if not exe:
+            if manual:
+                messagebox.showinfo("Обновление", "Обновляется только собранная программа Scan2-1C.exe")
+            return
+        self.updating = True
+
+        def run():
+            try:
+                update = updater.find_update()
+                if not update:
+                    self.events.put(("update_none", manual))
+                    return
+                label = f"Скачивается обновление {update.version}"
+
+                def progress(done, total):
+                    percent = f" — {done * 100 // total}%" if total else ""
+                    self.events.put(("status", f"{label}{percent}"))
+
+                self.events.put(("status", label + "…"))
+                updater.install(update, exe, progress=progress)
+                self.events.put(("update_ready", update.version))
+            except Exception as exc:  # noqa: BLE001 — сбой обновления не должен мешать работе
+                self.events.put(("update_failed", str(exc), manual))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_update_ready(self, version: str):
+        self.updating = False
+        exe = updater.current_exe()
+        # Список пуст — перезапускаемся сразу, иначе спрашиваем, чтобы не потерять распознанное.
+        if not self.items and not self.busy:
+            self._set_status(f"Установлена версия {version}, перезапуск…")
+            self.root.after(800, lambda: self._restart(exe))
+            return
+        self._set_status(f"Установлена версия {version} — она запустится при следующем открытии программы")
+        if messagebox.askyesno(
+                "Обновление установлено",
+                f"Новая версия {version} скачана и установлена.\n\n"
+                "Перезапустить программу сейчас? Несохранённые результаты распознавания пропадут.\n"
+                "Если нет — новая версия откроется в следующий раз."):
+            self._restart(exe)
+
+    def _restart(self, exe: Path | None):
+        if self.busy:
+            messagebox.showinfo("Обновление", "Дождитесь окончания текущей операции и перезапустите программу")
+            return
+        try:
+            updater.restart(exe)
+        except OSError as exc:
+            messagebox.showerror("Обновление", f"Не удалось перезапустить программу: {exc}")
+            return
+        self.root.destroy()
+
     # ---------- настройки и справка ----------
 
     def open_settings(self):
-        SettingsDialog(self.root, self.settings)
+        SettingsDialog(self.root, self.settings, on_check_updates=lambda: self.check_updates(manual=True))
 
     def show_help(self):
         messagebox.showinfo("Справка", HELP_TEXT)
@@ -431,9 +507,10 @@ class App:
 
 
 class SettingsDialog(tk.Toplevel):
-    def __init__(self, master, settings: Settings):
+    def __init__(self, master, settings: Settings, on_check_updates=None):
         super().__init__(master)
         self.settings = settings
+        self.on_check_updates = on_check_updates
         self.title("Настройки")
         self.geometry("720x620")
         self.transient(master)
@@ -456,6 +533,7 @@ class SettingsDialog(tk.Toplevel):
         self.password = tk.StringVar(value=settings.password)
         self.verify = tk.BooleanVar(value=settings.verify_ssl)
         self.folder = tk.StringVar(value=settings.exchange_dir)
+        self.auto_update = tk.BooleanVar(value=settings.auto_update)
 
         def entry(label, var, r, show=None):
             ttk.Label(frame, text=label).grid(row=r, column=0, sticky="w", pady=3, padx=(0, 8))
@@ -476,15 +554,23 @@ class SettingsDialog(tk.Toplevel):
         ttk.Entry(folder_row, textvariable=self.folder).grid(row=0, column=0, sticky="ew")
         ttk.Button(folder_row, text="Обзор…", command=self._browse).grid(row=0, column=1, padx=(6, 0))
 
+        ttk.Label(frame, text="Обновления").grid(row=7, column=0, sticky="w", pady=3)
+        update_row = ttk.Frame(frame)
+        update_row.grid(row=7, column=1, sticky="w")
+        ttk.Checkbutton(update_row, text=f"Обновлять автоматически с GitHub (сейчас {__version__})",
+                        variable=self.auto_update).pack(side="left")
+        if on_check_updates:
+            ttk.Button(update_row, text="Проверить сейчас", command=on_check_updates).pack(side="left", padx=(8, 0))
+
         ttk.Label(frame, text="Шаблон выгрузки (JSON): какие справочники и документ заполнять").grid(
-            row=7, column=0, columnspan=2, sticky="w", pady=(12, 2))
+            row=8, column=0, columnspan=2, sticky="w", pady=(12, 2))
         self.mapping = tk.Text(frame, height=16, font=("Consolas", 9), wrap="none")
-        self.mapping.grid(row=8, column=0, columnspan=2, sticky="nsew")
-        frame.rowconfigure(8, weight=1)
+        self.mapping.grid(row=9, column=0, columnspan=2, sticky="nsew")
+        frame.rowconfigure(9, weight=1)
         self.mapping.insert("1.0", json.dumps(merged_mapping(settings.mapping), ensure_ascii=False, indent=2))
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=9, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        buttons.grid(row=10, column=0, columnspan=2, sticky="e", pady=(10, 0))
         ttk.Button(buttons, text="Шаблон по умолчанию", command=self._reset_mapping).pack(side="left")
         ttk.Button(buttons, text="Проверить подключение", command=self._check).pack(side="left", padx=6)
         ttk.Button(buttons, text="Сохранить", command=self._save).pack(side="left")
@@ -525,6 +611,7 @@ class SettingsDialog(tk.Toplevel):
         s.mode, s.base_url, s.user, s.password = self.mode.get(), self.url.get().strip(), self.user.get(), \
             self.password.get()
         s.verify_ssl, s.exchange_dir, s.mapping = self.verify.get(), self.folder.get().strip(), mapping
+        s.auto_update = self.auto_update.get()
         try:
             s.save()
         except OSError as exc:

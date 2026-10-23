@@ -23,6 +23,7 @@ class Settings:
     verify_ssl: bool = True
     exchange_dir: str = ""
     mapping: dict = field(default_factory=dict)  # переопределения шаблона выгрузки
+    auto_update: bool = True  # при запуске скачивать и ставить новую версию с GitHub
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:

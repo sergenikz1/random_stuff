@@ -2,6 +2,7 @@
 
     Scan2-1C.exe [сканы...]                          — окно, переданные файлы сразу распознаются
     Scan2-1C.exe --extract скан.pdf ... --out r.json — только распознать и сохранить реквизиты в JSON
+    Scan2-1C.exe --self-check                        — проверить, что сборка рабочая (код 0); нужно автообновлению
 """
 
 import argparse
@@ -36,7 +37,20 @@ def run_extract(argv: list[str]) -> int:
     return 1 if failed else 0
 
 
+def run_self_check() -> int:
+    """Новая версия проверяется перед установкой: модули грузятся и встроенный OCR отвечает."""
+    import tkinter  # noqa: F401 — без Tk окно не откроется
+
+    from scan_to_1c import gui  # noqa: F401
+    from scan_to_1c.loader import configure_tesseract, tesseract_available
+
+    configure_tesseract()
+    return 0 if tesseract_available() else 2
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-check"]:
+        sys.exit(run_self_check())
     if "--extract" in sys.argv[1:]:
         sys.exit(run_extract(sys.argv[1:]))
     from scan_to_1c.gui import main

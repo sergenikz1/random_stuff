@@ -1,0 +1,51 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'dev.limitpulse.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'dev.limitpulse.app'
+        minSdk 26
+        targetSdk 35
+        versionCode 4
+        versionName '0.4.0'
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    testOptions { unitTests.includeAndroidResources = true }
+    lint { abortOnError true }
+}
+
+configurations { robolectricSdk; robolectricSdk26 }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    robolectricSdk 'org.robolectric:android-all-instrumented:15-robolectric-12650502-i7'
+    robolectricSdk26 'org.robolectric:android-all-instrumented:8.0.0_r4-robolectric-r1-i7'
+}
+
+def prepareRobolectricSdk = tasks.register('prepareRobolectricSdk', Sync) {
+    from configurations.robolectricSdk
+    from configurations.robolectricSdk26
+    into layout.buildDirectory.dir('robolectric-sdk')
+}
+
+tasks.withType(Test).configureEach {
+    dependsOn prepareRobolectricSdk
+    systemProperty 'robolectric.dependency.dir', layout.buildDirectory.dir('robolectric-sdk').get().asFile.absolutePath
+    systemProperty 'robolectric.offline', 'true'
+    systemProperty 'limitpulse.screenshotDir', layout.buildDirectory.dir('outputs/screenshots').get().asFile.absolutePath
+    // Honor an explicitly configured JVM proxy in cloud build environments.
+    ['http.proxyHost', 'http.proxyPort', 'https.proxyHost', 'https.proxyPort', 'http.nonProxyHosts'].each { key ->
+        if (System.getProperty(key) != null) systemProperty key, System.getProperty(key)
+    }
+}

@@ -1,9 +1,9 @@
-name: Android Limit Pulse
+name: Limit Pulse — сборка APK
 on:
   push:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['limit-pulse/**', '.github/workflows/limit-pulse.yml']
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['limit-pulse/**', '.github/workflows/limit-pulse.yml']
   workflow_dispatch:
     inputs:
       apk_base64:
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: android
+        working-directory: limit-pulse
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -61,9 +61,9 @@ jobs:
         with:
           name: android-verification
           path: |
-            android/app/build/reports/
-            android/app/build/test-results/
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            limit-pulse/app/build/reports/
+            limit-pulse/app/build/test-results/
+            limit-pulse/app/build/outputs/apk/release/app-release-unsigned.apk
   publish-signed-apk:
     if: github.event_name == 'workflow_dispatch' && inputs.apk_base64 != ''
     needs: verify
@@ -104,7 +104,7 @@ jobs:
           expected = os.environ['APK_SHA256']
           if len(expected) != 64 or hashlib.sha256(data).hexdigest() != expected:
               raise SystemExit('APK checksum mismatch')
-          gradle = pathlib.Path('android/app/build.gradle').read_text()
+          gradle = pathlib.Path('limit-pulse/app/build.gradle').read_text()
           version = re.search(r"versionName '([0-9]+\.[0-9]+\.[0-9]+)'", gradle).group(1)
           version_code = re.search(r'versionCode ([0-9]+)', gradle).group(1)
           apk_name = f'limit-pulse-v{version}.apk'
@@ -122,7 +122,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as output:
               output.write('LIMITPULSE_VERSION=' + version + '\n')
           cert = release_dir / 'signing-certificate.pem'
-          shutil.copyfile('android/release-signing-certificate.pem', cert)
+          shutil.copyfile('limit-pulse/release-signing-certificate.pem', cert)
           (release_dir / 'SHA256SUMS').write_text(
               expected + '  ' + apk_name + '\n' + hashlib.sha256(cert.read_bytes()).hexdigest() + '  signing-certificate.pem\n')
           PY
@@ -136,4 +136,4 @@ jobs:
             "$RUNNER_TEMP/limit-pulse-release/signing-certificate.pem" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Limit Pulse $LIMITPULSE_VERSION — лимиты Codex (Android)" \
-            --notes-file android/RELEASE_NOTES.md --prerelease
+            --notes-file limit-pulse/RELEASE_NOTES.md --prerelease

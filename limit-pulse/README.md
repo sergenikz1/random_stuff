@@ -1,6 +1,6 @@
 # Limit Pulse — Android-виджет лимитов Codex и Claude
 
-Небольшое независимое приложение для Android 8.0+ без рекламы, аналитики и собственного сервера. Исходная Telegram-страница в корне репозитория остаётся отдельным приложением.
+Небольшое независимое приложение для Android 8.0+ без рекламы, аналитики и собственного сервера. Остальные проекты репозитория лежат в соседних папках и с приложением не связаны.
 
 ## Что показывает
 
@@ -57,7 +57,7 @@
 Нужны JDK 17+ (проверено на JDK 21), Android SDK Platform 35 и Build Tools 35.0.0. Gradle 8.11.1 и Android Gradle Plugin 8.9.2 зафиксированы; wrapper проверяет SHA-256 дистрибутива.
 
 ```sh
-cd android
+cd limit-pulse
 export ANDROID_HOME=/path/to/android-sdk
 ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease
 ```

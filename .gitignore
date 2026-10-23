@@ -1,9 +1,0 @@
-# Android local state and credentials
-android/.gradle/
-android/local.properties
-android/**/build/
-*.jks
-*.keystore
-*.apk
-*.aab
-.idea/

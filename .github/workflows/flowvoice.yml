@@ -66,6 +66,10 @@ jobs:
           java-version: 17
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Пакет «tools» из набора по умолчанию убран из SDK, без этого sdkmanager падает.
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
 
       - uses: gradle/actions/setup-gradle@v4
 

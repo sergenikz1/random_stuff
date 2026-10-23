@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ScryerTV" parent="@style/Theme.Leanback">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.ScryerTV.Browse" parent="@style/Theme.Leanback.Browse">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.ScryerTV.Details" parent="@style/Theme.Leanback.Details">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.ScryerTV.VerticalGrid" parent="@style/Theme.Leanback.VerticalGrid">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.ScryerTV.GuidedStep" parent="@style/Theme.Leanback.GuidedStep">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+</resources>

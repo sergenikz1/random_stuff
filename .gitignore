@@ -1,0 +1,24 @@
+# Общие
+.idea/
+.vscode/
+.DS_Store
+__pycache__/
+.pytest_cache/
+
+# Подписи и сборки Android — ключи и APK не храним в репозитории
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# Limit Pulse (у остальных Android-проектов свои .gitignore в папках)
+limit-pulse/.gradle/
+limit-pulse/local.properties
+limit-pulse/**/build/
+
+# Сканы → 1С: сборка PyInstaller
+scan-to-1c/build/
+scan-to-1c/dist/
+scan-to-1c/bundle/
+scan-to-1c/release/
+scan-to-1c/*.spec

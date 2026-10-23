@@ -1,11 +1,14 @@
 name: Читалка вслух — релиз APK
 
-# Релиз собирается по тегу вида chitalka-v1.0 и публикуется в Releases
-# вместе с обоими APK. Модели синтеза речи подтягиваются задачей fetchTtsAssets.
+# Релиз собирается при изменении chitalka-vsluh/ в main или по тегу вида chitalka-v1.0
+# и публикуется в Releases вместе с обоими APK. Модели синтеза речи подтягиваются задачей fetchTtsAssets.
 on:
   push:
     branches:
-      - chitalka-vsluh
+      - main
+    paths:
+      - 'chitalka-vsluh/**'
+      - '.github/workflows/chitalka-vsluh-release.yml'
     tags:
       - 'chitalka-v*'
   workflow_dispatch:
@@ -34,12 +37,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            android-reader/app/libs
-            android-reader/app/src/main/assets/tts
-          key: tts-assets-${{ hashFiles('android-reader/app/build.gradle.kts') }}
+            chitalka-vsluh/app/libs
+            chitalka-vsluh/app/src/main/assets/tts
+          key: tts-assets-${{ hashFiles('chitalka-vsluh/app/build.gradle.kts') }}
 
       - name: Build APKs
-        working-directory: android-reader
+        working-directory: chitalka-vsluh
         run: ./gradlew :app:assembleDebug
 
       - name: Собрать файлы релиза
@@ -48,13 +51,13 @@ jobs:
           # Пуш тега задаёт имя релиза сам, для обычного пуша берём versionName из сборки.
           case "${{ github.ref_type }}" in
             tag) TAG="${{ github.ref_name }}" ;;
-            *)   TAG="chitalka-v$(grep -m1 versionName android-reader/app/build.gradle.kts | cut -d'"' -f2)" ;;
+            *)   TAG="chitalka-v$(grep -m1 versionName chitalka-vsluh/app/build.gradle.kts | cut -d'"' -f2)" ;;
           esac
           VERSION="${TAG#chitalka-v}"
           mkdir -p release
-          cp android-reader/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
+          cp chitalka-vsluh/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
              "release/chitalka-vsluh-$VERSION-arm64-v8a.apk"
-          cp android-reader/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk \
+          cp chitalka-vsluh/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk \
              "release/chitalka-vsluh-$VERSION-armeabi-v7a.apk"
           ls -la release
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -70,5 +73,5 @@ jobs:
             gh release create "$TAG" release/*.apk \
               --target "$GITHUB_SHA" \
               --title "Читалка вслух $TAG" \
-              --notes-file .github/release-notes-chitalka.md
+              --notes-file chitalka-vsluh/RELEASE_NOTES.md
           fi

@@ -1,0 +1,145 @@
+name: FlowVoice build
+
+on:
+  push:
+    paths:
+      - 'flowvoice/**'
+      - '.github/workflows/flowvoice.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flowvoice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows installer (.exe)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: flowvoice/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: flowvoice/desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No GH_TOKEN here on purpose: it would make electron-builder infer a
+      # GitHub publish target. Releases are published by the `publish` job.
+      - name: Build installer and portable build
+        run: npx electron-builder --win nsis portable --x64 --publish never
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp dist/*.exe out/
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flowvoice-windows
+          path: flowvoice/desktop/out/*.exe
+          if-no-files-found: error
+
+  android:
+    name: Android app (.apk)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flowvoice/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare signing key
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/flowvoice.jks"
+            echo "FLOWVOICE_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "FLOWVOICE_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "FLOWVOICE_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          else
+            # No secret configured: mint a throwaway key so the APK is still installable.
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/flowvoice.jks" \
+              -alias flowvoice -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass flowvoice -keypass flowvoice \
+              -dname "CN=FlowVoice, OU=FlowVoice, O=FlowVoice, L=-, S=-, C=-"
+            echo "FLOWVOICE_KEYSTORE_PASSWORD=flowvoice" >> "$GITHUB_ENV"
+            echo "FLOWVOICE_KEY_ALIAS=flowvoice" >> "$GITHUB_ENV"
+            echo "FLOWVOICE_KEY_PASSWORD=flowvoice" >> "$GITHUB_ENV"
+          fi
+          echo "FLOWVOICE_KEYSTORE=$RUNNER_TEMP/flowvoice.jks" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p out
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          cp app/build/outputs/apk/release/app-release.apk "out/FlowVoice-${VERSION}.apk"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flowvoice-android
+          path: flowvoice/android/out/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish downloads
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    # flowvoice-latest обновляют только сборки из main; в других ветках файлы остаются в артефактах.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+
+      - name: Flatten
+        run: |
+          mkdir -p release
+          find downloads -type f \( -name '*.exe' -o -name '*.apk' \) -exec cp {} release/ \;
+          ls -la release
+
+      - name: Publish rolling pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="flowvoice-latest"
+          NOTES="Automated build of FlowVoice from ${GITHUB_SHA::7} (${GITHUB_REF_NAME}).
+
+          * \`FlowVoice-Setup-*.exe\` — Windows installer
+          * \`FlowVoice-Portable-*.exe\` — Windows, no installation required
+          * \`FlowVoice-*.apk\` — Android (allow installation from unknown sources)
+
+          Neither build is code-signed, so Windows SmartScreen and Android will warn on first launch."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$NOTES" --prerelease
+          else
+            gh release create "$TAG" --title "FlowVoice — latest build" --notes "$NOTES" --prerelease
+          fi
+          gh release upload "$TAG" release/* --clobber

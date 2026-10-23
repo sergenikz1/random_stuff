@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FlowVoice</string>
+    <string name="ime_name">FlowVoice — голосовая клавиатура</string>
+    <string name="tagline">Диктуйте — текст появится там, где стоит курсор</string>
+
+    <string name="sec_engine">Движок распознавания</string>
+    <string name="engine_cloud">Whisper API</string>
+    <string name="engine_device">На устройстве</string>
+    <string name="engine_hint">Whisper даёт лучшее качество, но нужен API-ключ. Распознавание на устройстве бесплатное и работает без интернета, если скачан языковой пакет.</string>
+
+    <string name="label_base_url">Адрес API</string>
+    <string name="label_api_key">API-ключ</string>
+    <string name="label_stt_model">Модель распознавания</string>
+    <string name="label_cleanup_model">Модель обработки</string>
+    <string name="preset_openai">OpenAI</string>
+    <string name="preset_groq">Groq</string>
+    <string name="btn_test">Проверить подключение</string>
+    <string name="test_ok">Подключение работает</string>
+    <string name="test_no_key">Сначала укажите API-ключ</string>
+
+    <string name="sec_language">Язык речи</string>
+    <string name="lang_auto">Авто</string>
+    <string name="language_hint">«Авто» определяет язык сам — удобно, если вы переключаетесь между русским и английским.</string>
+
+    <string name="sec_cleanup">Обработка текста</string>
+    <string name="cleanup_title">Причёсывать текст языковой моделью</string>
+    <string name="cleanup_hint">Расставляет знаки препинания, убирает «эээ» и оговорки. Язык не меняется.</string>
+
+    <string name="sec_capture">Запись</string>
+    <string name="autostop_title">Останавливать запись после паузы</string>
+    <string name="autostop_hint">Замолчите — и запись закончится сама.</string>
+    <string name="trailing_title">Добавлять пробел в конце</string>
+
+    <string name="sec_dictionary">Личный словарь</string>
+    <string name="dictionary_hint">Имена, термины, названия продуктов — по одному в строке. Их будут писать правильно.</string>
+
+    <string name="sec_keyboard">Голосовая клавиатура</string>
+    <string name="keyboard_hint">Включите клавиатуру FlowVoice, чтобы диктовать в любом приложении: разрешите её в настройках системы, затем выберите в переключателе клавиатур.</string>
+    <string name="btn_enable_keyboard">Включить в настройках системы</string>
+    <string name="btn_choose_keyboard">Переключить клавиатуру</string>
+
+    <string name="btn_record">Нажмите на микрофон и говорите</string>
+    <string name="btn_stop">Остановить</string>
+    <string name="btn_copy">Копировать</string>
+    <string name="btn_share">Поделиться</string>
+    <string name="state_listening">Слушаю…</string>
+    <string name="state_processing">Расшифровка…</string>
+    <string name="result_hint">Здесь появится расшифровка.</string>
+
+    <string name="sec_history">Последние диктовки</string>
+    <string name="history_empty">Пока пусто. Нажмите на микрофон и продиктуйте что-нибудь.</string>
+    <string name="btn_clear_history">Очистить</string>
+
+    <string name="err_no_key">Сначала укажите API-ключ</string>
+    <string name="err_network">Проблема с сетью — проверьте подключение</string>
+    <string name="err_http">Сервер распознавания отклонил запрос</string>
+    <string name="err_empty">Ничего не расслышал</string>
+    <string name="err_permission">Нужен доступ к микрофону</string>
+    <string name="err_mic">Микрофон недоступен</string>
+    <string name="err_unavailable">Распознавание на устройстве недоступно на этом телефоне</string>
+
+    <string name="perm_rationale">FlowVoice нужен микрофон, чтобы превращать вашу речь в текст.</string>
+    <string name="sec_about">О программе</string>
+    <string name="about_text">API-ключ и история хранятся только на этом телефоне. Аудио отправляется лишь на выбранный вами сервер распознавания, а в режиме «на устройстве» вообще не покидает телефон.</string>
+    <string name="saved">Сохранено</string>
+    <string name="copied">Скопировано</string>
+
+    <string name="ime_hint_tap">Нажмите, чтобы диктовать</string>
+    <string name="ime_hint_setup">Откройте FlowVoice и добавьте API-ключ</string>
+    <string name="cd_mic">Микрофон</string>
+    <string name="cd_backspace">Стереть</string>
+    <string name="cd_enter">Ввод</string>
+    <string name="cd_switch">Сменить клавиатуру</string>
+    <string name="cd_settings">Настройки</string>
+    <string name="key_space">пробел</string>
+</resources>

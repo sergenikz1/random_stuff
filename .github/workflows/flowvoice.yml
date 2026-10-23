@@ -6,8 +6,6 @@ on:
       - 'flowvoice/**'
       - '.github/workflows/flowvoice.yml'
   workflow_dispatch:
-  release:
-    types: [created]
 
 permissions:
   contents: write
@@ -112,7 +110,8 @@ jobs:
     name: Publish downloads
     needs: [windows, android]
     runs-on: ubuntu-latest
-    if: github.event_name != 'release'
+    # flowvoice-latest обновляют только сборки из main; в других ветках файлы остаются в артефактах.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.VoiceReader" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">#FF101216</item>
-        <item name="android:navigationBarColor">#FF101216</item>
-        <item name="android:windowBackground">#FF101216</item>
-    </style>
-</resources>

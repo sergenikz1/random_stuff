@@ -1,4 +1,0 @@
--keep class org.apache.pdfbox.** { *; }
--keep class com.tom_roush.** { *; }
--dontwarn org.apache.**
--dontwarn javax.**

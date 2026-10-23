@@ -7,7 +7,7 @@ Telegram Mini App: пока приложение открыто, телефон 
 - В Telegram вибрация идёт через `Telegram.WebApp.HapticFeedback`, в обычном браузере — через Vibration API.
 - Вся логика — одна страница `index.html` без зависимостей.
 
-## Устройство ветки
+## Файлы
 
 | Путь | Что там |
 |---|---|
@@ -18,6 +18,7 @@ Telegram Mini App: пока приложение открыто, телефон 
 ## Запуск
 
 ```sh
+cd vibrate-tg
 node server.js                 # http://localhost:3000
 # или в Docker
 docker build -t vibrate . && docker run -p 3000:3000 vibrate
@@ -25,5 +26,3 @@ docker build -t vibrate . && docker run -p 3000:3000 vibrate
 
 Чтобы открыть приложение в Telegram, опубликуйте страницу по HTTPS и укажите её адрес
 у своего бота в [@BotFather](https://t.me/BotFather) (Bot Settings → Menu Button или Configure Mini App).
-
-Это ветка продукта из репозитория [random_stuff](../../tree/main), где каждый продукт живёт в своей ветке.

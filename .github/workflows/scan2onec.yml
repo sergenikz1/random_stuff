@@ -1,0 +1,104 @@
+name: Сканы → 1С — сборка exe
+
+# Собирает Scan2-1C.exe (один файл, Tesseract OCR с русским языком внутри).
+# Каждая сборка лежит в артефактах запуска; пуш в ветку по умолчанию или тег scan2onec-v* публикует релиз.
+on:
+  push:
+    branches:
+      - claude/gifted-newton-Gidog  # ветка по умолчанию репозитория
+    tags:
+      - 'scan2onec-v*'
+    paths:
+      - 'scan2onec/**'
+      - '.github/workflows/scan2onec.yml'
+  pull_request:
+    paths:
+      - 'scan2onec/**'
+      - '.github/workflows/scan2onec.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: scan2onec
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Установить зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pytest
+
+      - name: Установить Tesseract OCR и русский язык
+        run: |
+          choco install tesseract --no-progress -y
+          $tess = "C:\Program Files\Tesseract-OCR"
+          Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata" `
+            -OutFile "$tess\tessdata\rus.traineddata"
+          # В exe берём только движок, его DLL и нужные языки — без обучающих утилит.
+          New-Item -ItemType Directory -Force bundle\tesseract\tessdata | Out-Null
+          Copy-Item "$tess\tesseract.exe", "$tess\*.dll" bundle\tesseract\
+          Copy-Item "$tess\tessdata\eng.traineddata", "$tess\tessdata\osd.traineddata", `
+            "$tess\tessdata\rus.traineddata" bundle\tesseract\tessdata\
+          Copy-Item -Recurse "$tess\tessdata\configs" bundle\tesseract\tessdata\
+          Get-ChildItem -Recurse bundle | Measure-Object -Sum Length | Select-Object Count, Sum
+
+      - name: Тесты
+        run: python -m pytest -q tests
+
+      - name: Собрать exe
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name Scan2-1C `
+            --add-data "bundle\tesseract;tesseract" `
+            --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pillow_heif `
+            main.py
+
+      - name: Проверить собранный exe
+        run: |
+          python -c "import sys; sys.path.insert(0, 'tests'); from test_loader import render_scan; from samples import UPD; render_scan(UPD).save('smoke.jpg', quality=90)"
+          $p = Start-Process dist\Scan2-1C.exe -ArgumentList '--extract', 'smoke.jpg', '--out', 'smoke.json' -Wait -PassThru
+          Get-Content smoke.json -Encoding utf8
+          if ($p.ExitCode -ne 0) { throw "exe завершился с кодом $($p.ExitCode)" }
+          $r = Get-Content smoke.json -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($r[0].number -ne 'УТ-2041' -or $r[0].seller.inn -ne '7707083893') { throw "exe распознал скан неверно" }
+
+      - name: Подготовить файлы
+        id: files
+        run: |
+          $version = (Select-String -Path scan_to_1c\__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "scan2onec-v$version" }
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist\Scan2-1C.exe "release\Scan2-1C-$version.exe"
+          Copy-Item "1c\ЗагрузкаСканов.bsl" release\
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Scan2-1C
+          path: scan2onec/release/*
+
+      - name: Опубликовать релиз
+        if: >-
+          github.ref_type == 'tag' ||
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.files.outputs.tag }}"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag (Get-ChildItem release\*).FullName --clobber
+          } else {
+            gh release create $tag (Get-ChildItem release\*).FullName --target $env:GITHUB_SHA `
+              --title "Сканы → 1С $tag" --notes-file RELEASE_NOTES.md
+          }

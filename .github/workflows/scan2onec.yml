@@ -1,11 +1,11 @@
 name: Сканы → 1С — сборка exe
 
 # Собирает Scan2-1C.exe (один файл, Tesseract OCR с русским языком внутри).
-# Каждая сборка лежит в артефактах запуска; пуш в ветку по умолчанию или тег scan2onec-v* публикует релиз.
+# Каждая сборка лежит в артефактах запуска; пуш в ветку scan-to-1c или тег scan2onec-v* публикует релиз.
 on:
   push:
     branches:
-      - claude/gifted-newton-Gidog  # ветка по умолчанию репозитория
+      - scan-to-1c
     tags:
       - 'scan2onec-v*'
     paths:
@@ -88,9 +88,7 @@ jobs:
           path: scan2onec/release/*
 
       - name: Опубликовать релиз
-        if: >-
-          github.ref_type == 'tag' ||
-          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/scan-to-1c'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

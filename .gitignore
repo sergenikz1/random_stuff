@@ -7,3 +7,12 @@ android/**/build/
 *.apk
 *.aab
 .idea/
+
+# Сканы → 1С: сборка PyInstaller и кэш тестов
+scan2onec/build/
+scan2onec/dist/
+scan2onec/bundle/
+scan2onec/release/
+scan2onec/*.spec
+__pycache__/
+.pytest_cache/

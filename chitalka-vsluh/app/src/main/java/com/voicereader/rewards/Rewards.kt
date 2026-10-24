@@ -40,6 +40,9 @@ object Rewards {
 
     var today: () -> LocalDate = { LocalDate.now() }
 
+    /** Пока открыто окно нового ранга, отсчёт перерыва стоит: серия не сгорит, пока смотрите награду. */
+    @Volatile var celebrating = false
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("rewards", Context.MODE_PRIVATE)
@@ -77,7 +80,7 @@ object Rewards {
         pauseJob = scope.launch {
             while (isActive && _state.value.pauseLeft != null) {
                 delay(1000)
-                _state.value = RewardsEngine.pauseTick(_state.value)
+                if (!celebrating) _state.value = RewardsEngine.pauseTick(_state.value)
             }
             save()
         }
@@ -136,7 +139,9 @@ object Rewards {
                 backgroundId = o.optString("bg").ifEmpty { null },
                 textId = o.optString("text").ifEmpty { null },
                 font = enumOr(o.optString("font"), ReaderFont.DEFAULT),
-                manner = enumOr(o.optString("manner"), VoiceManner.NORMAL),
+                anims = o.optJSONObject("anims")?.let { a ->
+                    AnimKind.entries.mapNotNull { k -> a.optString(k.name).ifEmpty { null }?.let { k to it } }.toMap()
+                } ?: emptyMap(),
                 ribbonEnabled = o.optBoolean("ribbon", true),
                 dailyEnabled = o.optBoolean("daily", true),
                 celebrations = o.optBoolean("celebrations", true)
@@ -156,7 +161,8 @@ object Rewards {
             .put("growthDays", s.growthDays).put("lastCounted", s.lastCountedDay ?: "").put("drops", s.drops)
             .put("wilted", s.wilted).put("welcomeShown", s.welcomeShownDay ?: "").put("wordsCarry", s.wordsCarry)
             .put("grow", s.growKind.name).put("bg", s.backgroundId ?: "").put("text", s.textId ?: "")
-            .put("font", s.font.name).put("manner", s.manner.name)
+            .put("font", s.font.name)
+            .put("anims", JSONObject(s.anims.mapKeys { it.key.name } as Map<*, *>))
             .put("ribbon", s.ribbonEnabled).put("daily", s.dailyEnabled).put("celebrations", s.celebrations)
         prefs.edit().putString("state", o.toString()).apply()
     }

@@ -31,7 +31,8 @@ data class RewardsState(
     val backgroundId: String? = null,
     val textId: String? = null,
     val font: ReaderFont = ReaderFont.DEFAULT,
-    val manner: VoiceManner = VoiceManner.NORMAL,
+    /** Выбранные анимации из наград: id награды по каждому виду. */
+    val anims: Map<AnimKind, String> = emptyMap(),
     // Переключатели
     val ribbonEnabled: Boolean = true,
     val dailyEnabled: Boolean = true,
@@ -44,6 +45,8 @@ data class RewardsState(
     fun unlocked(reward: Reward) = rank >= reward.rank
     fun unlocked(kind: GrowKind) = kind == GrowKind.TREE ||
         RanksCatalog.REWARDS.any { it.grow == kind && unlocked(it) }
+    /** Включённая анимация этого вида, если её ранг уже получен. */
+    fun anim(kind: AnimKind): Reward? = RanksCatalog.byId(anims[kind])?.takeIf { it.anim == kind && unlocked(it) }
 }
 
 sealed interface RewardEvent {

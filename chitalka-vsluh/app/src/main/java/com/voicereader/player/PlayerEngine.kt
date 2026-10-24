@@ -14,7 +14,6 @@ import com.voicereader.data.LibraryStore
 import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
 import com.voicereader.rewards.Rewards
-import com.voicereader.rewards.VoiceManner
 import com.voicereader.tts.NeuralTtsBackend
 import com.voicereader.tts.NeuralVoice
 import com.voicereader.tts.SpeechBackend
@@ -211,19 +210,18 @@ object PlayerEngine {
     }
 
     private fun ensureBackend(profile: VoiceProfile, neural: NeuralVoice?, language: String): SpeechBackend {
-        val manner = Rewards.state.value.manner
-        val key = "${neural?.id ?: "system"}|${profile.systemVoiceName}|${profile.pitch}|${profile.rate}|$language|$manner"
+        val key = "${neural?.id ?: "system"}|${profile.systemVoiceName}|${profile.pitch}|${profile.rate}|$language"
         backend?.let { if (key == backendKey) return it }
         releaseBackend()
         val created: SpeechBackend = if (neural != null) {
-            NeuralTtsBackend(app, neural, speechListener, profile.rate * manner.rate, manner.pauseMs)
+            NeuralTtsBackend(app, neural, speechListener, profile.rate)
         } else {
             if (profile.kind == VoiceKind.NEURAL) {
                 _state.value = _state.value.copy(
                     message = AppText.get(R.string.msg_neural_other_language)
                 )
             }
-            SystemTtsBackend(speechListener, profile.copy(rate = profile.rate * manner.rate), language)
+            SystemTtsBackend(speechListener, profile, language)
         }
         backend = created
         backendKey = key
@@ -340,8 +338,8 @@ object PlayerEngine {
 
     private var preview: NeuralTtsBackend? = null
 
-    /** Читает короткую фразу выбранным голосом и манерой, не трогая позицию в книге. */
-    fun previewVoice(voiceId: String?, manner: VoiceManner = Rewards.state.value.manner) {
+    /** Читает короткую фразу выбранным голосом, не трогая позицию в книге. */
+    fun previewVoice(voiceId: String?) {
         val voice = com.voicereader.tts.VoiceCatalog.byId(voiceId) ?: return
         if (_state.value.isPlaying) pause()
         stopPreview()
@@ -361,8 +359,8 @@ object PlayerEngine {
                 override fun onPreparing(preparing: Boolean) {}
                 override fun onError(message: String) {}
             }
-            val rate = Settings.state.value.activeProfile.rate * manner.rate
-            preview = NeuralTtsBackend(app, voice, silent, rate, manner.pauseMs).also {
+            val rate = Settings.state.value.activeProfile.rate
+            preview = NeuralTtsBackend(app, voice, silent, rate).also {
                 it.start(listOf(AppText.get(R.string.preview_phrase), AppText.get(R.string.preview_phrase2)), 0)
             }
         }

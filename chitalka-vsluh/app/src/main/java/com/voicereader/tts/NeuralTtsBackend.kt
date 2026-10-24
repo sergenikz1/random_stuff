@@ -38,9 +38,7 @@ class NeuralTtsBackend(
     private val context: Context,
     private val voice: NeuralVoice,
     private val listener: SpeechListener,
-    private val speed: Float,
-    /** Тишина после каждого предложения — для неторопливой манеры чтения. */
-    private val pauseMs: Int = 0
+    private val speed: Float
 ) : SpeechBackend {
 
     override val supportsPitch = false
@@ -75,12 +73,10 @@ class NeuralTtsBackend(
                 val producer = launch {
                     for (i in fromIndex until sentences.size) {
                         coroutineContext.ensureActive()
-                        val speech = synthLock.withLock {
+                        val samples = synthLock.withLock {
                             coroutineContext.ensureActive()
                             engine.generate(sentences[i], 0, speed).samples
                         }
-                        val samples = if (pauseMs <= 0) speech
-                        else speech.copyOf(speech.size + sampleRate * pauseMs / 1000)
                         channel.send(Piece(i, samples))
                     }
                     channel.close()

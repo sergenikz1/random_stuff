@@ -46,7 +46,16 @@ import com.voicereader.R
 import com.voicereader.rewards.Reward
 import com.voicereader.rewards.RewardKind
 import com.voicereader.rewards.Rewards
+import com.voicereader.ui.rewards.DayChip
+import com.voicereader.ui.rewards.LiveBackground
 import com.voicereader.ui.rewards.MedalRibbon
+import com.voicereader.ui.rewards.drawChapterTransition
+import com.voicereader.ui.rewards.sentenceHighlight
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.graphicsLayer
 import com.voicereader.ui.rewards.ReaderLook
 import com.voicereader.ui.rewards.RewardCelebrations
 import com.voicereader.ui.rewards.lookOf
@@ -158,6 +167,7 @@ fun ReaderScreen(
                 .padding(if (focusMode) PaddingValues(0.dp) else padding)
                 .then(if (focusMode) Modifier.displayCutoutPadding() else Modifier)
         ) {
+            look.live?.let { LiveBackground(it, Modifier.matchParentSize()) }
             // В режиме «только текст» лента наград не показывается.
             val ribbon = rewards.ribbonEnabled && !focusMode && state.sentences.isNotEmpty()
             when {
@@ -168,7 +178,7 @@ fun ReaderScreen(
                 else -> BookText(
                     state, settings.fontSizeSp, settings.lineHeightMult, settings.textWindow, settings.autoScroll,
                     look = look,
-                    bottomPadding = if (ribbon) 150.dp else 12.dp,
+                    bottomPadding = if (ribbon) 196.dp else 64.dp,
                     onSentenceClick = if (focusMode) { _ -> barsVisible = !barsVisible } else PlayerEngine::seekTo
                 )
             }
@@ -176,11 +186,28 @@ fun ReaderScreen(
             if (ribbon) {
                 // Плавный переход от текста к ленте, в цвет выбранного фона.
                 Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp).background(
-                        Brush.verticalGradient(listOf(Color.Transparent, (look.backgroundColor ?: MaterialTheme.colorScheme.background).copy(alpha = 0.92f), (look.backgroundColor ?: MaterialTheme.colorScheme.background)))
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(170.dp).background(
+                        Brush.verticalGradient(listOf(Color.Transparent, (look.backgroundColor ?: MaterialTheme.colorScheme.background).copy(alpha = 0.85f), (look.backgroundColor ?: MaterialTheme.colorScheme.background)))
                     )
                 )
-                MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) { onAwards(0) }
+                MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding(), ringFx = look.ring) { onAwards(0) }
+            }
+            if (!focusMode && state.sentences.isNotEmpty()) {
+                DayChip(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (ribbon) 140.dp else 16.dp))
+            }
+
+            // Смена главы: переход из наград.
+            look.chapter?.let { fx ->
+                val chapterKey = state.chapterTitle
+                val k = remember { Animatable(1f) }
+                var first by remember { mutableStateOf(true) }
+                LaunchedEffect(chapterKey) {
+                    if (first) { first = false; return@LaunchedEffect }
+                    if (!state.isPlaying) return@LaunchedEffect
+                    k.snapTo(0f); k.animateTo(1f, tween(1100, easing = LinearEasing))
+                }
+                val pageColor = look.backgroundColor ?: MaterialTheme.colorScheme.background
+                if (k.value < 1f) Canvas(Modifier.matchParentSize()) { drawChapterTransition(fx, k.value, pageColor) }
             }
 
             if (focusMode && barsVisible) {
@@ -205,7 +232,7 @@ fun ReaderScreen(
         }
     }
 
-    RewardCelebrations(onApply = ::applyReward)
+    RewardCelebrations(onApply = ::applyReward, celebrate = look.celebrate)
 
     if (showChapters) {
         ModalBottomSheet(onDismissRequest = { showChapters = false }) {
@@ -302,14 +329,18 @@ private fun SentenceItem(
         else -> ReaderPalette.upcoming
     }
 
-    val annotated: AnnotatedString = remember(text, wordRange, isActive) {
+    val wordColor = if (look.light) Color(0xFF1E5BB8) else ReaderPalette.word
+    // «Чернила»: озвучиваемое предложение проявляется.
+    val ink = remember(text, isActive) { Animatable(if (isActive && look.highlight == "INK") 0f else 1f) }
+    LaunchedEffect(text, isActive) { if (ink.value < 1f) ink.animateTo(1f, tween(700)) }
+    val annotated: AnnotatedString = remember(text, wordRange, isActive, wordColor) {
         if (!isActive || wordRange == null) AnnotatedString(text)
         else buildAnnotatedString {
             append(text)
             val start = wordRange.first.coerceIn(0, text.length)
             val end = (wordRange.last + 1).coerceIn(start, text.length)
             if (end > start) {
-                addStyle(SpanStyle(color = ReaderPalette.word, fontWeight = FontWeight.Bold), start, end)
+                addStyle(SpanStyle(color = wordColor, fontWeight = FontWeight.Bold), start, end)
             }
         }
     }
@@ -324,7 +355,8 @@ private fun SentenceItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .then(if (isActive) Modifier.background(ReaderPalette.activeBackground) else Modifier)
+            .graphicsLayer { alpha = .25f + .75f * ink.value }
+            .sentenceHighlight(look.highlight, isActive, text, ReaderPalette.activeBackground)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp)
     )
@@ -622,8 +654,8 @@ fun applyReward(reward: Reward) {
         RewardKind.TEXT -> Rewards.edit { it.copy(textId = reward.id) }
         RewardKind.FONT -> reward.font?.let { f -> Rewards.edit { it.copy(font = f) } }
         RewardKind.GROW -> reward.grow?.let { g -> Rewards.edit { it.copy(growKind = g) } }
+        RewardKind.ANIM -> reward.anim?.let { k -> Rewards.edit { it.copy(anims = it.anims + (k to reward.id)) } }
         RewardKind.VOICE -> {
-            reward.manner?.let { m -> Rewards.edit { it.copy(manner = m) } }
             reward.voiceId?.let { id ->
                 Settings.updateProfile(Settings.state.value.activeVoice) {
                     it.copy(kind = VoiceKind.NEURAL, neuralVoiceId = id, label = id)

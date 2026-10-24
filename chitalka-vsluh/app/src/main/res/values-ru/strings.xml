@@ -5,7 +5,6 @@
     <string name="cancel">Отмена</string>
     <string name="delete">Удалить</string>
     <string name="apply">Применить</string>
-    <string name="later">Позже</string>
     <string name="play">Читать</string>
     <string name="pause">Пауза</string>
     <string name="settings">Настройки</string>
@@ -100,7 +99,7 @@
     <string name="voice_ruslan">Руслан</string>
     <string name="voice_ruslan_desc">мужской, более чёткий и собранный</string>
     <string name="voice_sima">Сима</string>
-    <string name="voice_sima_desc">ровный и глубокий — награда за звание «Мастер слова»</string>
+    <string name="voice_sima_desc">ровный и глубокий — награда за ранг «Летописец I»</string>
     <string name="preview_phrase">Однажды весною, в час небывало жаркого заката, в Москве появились два гражданина.</string>
     <string name="preview_phrase2">Так звучит выбранный голос.</string>
     <string name="err_open_book">Не удалось открыть книгу: %1$s</string>
@@ -133,17 +132,16 @@
     <string name="notif_stop">Стоп</string>
     <string name="my_rewards">Мои награды</string>
     <string name="appearance">Оформление</string>
-    <string name="appearance_sub">открывается за звания</string>
+    <string name="appearance_sub">открывается за ранги</string>
     <string name="rewards_section">Награды</string>
     <string name="tab_focus">Без перерыва</string>
     <string name="tab_daily">Каждый день</string>
-    <string name="tab_ranks">Звания</string>
+    <string name="tab_ranks">Ранги</string>
     <string name="medal_start">Старт</string>
-    <string name="ribbon_pause">⏸ пауза — серия сгорит через %1$d с</string>
+    <string name="ribbon_pause">Пауза · серия сгорит через %1$s</string>
     <string name="toast_record">Новый рекорд: %1$d мин без перерыва!</string>
     <string name="toast_day">День засчитан · подряд: %1$d</string>
-    <string name="new_rank">Новое звание</string>
-    <string name="new_reward_unlocked">Открыта новая награда</string>
+    <string name="new_rank">Новый ранг</string>
     <string name="reward_unlocked">получено</string>
     <string name="reward_at_points">на %1$s ✦</string>
     <string name="rarity_common">ОБЫЧНАЯ</string>
@@ -173,8 +171,6 @@
     <string name="tier_ruby">Рубин</string>
     <string name="tier_diamond">Алмаз</string>
     <string name="daily_title">%1$s · подряд: %2$d</string>
-    <string name="daily_today_done">Сегодня день засчитан: %1$d мин из нужных %2$d</string>
-    <string name="daily_today_left">Сегодня: %1$d из %2$d мин — почитайте ещё немного</string>
     <string name="daily_next_stage">До стадии «%1$s»: %2$d дн.</string>
     <string name="daily_drops">Капли воды: %1$d — спасут пропуск</string>
     <string name="heatmap_title">Чтение за год</string>
@@ -204,19 +200,17 @@
     <string name="welcome_saved">Капля спасла серию!</string>
     <string name="welcome_next_stage">Ещё %1$d дн. подряд — и будет «%2$s»</string>
     <string name="welcome_max_stage">Это самая высокая стадия — так держать!</string>
-    <string name="welcome_wilted_text">Листья опали, но оно живо. Прочитайте сегодня 10 минут — и оно оживёт.</string>
-    <string name="welcome_wilted_warning">Если пропустить ещё день, оно уменьшится на одну стадию.</string>
-    <string name="welcome_read">Читать</string>
-    <string name="welcome_water">Полить — начать читать</string>
+    <string name="welcome_wilted_text">Листья опали, но оно живо.</string>
+    <string name="welcome_read">Читать — 1 минута</string>
+    <string name="welcome_water">Полить — читать 1 минуту</string>
     <string name="rank_progress">%1$s · ✦ %2$s / %3$s до «%4$s»</string>
-    <string name="rank_max">%1$s · высшее звание</string>
+    <string name="rank_max">%1$s · высший ранг</string>
     <string name="rank_from">с %1$s ✦</string>
     <string name="rank_start_reward">Стандартное оформление</string>
     <string name="preview">Предпросмотр</string>
     <string name="preview_text">Однажды весною, в час небывало жаркого заката, в Москве, на Патриарших прудах, появились два гражданина.</string>
     <string name="text_white">Белый</string>
     <string name="voice_listen_hint">▶ — прослушать</string>
-    <string name="manner_title">Манера чтения</string>
     <string name="rewards_settings">Награды</string>
     <string name="toggle_ribbon">Лента медалей при чтении</string>
     <string name="toggle_daily">Экран дня при первом входе</string>
@@ -226,10 +220,10 @@
     <string name="bg_ocean">Ночной океан</string>
     <string name="bg_stars">Звёздное небо</string>
     <string name="bg_parchment">Пергамент</string>
-    <string name="bg_forest">Лес</string>
+    <string name="bg_forest">Лесной</string>
     <string name="bg_wine">Вино</string>
     <string name="bg_graphite">Графит</string>
-    <string name="bg_aurora">Северное сияние</string>
+    <string name="bg_aurora">Полярная ночь</string>
     <string name="text_amber">Янтарь</string>
     <string name="text_mint">Мята</string>
     <string name="text_lavender">Лаванда</string>
@@ -243,28 +237,146 @@
     <string name="font_typewriter">Пишущая машинка</string>
     <string name="font_antique">Старинный</string>
     <string name="font_rounded">Округлый</string>
-    <string name="font_handwriting">Рукопись</string>
+    <string name="font_handwriting">Рукописный</string>
     <string name="font_newspaper">Газетный</string>
-    <string name="manner_normal">Обычная</string>
-    <string name="manner_storyteller">Сказочник</string>
-    <string name="manner_announcer">Диктор</string>
-    <string-array name="ranks">
+    <string name="fx_live_snow">Снегопад</string>
+    <string name="fx_highlight_wave">Мягкая волна</string>
+    <string name="fx_live_stars">Мерцающие звёзды</string>
+    <string name="fx_celebrate_confetti">Конфетти</string>
+    <string name="fx_chapter_flip">Перелистывание</string>
+    <string name="fx_live_fireflies">Светлячки</string>
+    <string name="fx_live_rain">Дождь по стеклу</string>
+    <string name="fx_highlight_marker">Маркер</string>
+    <string name="fx_ring_flame">Пламя по кольцу</string>
+    <string name="bg_plum">Сливовый</string>
+    <string name="fx_celebrate_starfall">Звездопад</string>
+    <string name="bg_milk_tea">Чай с молоком</string>
+    <string name="font_bookish">Книжный</string>
+    <string name="fx_live_leaves">Листопад</string>
+    <string name="bg_midnight">Полночь</string>
+    <string name="text_lemon">Лимон</string>
+    <string name="fx_celebrate_fireworks">Фейерверк</string>
+    <string name="font_garamond">Гарамон</string>
+    <string name="fx_chapter_dissolve">Растворение</string>
+    <string name="bg_moss">Мох</string>
+    <string name="fx_highlight_pen">Подчёркивание пером</string>
+    <string name="text_peach">Персик</string>
+    <string name="fx_live_candle">Пламя свечи</string>
+    <string name="bg_coffee">Кофе</string>
+    <string name="font_elegant">Изящный</string>
+    <string name="text_sage">Шалфей</string>
+    <string name="fx_celebrate_petals">Лепестки</string>
+    <string name="bg_dusk">Сумерки</string>
+    <string name="fx_live_sea">Морская рябь</string>
+    <string name="text_ice">Лёд</string>
+    <string name="font_dense">Плотный</string>
+    <string name="bg_deep">Глубина</string>
+    <string name="fx_highlight_ink">Чернила</string>
+    <string name="text_lilac">Сирень</string>
+    <string name="fx_chapter_scroll">Свиток</string>
+    <string name="bg_ash">Пепел</string>
+    <string name="font_slab">Брусковый</string>
+    <string name="fx_live_sakura">Лепестки сакуры</string>
+    <string name="text_sand">Песок</string>
+    <string name="bg_terracotta">Терракота</string>
+    <string name="font_clear">Ясный</string>
+    <string name="fx_celebrate_lightning">Молнии</string>
+    <string name="bg_indigo">Индиго</string>
+    <string name="text_turquoise">Бирюза</string>
+    <string name="fx_live_bubbles">Пузырьки</string>
+    <string name="bg_pine">Хвоя</string>
+    <string name="font_school">Школьная тетрадь</string>
+    <string name="text_cherry">Вишня</string>
+    <string name="fx_highlight_neon">Неон</string>
+    <string name="bg_plum_honey">Слива и мёд</string>
+    <string name="text_sepia_ink">Сепия-чернила</string>
+    <string name="fx_live_aurora">Северное сияние</string>
+    <string name="font_calligraphy">Каллиграфия</string>
+    <string name="fx_ring_electric">Электричество</string>
+    <string name="fx_live_meteors">Метеоры</string>
+    <string name="text_emerald">Изумруд</string>
+    <string name="fx_chapter_slide">Сдвиг</string>
+    <string name="bg_sunset">Закат</string>
+    <string name="font_philosopher">Философ</string>
+    <string name="fx_ring_rainbow">Радуга</string>
+    <string name="text_sapphire">Сапфир</string>
+    <string name="fx_celebrate_sparks">Огненные искры</string>
+    <string name="bg_paper">Бумага (светлая)</string>
+    <string name="fx_highlight_gold_dust">Золотая пыль</string>
+    <string name="font_poster">Афиша</string>
+    <string name="text_ruby">Рубин</string>
+    <string name="bg_mint_paper">Мятная бумага</string>
+    <string name="fx_live_nebula">Туманность</string>
+    <string name="kind_anim">Анимация</string>
+    <string name="anim_live">Живой фон</string>
+    <string name="anim_live_hint">Тихо движется за текстом, пока вы читаете</string>
+    <string name="anim_highlight">Подсветка предложения</string>
+    <string name="anim_highlight_hint">Как выделяется предложение, которое сейчас звучит</string>
+    <string name="anim_celebrate">Салют наград</string>
+    <string name="anim_celebrate_hint">Эффект в окне нового ранга</string>
+    <string name="anim_chapter">Смена главы</string>
+    <string name="anim_chapter_hint">Переход, когда начинается новая глава</string>
+    <string name="anim_ring">Кольцо медали</string>
+    <string name="anim_ring_hint">Эффект на кольце в ленте медалей</string>
+    <string name="anim_none">Без анимации</string>
+    <string name="grow_cactus">Кактус</string>
+    <string name="grow_stars">Созвездие</string>
+    <string name="grow_castle">Замок</string>
+    <string name="grow_coral">Коралловый риф</string>
+    <string name="grew_cactus">Кактус подрос!</string>
+    <string name="grew_stars">Созвездие разгорелось!</string>
+    <string name="grew_castle">Замок подрос!</string>
+    <string name="grew_coral">Риф подрос!</string>
+    <string name="wilted_cactus">Кактус загрустил</string>
+    <string name="wilted_stars">Созвездие потускнело</string>
+    <string name="wilted_castle">Замок обветшал</string>
+    <string name="wilted_coral">Риф побледнел</string>
+    <string name="daily_goal_title">ЗАДАНИЕ НА СЕГОДНЯ</string>
+    <string name="daily_goal">Почитайте 1 минуту — и день засчитается</string>
+    <string name="daily_goal_revive">Почитайте 1 минуту — и оно оживёт</string>
+    <string name="daily_goal_done">Готово — день засчитан!</string>
+    <string name="daily_today_seconds">Сегодня: ещё %1$d с</string>
+    <string name="daily_today_counted">Сегодня день засчитан ✓</string>
+    <string name="daily_goal_hint">Каждый день достаточно 1 минуты чтения — и всё растёт</string>
+    <string name="daily_rules_title">Как это растёт</string>
+    <string name="daily_rule_1">📖 1 минута чтения в день — день засчитан</string>
+    <string name="daily_rule_2">🌱 дни подряд → новые стадии: 1, 3, 7, 14, 21, 30 … 365</string>
+    <string name="daily_rule_3">💧 каждые 7 дней — капля воды (до 2), она спасает один пропуск</string>
+    <string name="daily_rule_4">🍂 пропуск без капли — вянет, два подряд — уменьшается на стадию</string>
+    <string name="welcome_new_stage">Новая стадия: %1$s</string>
+    <string name="welcome_drops">💧 капель: %1$d — спасут пропуск</string>
+    <string name="welcome_no_drops">Капель воды нет. Пропустите ещё день — и оно уменьшится на стадию</string>
+    <string name="daychip_progress">День: %1$s из 1:00</string>
+    <string name="daychip_hint">минута чтения засчитает день</string>
+    <string name="daychip_done">День засчитан ✓</string>
+    <string name="daychip_streak">подряд: %1$d дн.</string>
+    <string name="reading_paused">Чтение на паузе — продолжится после окна</string>
+    <string name="read_on">▶ Читать дальше</string>
+    <string name="applied">✓ Применено</string>
+    <string name="reward_saved_hint">Награда сохранится в «Оформлении»</string>
+    <string name="rank_points_next">✦ %1$s · до «%3$s» — %2$s ✦</string>
+    <string name="rank_points_max">✦ %1$s · высший ранг</string>
+    <string name="ribbon_earned">Получено · %1$s</string>
+    <string name="ribbon_tier_up">Новая ступень · %1$s</string>
+    <string name="ribbon_broken">Серия прервана</string>
+    <string name="reward_listen">▶ Послушать</string>
+    <string name="voice_reward_desc">Новый нейросетевой голос для озвучки</string>
+    <string name="bg_reward_desc">Цвет страницы за текстом</string>
+    <string name="text_reward_desc">Цвет текста книги</string>
+    <string name="font_reward_desc">Шрифт текста книги</string>
+    <string name="grow_reward_desc">Что растёт, когда читаешь каждый день</string>
+    <string-array name="rank_titles">
         <item>Новичок</item>
         <item>Слушатель</item>
         <item>Ученик</item>
         <item>Читатель</item>
         <item>Книгочей</item>
         <item>Чтец</item>
-        <item>Любитель книг</item>
         <item>Библиофил</item>
         <item>Знаток</item>
         <item>Книжник</item>
         <item>Эрудит</item>
-        <item>Толкователь</item>
-        <item>Переписчик</item>
         <item>Летописец</item>
-        <item>Хранитель свитков</item>
-        <item>Рассказчик</item>
         <item>Сказитель</item>
         <item>Литератор</item>
         <item>Критик</item>
@@ -272,13 +384,8 @@
         <item>Библиотекарь</item>
         <item>Архивариус</item>
         <item>Мудрец</item>
-        <item>Академик</item>
         <item>Магистр слова</item>
-        <item>Мастер слова</item>
         <item>Хранитель библиотеки</item>
-        <item>Хранитель мудрости</item>
-        <item>Легенда библиотеки</item>
-        <item>Великий библиотекарь</item>
     </string-array>
     <string-array name="stages_tree">
         <item>семечко</item>
@@ -344,6 +451,58 @@
         <item>оранжерея</item>
         <item>луг</item>
         <item>райский сад</item>
+    </string-array>
+    <string-array name="stages_cactus">
+        <item>семечко</item>
+        <item>росток</item>
+        <item>колючка</item>
+        <item>кактус</item>
+        <item>с отростком</item>
+        <item>бутон</item>
+        <item>цветёт</item>
+        <item>два кактуса</item>
+        <item>кактусовый сад</item>
+        <item>оазис</item>
+        <item>пустыня в цвету</item>
+    </string-array>
+    <string-array name="stages_stars">
+        <item>искорка</item>
+        <item>звезда</item>
+        <item>две звезды</item>
+        <item>треугольник</item>
+        <item>ковш</item>
+        <item>созвездие</item>
+        <item>млечный путь</item>
+        <item>туманность</item>
+        <item>галактика</item>
+        <item>скопление</item>
+        <item>вселенная</item>
+    </string-array>
+    <string-array name="stages_castle">
+        <item>камень</item>
+        <item>фундамент</item>
+        <item>стена</item>
+        <item>башня</item>
+        <item>две башни</item>
+        <item>ворота</item>
+        <item>замок</item>
+        <item>флаги</item>
+        <item>крепость</item>
+        <item>город</item>
+        <item>королевство</item>
+    </string-array>
+    <string-array name="stages_coral">
+        <item>полип</item>
+        <item>росток коралла</item>
+        <item>веточка</item>
+        <item>коралл</item>
+        <item>рыбка</item>
+        <item>водоросли</item>
+        <item>риф</item>
+        <item>ракушки</item>
+        <item>черепаха</item>
+        <item>большой риф</item>
+        <item>подводный мир</item>
     </string-array>
     <string-array name="weekdays_short">
         <item>пн</item>

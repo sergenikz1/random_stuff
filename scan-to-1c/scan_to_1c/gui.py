@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__
+from . import __version__, ai, updater
 from .exporter import export_to_folder
 from .extract import ExtractedData, extract, parse_amount, parse_date
 from .loader import SUPPORTED_EXTENSIONS, configure_tesseract, is_supported, load_document, tesseract_available
@@ -57,6 +57,7 @@ class App:
         self.items: list[DocItem] = []
         self.events: queue.Queue = queue.Queue()
         self.busy = False
+        self.updating = False
         self.current: DocItem | None = None
 
         root.title(f"Сканы → 1С  {__version__}")
@@ -81,6 +82,10 @@ class App:
         if files:
             self.add_paths([Path(f) for f in files])
             self.recognize()
+
+        updater.cleanup_old()
+        if self.settings.auto_update:
+            root.after(1500, self.check_updates)
 
     # ---------- интерфейс ----------
 
@@ -352,6 +357,17 @@ class App:
                     self.progress.configure(value=index)
                 elif event[0] == "status":
                     self._set_status(event[1])
+                elif event[0] == "update_ready":
+                    self._on_update_ready(event[1])
+                elif event[0] == "update_none":
+                    self.updating = False
+                    if event[1]:
+                        self._set_status(f"У вас последняя версия {__version__}")
+                elif event[0] == "update_failed":
+                    self.updating = False
+                    self._set_status(event[1])
+                    if event[2]:
+                        messagebox.showwarning("Обновление", event[1])
                 elif event[0] == "done":
                     self.busy = False
                     errors = sum(1 for i in self.items if i.status == ST_ERROR)
@@ -369,6 +385,14 @@ class App:
         else:
             items = [i for i in self.items if i.status in (ST_NEW, ST_ERROR)]
 
+        s = self.settings
+        client = None
+        if s.ai_enabled:
+            try:
+                client = ai.AIClient(ai.config_from_settings(s))
+            except ai.AIError as exc:
+                messagebox.showwarning("Распознавание ИИ", f"{exc}. Документы распознаются шаблонами.")
+
         def work(item: DocItem):
             item.status, item.message = ST_WORK, ""
             self.events.put(("row", item, 0))
@@ -376,9 +400,11 @@ class App:
             def progress(page, total):
                 self.events.put(("status", f"{item.path.name}: страница {page} из {total}"))
 
-            doc = load_document(item.path, progress=progress)
+            doc = load_document(item.path, progress=progress, keep_images=bool(client and s.ai_send_images))
             item.text = doc.text
-            item.data = extract(doc.text)
+            if client:
+                self.events.put(("status", f"{item.path.name}: распознаёт ИИ…"))
+            item.data, item.message = ai.recognize(client, doc.text, doc.images, extract(doc.text))
             item.status = ST_WARN if item.data.warnings else ST_READY
 
         self._run_background("Распознавание…", items, work)
@@ -418,10 +444,70 @@ class App:
 
         self._run_background("Загрузка в 1С…", items, work)
 
+    # ---------- автообновление ----------
+
+    def check_updates(self, manual: bool = False):
+        """Ищет новую версию на GitHub и сразу её скачивает и ставит — в фоне, не мешая работе."""
+        exe = updater.current_exe()
+        if self.updating:
+            return
+        if not exe:
+            if manual:
+                messagebox.showinfo("Обновление", "Обновляется только собранная программа Scan2-1C.exe")
+            return
+        self.updating = True
+
+        def run():
+            try:
+                update = updater.find_update()
+                if not update:
+                    self.events.put(("update_none", manual))
+                    return
+                label = f"Скачивается обновление {update.version}"
+
+                def progress(done, total):
+                    percent = f" — {done * 100 // total}%" if total else ""
+                    self.events.put(("status", f"{label}{percent}"))
+
+                self.events.put(("status", label + "…"))
+                updater.install(update, exe, progress=progress)
+                self.events.put(("update_ready", update.version))
+            except Exception as exc:  # noqa: BLE001 — сбой обновления не должен мешать работе
+                self.events.put(("update_failed", str(exc), manual))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_update_ready(self, version: str):
+        self.updating = False
+        exe = updater.current_exe()
+        # Список пуст — перезапускаемся сразу, иначе спрашиваем, чтобы не потерять распознанное.
+        if not self.items and not self.busy:
+            self._set_status(f"Установлена версия {version}, перезапуск…")
+            self.root.after(800, lambda: self._restart(exe))
+            return
+        self._set_status(f"Установлена версия {version} — она запустится при следующем открытии программы")
+        if messagebox.askyesno(
+                "Обновление установлено",
+                f"Новая версия {version} скачана и установлена.\n\n"
+                "Перезапустить программу сейчас? Несохранённые результаты распознавания пропадут.\n"
+                "Если нет — новая версия откроется в следующий раз."):
+            self._restart(exe)
+
+    def _restart(self, exe: Path | None):
+        if self.busy:
+            messagebox.showinfo("Обновление", "Дождитесь окончания текущей операции и перезапустите программу")
+            return
+        try:
+            updater.restart(exe)
+        except OSError as exc:
+            messagebox.showerror("Обновление", f"Не удалось перезапустить программу: {exc}")
+            return
+        self.root.destroy()
+
     # ---------- настройки и справка ----------
 
     def open_settings(self):
-        SettingsDialog(self.root, self.settings)
+        SettingsDialog(self.root, self.settings, on_check_updates=lambda: self.check_updates(manual=True))
 
     def show_help(self):
         messagebox.showinfo("Справка", HELP_TEXT)
@@ -431,11 +517,12 @@ class App:
 
 
 class SettingsDialog(tk.Toplevel):
-    def __init__(self, master, settings: Settings):
+    def __init__(self, master, settings: Settings, on_check_updates=None):
         super().__init__(master)
         self.settings = settings
+        self.on_check_updates = on_check_updates
         self.title("Настройки")
-        self.geometry("720x620")
+        self.geometry("760x780")
         self.transient(master)
         self.grab_set()
 
@@ -456,6 +543,12 @@ class SettingsDialog(tk.Toplevel):
         self.password = tk.StringVar(value=settings.password)
         self.verify = tk.BooleanVar(value=settings.verify_ssl)
         self.folder = tk.StringVar(value=settings.exchange_dir)
+        self.auto_update = tk.BooleanVar(value=settings.auto_update)
+        self.ai_enabled = tk.BooleanVar(value=settings.ai_enabled)
+        self.ai_url = tk.StringVar(value=settings.ai_base_url)
+        self.ai_key = tk.StringVar(value=settings.ai_api_key)
+        self.ai_model = tk.StringVar(value=settings.ai_model)
+        self.ai_images = tk.BooleanVar(value=settings.ai_send_images)
 
         def entry(label, var, r, show=None):
             ttk.Label(frame, text=label).grid(row=r, column=0, sticky="w", pady=3, padx=(0, 8))
@@ -476,15 +569,40 @@ class SettingsDialog(tk.Toplevel):
         ttk.Entry(folder_row, textvariable=self.folder).grid(row=0, column=0, sticky="ew")
         ttk.Button(folder_row, text="Обзор…", command=self._browse).grid(row=0, column=1, padx=(6, 0))
 
+        ttk.Label(frame, text="Обновления").grid(row=7, column=0, sticky="w", pady=3)
+        update_row = ttk.Frame(frame)
+        update_row.grid(row=7, column=1, sticky="w")
+        ttk.Checkbutton(update_row, text=f"Обновлять автоматически с GitHub (сейчас {__version__})",
+                        variable=self.auto_update).pack(side="left")
+        if on_check_updates:
+            ttk.Button(update_row, text="Проверить сейчас", command=on_check_updates).pack(side="left", padx=(8, 0))
+
+        ttk.Label(frame, text="Распознавание ИИ", font=("Segoe UI", 9, "bold")).grid(
+            row=8, column=0, columnspan=2, sticky="w", pady=(12, 2))
+        ai_row = ttk.Frame(frame)
+        ai_row.grid(row=9, column=1, sticky="w")
+        ttk.Checkbutton(ai_row, text="Распознавать реквизиты ИИ через OmniRoute",
+                        variable=self.ai_enabled).pack(side="left")
+        ttk.Button(ai_row, text="Проверить OmniRoute", command=self._check_ai).pack(side="left", padx=(8, 0))
+        entry("Адрес OmniRoute", self.ai_url, 10)
+        entry("Ключ OmniRoute", self.ai_key, 11, show="•")
+        entry("Модель", self.ai_model, 12)
+        ttk.Checkbutton(frame, text="Отправлять картинки страниц (точнее; нужна модель с vision)",
+                        variable=self.ai_images).grid(row=13, column=1, sticky="w")
+        ttk.Label(frame, foreground="#666", wraplength=520, justify="left",
+                  text="Ключ — в панели OmniRoute: Dashboard → Endpoints. Модель «auto» — OmniRoute выберет сам. "
+                       "Сканы уходят тому провайдеру, к которому OmniRoute направит запрос.").grid(
+            row=14, column=1, sticky="w")
+
         ttk.Label(frame, text="Шаблон выгрузки (JSON): какие справочники и документ заполнять").grid(
-            row=7, column=0, columnspan=2, sticky="w", pady=(12, 2))
-        self.mapping = tk.Text(frame, height=16, font=("Consolas", 9), wrap="none")
-        self.mapping.grid(row=8, column=0, columnspan=2, sticky="nsew")
-        frame.rowconfigure(8, weight=1)
+            row=15, column=0, columnspan=2, sticky="w", pady=(12, 2))
+        self.mapping = tk.Text(frame, height=10, font=("Consolas", 9), wrap="none")
+        self.mapping.grid(row=16, column=0, columnspan=2, sticky="nsew")
+        frame.rowconfigure(16, weight=1)
         self.mapping.insert("1.0", json.dumps(merged_mapping(settings.mapping), ensure_ascii=False, indent=2))
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=9, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        buttons.grid(row=17, column=0, columnspan=2, sticky="e", pady=(10, 0))
         ttk.Button(buttons, text="Шаблон по умолчанию", command=self._reset_mapping).pack(side="left")
         ttk.Button(buttons, text="Проверить подключение", command=self._check).pack(side="left", padx=6)
         ttk.Button(buttons, text="Сохранить", command=self._save).pack(side="left")
@@ -517,6 +635,13 @@ class SettingsDialog(tk.Toplevel):
         except OneCError as exc:
             messagebox.showerror("1С", str(exc), parent=self)
 
+    def _check_ai(self):
+        config = ai.AIConfig(base_url=self.ai_url.get(), api_key=self.ai_key.get().strip(), timeout=15)
+        try:
+            messagebox.showinfo("OmniRoute", ai.AIClient(config).check(), parent=self)
+        except ai.AIError as exc:
+            messagebox.showerror("OmniRoute", str(exc), parent=self)
+
     def _save(self):
         mapping = self._read_mapping()
         if mapping is None:
@@ -525,6 +650,10 @@ class SettingsDialog(tk.Toplevel):
         s.mode, s.base_url, s.user, s.password = self.mode.get(), self.url.get().strip(), self.user.get(), \
             self.password.get()
         s.verify_ssl, s.exchange_dir, s.mapping = self.verify.get(), self.folder.get().strip(), mapping
+        s.auto_update = self.auto_update.get()
+        s.ai_enabled, s.ai_base_url, s.ai_api_key = self.ai_enabled.get(), self.ai_url.get().strip(), \
+            self.ai_key.get().strip()
+        s.ai_model, s.ai_send_images = self.ai_model.get().strip() or ai.DEFAULT_MODEL, self.ai_images.get()
         try:
             s.save()
         except OSError as exc:

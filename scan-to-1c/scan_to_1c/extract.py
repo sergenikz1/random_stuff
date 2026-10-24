@@ -231,8 +231,6 @@ def find_parties(text: str, result: ExtractedData) -> None:
             known.kpp = known.kpp or kpp
             known.name = known.name or name
             continue
-        if not inn_is_valid(inn):
-            result.warnings.append(f"ИНН {inn} не прошёл проверку контрольной суммы — проверьте распознавание")
         found.append((_role_before(text, m.end()), Party(name=name, inn=inn, kpp=kpp)))
 
     for role, party in found:
@@ -290,13 +288,6 @@ def find_amounts(text: str, result: ExtractedData) -> None:
         if vat_values:
             result.vat = max(vat_values)
 
-    if result.total and result.vat and result.vat_rate.endswith("%"):
-        rate = int(result.vat_rate[:-1])
-        expected = round(result.total * rate / (100 + rate), 2)
-        if abs(expected - result.vat) > 1:
-            result.warnings.append(
-                f"НДС {result.vat:.2f} не сходится со ставкой {result.vat_rate} от суммы {result.total:.2f}")
-
 
 def find_bank(text: str, result: ExtractedData) -> None:
     m = re.search(r"БИК\s*:?\s*(0\d{8})", text, re.IGNORECASE)
@@ -322,15 +313,30 @@ def extract(text: str) -> ExtractedData:
     find_parties(text, result)
     find_amounts(text, result)
     find_bank(text, result)
-
-    if not result.doc_type:
-        result.warnings.append("Не удалось определить тип документа")
-    if not result.number:
-        result.warnings.append("Не найден номер документа")
-    if not result.date:
-        result.warnings.append("Не найдена дата документа")
-    if not result.seller.inn:
-        result.warnings.append("Не найден ИНН контрагента")
-    if result.total is None:
-        result.warnings.append("Не найдена сумма документа")
+    result.warnings = validate(result)
     return result
+
+
+def validate(result: ExtractedData) -> list[str]:
+    """Что в реквизитах стоит проверить глазами — одинаково для разбора шаблонами и ИИ."""
+    warnings = []
+    for party in (result.seller, result.buyer):
+        if party.inn and not inn_is_valid(party.inn):
+            warnings.append(f"ИНН {party.inn} не прошёл проверку контрольной суммы — проверьте распознавание")
+    if result.total and result.vat and result.vat_rate.endswith("%"):
+        rate = int(result.vat_rate[:-1])
+        expected = round(result.total * rate / (100 + rate), 2)
+        if abs(expected - result.vat) > 1:
+            warnings.append(
+                f"НДС {result.vat:.2f} не сходится со ставкой {result.vat_rate} от суммы {result.total:.2f}")
+    if not result.doc_type:
+        warnings.append("Не удалось определить тип документа")
+    if not result.number:
+        warnings.append("Не найден номер документа")
+    if not result.date:
+        warnings.append("Не найдена дата документа")
+    if not result.seller.inn:
+        warnings.append("Не найден ИНН контрагента")
+    if result.total is None:
+        warnings.append("Не найдена сумма документа")
+    return warnings

@@ -29,6 +29,8 @@ SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS
 MIN_TEXT_LAYER_CHARS = 40
 PDF_RENDER_DPI = 300
 OCR_LANG = "rus+eng"
+# Сколько страниц сохранять картинками для ИИ: счёт или УПД почти всегда умещаются в 1–3 листа.
+MAX_IMAGE_PAGES = 5
 
 
 class LoaderError(Exception):
@@ -40,6 +42,7 @@ class LoadedDocument:
     path: Path
     pages: list[str] = field(default_factory=list)
     used_ocr: bool = False
+    images: list[Image.Image] = field(default_factory=list)  # страницы для ИИ, если просили keep_images
 
     @property
     def text(self) -> str:
@@ -109,7 +112,10 @@ def _fix_rotation(image: Image.Image) -> Image.Image:
 
 
 def ocr_image(image: Image.Image) -> str:
-    image = _fix_rotation(prepare_image(image))
+    return _ocr_prepared(_fix_rotation(prepare_image(image)))
+
+
+def _ocr_prepared(image: Image.Image) -> str:
     return pytesseract.image_to_string(image, lang=OCR_LANG, config="--psm 3")
 
 
@@ -125,8 +131,11 @@ def _image_pages(path: Path) -> list[Image.Image]:
     return pages
 
 
-def load_document(path: str | Path, progress=None) -> LoadedDocument:
-    """Возвращает текст документа постранично. progress(page, total) вызывается по ходу."""
+def load_document(path: str | Path, progress=None, keep_images: bool = False) -> LoadedDocument:
+    """Возвращает текст документа постранично. progress(page, total) вызывается по ходу.
+
+    keep_images=True дополнительно сохраняет первые страницы картинками — их смотрит ИИ.
+    """
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
@@ -145,10 +154,14 @@ def load_document(path: str | Path, progress=None) -> LoadedDocument:
             for index in range(total):
                 page = pdf[index]
                 text = page.get_textpage().get_text_bounded() or ""
-                if len(text.strip()) < MIN_TEXT_LAYER_CHARS:
-                    bitmap = page.render(scale=PDF_RENDER_DPI / 72)
-                    text = ocr_image(bitmap.to_pil())
-                    doc.used_ocr = True
+                need_image = keep_images and index < MAX_IMAGE_PAGES
+                if len(text.strip()) < MIN_TEXT_LAYER_CHARS or need_image:
+                    image = _fix_rotation(prepare_image(page.render(scale=PDF_RENDER_DPI / 72).to_pil()))
+                    if need_image:
+                        doc.images.append(image)
+                    if len(text.strip()) < MIN_TEXT_LAYER_CHARS:
+                        text = _ocr_prepared(image)
+                        doc.used_ocr = True
                 doc.pages.append(text)
                 if progress:
                     progress(index + 1, total)
@@ -158,7 +171,10 @@ def load_document(path: str | Path, progress=None) -> LoadedDocument:
 
     images = _image_pages(path)
     for index, image in enumerate(images):
-        doc.pages.append(ocr_image(image))
+        image = _fix_rotation(prepare_image(image))
+        if keep_images and index < MAX_IMAGE_PAGES:
+            doc.images.append(image)
+        doc.pages.append(_ocr_prepared(image))
         if progress:
             progress(index + 1, len(images))
     doc.used_ocr = True

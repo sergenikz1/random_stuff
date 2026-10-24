@@ -42,6 +42,8 @@ import com.voicereader.text.SpeedWords
 import com.voicereader.R
 import com.voicereader.rewards.Rewards
 import com.voicereader.ui.rewards.MedalRibbon
+import com.voicereader.ui.rewards.RewardCelebrations
+import com.voicereader.ui.rewards.lookOf
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
@@ -163,7 +165,7 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
         }
 
         if (playing && rewards.ribbonEnabled) {
-            MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding(), dim = true)
+            MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding(), dim = true, ringFx = lookOf(rewards).ring)
         }
 
         if (!playing) {
@@ -181,6 +183,14 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
             )
         }
     }
+
+    // Новый ранг и в быстром чтении: показ останавливается, «Читать дальше» его продолжает.
+    RewardCelebrations(
+        onApply = ::applyReward,
+        celebrate = lookOf(rewards).celebrate,
+        pauseReading = { val was = playing; playing = false; was },
+        resumeReading = { shownSinceStart = 0; playing = true }
+    )
 }
 
 /** Название новой главы: плавно проявляется, держится и так же плавно гаснет. */

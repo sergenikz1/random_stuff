@@ -152,10 +152,6 @@ private fun DailyTab(state: RewardsState) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(stringResource(R.string.daily_title, stringResource(state.growKind.title), state.growthDays), fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                    val goal = DailyCatalog.DAY_GOAL_SECONDS / 60
-                    DailyRow("⏱", if (todaySeconds >= DailyCatalog.DAY_GOAL_SECONDS)
-                        stringResource(R.string.daily_today_done, todaySeconds / 60, goal)
-                    else stringResource(R.string.daily_today_left, todaySeconds / 60, goal))
                     DailyCatalog.daysToNextStage(state.growthDays)?.let {
                         DailyRow("🌱", stringResource(R.string.daily_next_stage, stages[(state.stage + 1).coerceAtMost(stages.size - 1)], it))
                     }
@@ -163,8 +159,49 @@ private fun DailyTab(state: RewardsState) {
                 }
             }
         }
+        item { TodayGoal(todaySeconds) }
         item { YearHeatmap(state) }
         item { StageCircles(state, stages) }
+        item {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Surface).padding(14.dp, 12.dp)) {
+                Text(stringResource(R.string.daily_rules_title), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                listOf(R.string.daily_rule_1, R.string.daily_rule_2, R.string.daily_rule_3, R.string.daily_rule_4).forEach {
+                    Text(stringResource(it), fontSize = 12.5.sp, color = Color(0xFFC9D1DE), lineHeight = 19.sp)
+                }
+            }
+        }
+    }
+}
+
+/** Крупно: сколько осталось прочитать сегодня, чтобы день засчитался. */
+@Composable
+private fun TodayGoal(todaySeconds: Int) {
+    val goal = DailyCatalog.DAY_GOAL_SECONDS
+    val done = todaySeconds >= goal
+    val green = Color(0xFF7BD88F)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xE6142219))
+            .border(1.5.dp, Color(0xFF3F8F55), RoundedCornerShape(16.dp)).padding(12.dp, 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val st = androidx.compose.ui.graphics.drawscope.Stroke(5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                val inset = 4.dp.toPx()
+                drawArc(Color(0xFF24352A), 0f, 360f, false, Offset(inset, inset), androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), style = st)
+                drawArc(green, -90f, 360f * (todaySeconds.coerceAtMost(goal) / goal.toFloat()), false, Offset(inset, inset), androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), style = st)
+            }
+            Text(if (done) "✓" else "%d:%02d".format(todaySeconds / 60, todaySeconds % 60), fontSize = if (done) 18.sp else 12.sp, fontWeight = FontWeight.Bold, color = if (done) green else Color(0xFFE6EAF2))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                if (done) stringResource(R.string.daily_today_counted) else stringResource(R.string.daily_today_seconds, goal - todaySeconds),
+                fontSize = 15.sp, fontWeight = FontWeight.SemiBold
+            )
+            Text(stringResource(R.string.daily_goal_hint), fontSize = 12.sp, color = Color(0xFFA9C2B0), lineHeight = 16.sp)
+        }
     }
 }
 
@@ -199,6 +236,7 @@ private fun YearHeatmap(state: RewardsState) {
                 val color = when {
                     key in state.savedDays -> Color(0xFF4A6FA5)
                     seconds == 0 -> Color(0xFF242A34)
+                    seconds < DailyCatalog.DAY_GOAL_SECONDS -> Color(0xFF1E2A24)
                     seconds < 10 * 60 -> Color(0xFF1F3B29)
                     seconds < 25 * 60 -> Color(0xFF2B6A3E)
                     seconds < 50 * 60 -> Color(0xFF3FA35A)

@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.PathParser
 import com.voicereader.rewards.FocusCatalog
 import com.voicereader.rewards.GrowKind
+import com.voicereader.rewards.RanksCatalog
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -69,6 +70,41 @@ private inline fun DrawScope.inBox(half: Float, block: DrawScope.() -> Unit) {
         translate(size.width / 2, size.height / 2)
         scale(s, s, Offset.Zero)
     }) { block() }
+}
+
+/**
+ * Медаль для ленты: рисуется прямо на холсте с цветовым фильтром.
+ * [lock] — закрыта (серая и тёмная), [dull] — ещё не получена (приглушена), [pause] — пауза серии,
+ * [flash] — вспышка вручения, [flip] — сжатие по горизонтали при перевороте. index −1 — «Старт».
+ */
+fun DrawScope.drawRibbonMedal(
+    index: Int, center: Offset, sizePx: Float, alpha: Float,
+    lock: Float = 0f, dull: Float = 0f, pause: Float = 0f, flash: Float = 0f,
+    flip: Float = 1f, scale: Float = 1f, rot: Float = 0f
+) {
+    if (alpha <= 0.01f || sizePx < 1f) return
+    val gray = maxOf(lock, 0.85f * pause)
+    val sat = (1 - gray) * (1 - 0.5f * dull)
+    val bright = 1 - 0.55f * lock - 0.08f * dull - 0.12f * pause + 0.35f * flash
+    val m = ColorMatrix().apply { setToSaturation(sat) }
+    val v = m.values
+    for (row in 0 until 3) for (col in 0 until 3) v[row * 5 + col] *= bright
+    val half = sizePx * scale * 0.75f
+    drawIntoCanvas { canvas ->
+        val paint = androidx.compose.ui.graphics.Paint().apply { colorFilter = ColorFilter.colorMatrix(ColorMatrix(v)); this.alpha = alpha.coerceIn(0f, 1f) }
+        canvas.saveLayer(Rect(center.x - half, center.y - half, center.x + half, center.y + half), paint)
+        withTransform({
+            translate(center.x, center.y); rotate(rot, Offset.Zero)
+            scale(flip * scale * sizePx / 100f, scale * sizePx / 100f, Offset.Zero)
+        }) {
+            if (index < 0) {
+                drawCircle(Color(0xFF161A21), 40f, Offset.Zero)
+                drawCircle(Color(0xFF4A5263), 40f, Offset.Zero, style = Stroke(3f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(7f, 6f))))
+                drawPath(svg("M-9 -16v32M-9 -16h20l-5 7 5 7h-20"), Color(0xFF8B95A7), style = Stroke(4f, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            } else drawMedal(index.coerceIn(0, FocusCatalog.COUNT - 1))
+        }
+        canvas.restore()
+    }
 }
 
 @Composable
@@ -137,30 +173,91 @@ private fun DrawScope.drawEmblem(tier: Int, fill: Color, hl: Color, outline: Col
     }
 }
 
-// --- Звания: щит со звёздами; цвет звёзд меняется каждые 5 званий ---
+// --- Ранги: у каждого из 20 званий своя эмблема, оправа меняется по эпохам, звёзды — ступень I–V ---
 
-private val STAR_COLORS = longArrayOf(0xFFD08A4E, 0xFFDFE6EE, 0xFFFFD86B, 0xFF5EE39A, 0xFFFF6F8A, 0xFFBFF0FF)
+private class Era(val rim: Long, val rim2: Long, val dark: Long)
 
+private val ERAS = listOf(
+    Era(0xFFD39A5C, 0xFFD39A5C, 0xFF3A2616),   // медная
+    Era(0xFFD7E0EA, 0xFFD7E0EA, 0xFF262D38),   // серебряная
+    Era(0xFFFFD86B, 0xFFFFD86B, 0xFF3A2E10),   // золотая, с лаврами
+    Era(0xFFB9A2FF, 0xFF7FE3FF, 0xFF221A40)    // звёздная, с крыльями
+)
+
+/** Цвет эпохи ранга — для подсветки окна нового ранга. */
+fun eraColor(rank: Int): Color = Color(ERAS[RanksCatalog.eraOf(rank).coerceIn(0, ERAS.size - 1)].rim)
+
+/** [stars] — сколько звёзд уже зажжено (для анимации), null — все. */
 @Composable
-fun RankBadge(rank: Int, modifier: Modifier = Modifier, locked: Boolean = false) {
-    Canvas(modifier) { maybeGray(locked, 0.55f) { inBox(36f) { drawBadge(rank) } } }
+fun RankBadge(rank: Int, modifier: Modifier = Modifier, locked: Boolean = false, stars: Int? = null) {
+    Canvas(modifier) { maybeGray(locked, 0.55f) { inBox(55f) { drawBadge(rank.coerceIn(0, RanksCatalog.COUNT - 1), stars) } } }
 }
 
-private fun DrawScope.drawBadge(rank: Int) {
-    val color = Color(STAR_COLORS[(rank / 5).coerceIn(0, STAR_COLORS.size - 1)])
-    val stars = rank % 5 + 1
-    val shield = svg("M-24 -32h48v46l-24 18-24-18z")
-    drawPath(shield, Color(0xFF1F2633))
-    drawPath(shield, color, style = Stroke(2.5f))
-    drawPath(svg("M-18 -26h36"), color.copy(alpha = 0.5f), style = Stroke(1.5f))
-    val xs = when (stars) { 1 -> listOf(0f); 2 -> listOf(-9f, 9f); 3 -> listOf(-12f, 0f, 12f); 4 -> listOf(-14f, -5f, 5f, 14f); else -> listOf(-16f, -8f, 0f, 8f, 16f) }
-    val star = svg("M0 -10l2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L0 4.8l-5.9 3.2 1.3-6.6-4.9-4.5 6.6-.8z")
-    xs.forEachIndexed { k, x ->
-        val y = if (stars > 3) (if (k % 2 == 1) 2f else -6f) else -2f
-        val s = if (stars > 3) 0.62f else 0.8f
-        withTransform({ translate(x, y); scale(s, s, Offset.Zero) }) { drawPath(star, color) }
+private val STAR = "M0 -10l2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L0 4.8l-5.9 3.2 1.3-6.6-4.9-4.5 6.6-.8z"
+private val DARK = Color(0x66000000)
+
+private fun DrawScope.drawBadge(rank: Int, starsLit: Int?) {
+    val title = RanksCatalog.titleOf(rank); val step = RanksCatalog.stepOf(rank); val e = RanksCatalog.eraOf(rank)
+    val era = ERAS[e]
+    val rim = Color(era.rim); val rim2 = Color(era.rim2); val dark = Color(era.dark)
+    val brush = Brush.linearGradient(listOf(rim, rim2), Offset(-26f, -26f), Offset(26f, 34f))
+    if (e >= 2) for (side in listOf(1f, -1f)) withTransform({ scale(side, 1f, Offset.Zero) }) {
+        for (k in 0 until 5) withTransform({ translate(-31f + k * 1.2f, 18f - k * 9f); rotate(-30f + k * 8f, Offset.Zero) }) {
+            drawOval(rim.copy(alpha = 0.9f), Offset(-3.2f, -6.5f), androidx.compose.ui.geometry.Size(6.4f, 13f))
+        }
     }
-    drawLabel((rank + 1).toString(), 0f, 22f, 9f, STAR_COLORS[(rank / 5).coerceIn(0, STAR_COLORS.size - 1)])
+    if (e >= 3) for (side in listOf(1f, -1f)) withTransform({ scale(side, 1f, Offset.Zero) }) {
+        drawPath(svg("M-27 -14c-14-2-20 6-22 14 6-3 10-3 13-1-5 2-8 6-9 11 5-3 10-4 14-2"), rim2, style = Stroke(2.4f, cap = StrokeCap.Round))
+    }
+    val shield = svg("M-26 -26h52v32c0 14-12 22-26 28-14-6-26-14-26-28z")
+    drawPath(shield, Brush.radialGradient(listOf(lerp(dark, Color.White, 0.12f), dark), Offset(-6f, -12f), 50f))
+    drawPath(shield, brush, style = Stroke(if (e >= 1) 3.4f else 2.6f))
+    if (e >= 1) drawLine(rim.copy(alpha = 0.5f), Offset(-20f, -20f), Offset(20f, -20f), 1.4f)
+    withTransform({ translate(0f, 2f) }) { drawRankEmblem(title, brush, era.rim) }
+    val n = step + 1
+    for (k in 0 until n) withTransform({ translate((k - (n - 1) / 2f) * 9f, -33f); scale(0.42f, 0.42f, Offset.Zero) }) {
+        drawPath(svg(STAR), if (starsLit == null || k < starsLit) rim else Color(0xFF3A4150))
+    }
+    val ribbon = svg("M-15 28h30l-3 6 3 6h-30l3-6z")
+    drawPath(ribbon, dark); drawPath(ribbon, brush, style = Stroke(1.6f))
+    drawLabel(RanksCatalog.ROMAN[step], 0f, 37.5f, 9f, era.rim)
+}
+
+private fun lerp(a: Color, b: Color, k: Float) = Color(a.red + (b.red - a.red) * k, a.green + (b.green - a.green) * k, a.blue + (b.blue - a.blue) * k, 1f)
+
+/** Эмблемы званий: книга, наушники, карандаш, очки, стопка книг, микрофон, книга с сердцем, лампа, закладка, глобус,
+ *  свиток, перо жар-птицы, перо с чернильницей, лупа, буквица «Ѣ», ключ, песочные часы, сова, шапочка магистра, башня. */
+private fun DrawScope.drawRankEmblem(title: Int, c: Brush, rim: Long) {
+    fun fill(d: String, alpha: Float = 1f) = drawPath(svg(d), c, alpha = alpha)
+    fun dark(d: String) = drawPath(svg(d), DARK)
+    fun line(d: String, w: Float, color: Color? = null) =
+        if (color != null) drawPath(svg(d), color, style = Stroke(w, cap = StrokeCap.Round))
+        else drawPath(svg(d), c, style = Stroke(w, cap = StrokeCap.Round))
+    fun ring(cx: Float, cy: Float, r: Float, w: Float) = drawCircle(c, r, Offset(cx, cy), style = Stroke(w))
+    fun box(x: Float, y: Float, w: Float, h: Float, r: Float, alpha: Float = 1f) =
+        drawRoundRect(c, Offset(x, y), androidx.compose.ui.geometry.Size(w, h), androidx.compose.ui.geometry.CornerRadius(r, r), alpha = alpha)
+    when (title) {
+        0 -> fill("M-16 -8q8-4 15 0v20q-7-4-15 0zM16 -8q-8-4-15 0v20q7-4 15 0z")
+        1 -> { line("M-14 6v-4a14 14 0 0 1 28 0v4", 3.4f); box(-17f, 3f, 8f, 12f, 3f); box(9f, 3f, 8f, 12f, 3f) }
+        2 -> { fill("M-13 13l3-9 17-17 6 6-17 17z"); drawPath(svg("M-13 13l3-9 6 6z"), Color(0xFFF6E0B5)); line("M4 -10l6 6", 1.5f, DARK) }
+        3 -> { ring(-9f, 2f, 7f, 3.2f); ring(9f, 2f, 7f, 3.2f); line("M-2 1q2-3 4 0M-16 0l-4-5M16 0l4-5", 2.6f) }
+        4 -> { box(-15f, 6f, 30f, 7f, 1.5f); box(-12f, -2f, 26f, 7f, 1.5f, 0.8f); box(-14f, -10f, 24f, 7f, 1.5f) }
+        5 -> { box(-6f, -14f, 12f, 20f, 6f); line("M-11 0a11 11 0 0 0 22 0M0 11v5M-6 16h12", 2.8f) }
+        6 -> { fill("M-14 -12h28v26h-28z"); drawPath(svg("M0 8c-9-6-9-12-4-13 2 0 4 2 4 3 0-1 2-3 4-3 5 1 5 7-4 13z"), Color(0x80000000)) }
+        7 -> { fill("M-8 8a12 12 0 1 1 16 0v4h-16z"); box(-6f, 13f, 12f, 4f, 1.5f, 0.75f); line("M-3 4l3-6 3 6", 1.6f, DARK) }
+        8 -> { fill("M-11 -15h22v30l-11-8-11 8z"); line("M-6 -9h12M-6 -4h12", 1.6f, DARK) }
+        9 -> { ring(0f, 0f, 13f, 3f); drawOval(c, Offset(-6f, -13f), androidx.compose.ui.geometry.Size(12f, 26f), style = Stroke(2.2f)); line("M-13 0h26M-11 -7h22M-11 7h22", 2f) }
+        10 -> { fill("M-12 -12h20a4 4 0 0 1 0 8h-2v18h-18a4 4 0 0 1 0-8h2z"); line("M-6 -2h10M-6 3h10", 1.6f, DARK) }
+        11 -> { fill("M-12 15c4-14 12-25 25-30-2 12-10 22-21 26z"); line("M-12 15l15-19", 1.6f, Color(0x70000000)); drawCircle(DARK, 3f, Offset(6f, -6f)) }
+        12 -> { fill("M-12 6h14l-2 9h-10z"); fill("M-4 5c3-10 9-17 18-20-1 9-7 16-15 20z", 0.85f) }
+        13 -> { ring(-3f, -3f, 10f, 3.6f); line("M5 5l9 9", 5f) }
+        14 -> drawLabel("Ѣ", 0f, 9f, 28f, rim, serif = true)
+        15 -> { ring(-7f, -6f, 7f, 3.4f); line("M-2 -1l14 14M6 7l4-4M9 10l4-4", 3.4f) }
+        16 -> { line("M-10 -15h20M-10 15h20", 3f); fill("M-8 -13h16l-8 13 8 13h-16l8-13z", 0.9f) }
+        17 -> { fill("M-13 -12l5 4q8-4 16 0l5-4v20a13 12 0 0 1-26 0z"); drawCircle(DARK, 4f, Offset(-5f, -1f)); drawCircle(DARK, 4f, Offset(5f, -1f)); dark("M-2 5l2 3 2-3z") }
+        18 -> { fill("M-18 -4l18-8 18 8-18 8z"); fill("M-10 0v8q10 6 20 0v-8", 0.8f); line("M15 -3v12", 2f); drawCircle(c, 2f, Offset(15f, 10f)) }
+        else -> { fill("M-12 15v-20h24v20z"); fill("M-14 -5l4-9 5 5 5-8 5 8 5-5 4 9z"); dark("M-4 15v-9a4 4 0 0 1 8 0v9z") }
+    }
 }
 
 // --- Что растёт каждый день: 11 стадий для каждого вида ---
@@ -201,6 +298,10 @@ private fun DrawScope.drawGrowth(kind: GrowKind, stage: Int) {
         GrowKind.FIRE -> { if (stage < 9) ground(); fire(stage) }
         GrowKind.CRYSTAL -> crystals(stage)
         GrowKind.GARDEN -> { ground(); garden(stage) }
+        GrowKind.CACTUS -> cacti(stage)
+        GrowKind.STARS -> constellation(stage)
+        GrowKind.CASTLE -> { ground(); castle(stage) }
+        GrowKind.CORAL -> reef(stage)
     }
 }
 
@@ -319,5 +420,176 @@ private fun DrawScope.garden(stage: Int) {
             drawCircle(colors[k % 4], 2.6f, Offset(x + (cos(ang) * 3.2).toFloat(), y + (sin(ang) * 3.2).toFloat()))
         }
         drawCircle(Color(0xFFFFF3B0), 1.8f, Offset(x, y))
+    }
+}
+
+// --- Кактус: песок, колючки, цветы ---
+
+private fun DrawScope.sand() {
+    drawOval(Color(0xFF6B4F2A), Offset(-38f, 35f), androidx.compose.ui.geometry.Size(76f, 12f))
+    drawOval(Color(0xFFC9A86A), Offset(-34f, 36f), androidx.compose.ui.geometry.Size(68f, 8f))
+}
+
+private fun DrawScope.cactus(x: Float, h: Float, w: Float, arms: Int, bloom: Int) {
+    val green = Color(0xFF3C9A5A); val dark = Color(0xFF2B7444)
+    fun body(left: Float, top: Float, bw: Float, bh: Float) =
+        drawRoundRect(green, Offset(left, top), androidx.compose.ui.geometry.Size(bw, bh), androidx.compose.ui.geometry.CornerRadius(bw / 2, bw / 2))
+    if (arms >= 1) { body(x - w * 1.5f, 40 - h * .7f, w * .55f, h * .35f); drawRect(green, Offset(x - w * 1.3f, 40 - h * .42f), androidx.compose.ui.geometry.Size(w, w * .45f)) }
+    if (arms >= 2) { body(x + w * .95f, 40 - h * .85f, w * .55f, h * .4f); drawRect(green, Offset(x + w * .3f, 40 - h * .52f), androidx.compose.ui.geometry.Size(w, w * .45f)) }
+    body(x - w / 2, 40 - h, w, h + 2)
+    drawLine(dark, Offset(x, 40 - h + 3), Offset(x, 40f), 1f)
+    if (w > 6) { drawLine(dark, Offset(x - w * .25f, 40 - h + 5), Offset(x - w * .25f, 40f), .8f); drawLine(dark, Offset(x + w * .25f, 40 - h + 5), Offset(x + w * .25f, 40f), .8f) }
+    for (k in 0 until (h / 6).toInt()) {
+        val y = 40 - h + 5 + k * 6
+        drawLine(Color(0xFFF1E6D0), Offset(x - w / 2 - 1.5f, y), Offset(x - w / 2 + .5f, y), .7f)
+        drawLine(Color(0xFFF1E6D0), Offset(x + w / 2 - .5f, y + 3), Offset(x + w / 2 + 1.5f, y + 3), .7f)
+    }
+    when (bloom) {
+        1 -> drawOval(Color(0xFFFF8AB8), Offset(x - 2.5f, 40 - h - 4), androidx.compose.ui.geometry.Size(5f, 6f))
+        2 -> { for (a in 0 until 5) { val ang = a * 72 * PI / 180 - PI / 2
+            drawCircle(Color(0xFFFF6FA5), 2.8f, Offset(x + (cos(ang) * 3.4).toFloat(), 40 - h - 2 + (sin(ang) * 3.4).toFloat())) }
+            drawCircle(Color(0xFFFFE08A), 1.8f, Offset(x, 40 - h - 2)) }
+    }
+}
+
+private fun DrawScope.cacti(stage: Int) {
+    sand()
+    when (stage) {
+        0 -> drawOval(Color(0xFF6B4F2A), Offset(-3f, 33f), androidx.compose.ui.geometry.Size(6f, 4f))
+        1 -> drawRoundRect(Color(0xFF3C9A5A), Offset(-2.5f, 31f), androidx.compose.ui.geometry.Size(5f, 9f), androidx.compose.ui.geometry.CornerRadius(2.5f, 2.5f))
+        2 -> cactus(0f, 14f, 7f, 0, 0)
+        3 -> cactus(0f, 26f, 10f, 0, 0)
+        4 -> cactus(0f, 30f, 10f, 1, 0)
+        5 -> cactus(0f, 34f, 11f, 2, 1)
+        6 -> cactus(0f, 36f, 11f, 2, 2)
+        7 -> { cactus(-14f, 22f, 8f, 1, 2); cactus(8f, 36f, 11f, 2, 2) }
+        8 -> { cactus(-20f, 18f, 7f, 0, 2); cactus(18f, 24f, 8f, 1, 1); cactus(0f, 38f, 11f, 2, 2) }
+        9 -> { drawOval(Color(0xFF3A8FD6), Offset(-30f, 33f), androidx.compose.ui.geometry.Size(26f, 7f)); cactus(-24f, 18f, 7f, 0, 2); cactus(12f, 38f, 11f, 2, 2); cactus(28f, 20f, 7f, 1, 2) }
+        else -> { drawOval(Color(0xFF3A8FD6), Offset(-30f, 33f), androidx.compose.ui.geometry.Size(26f, 7f))
+            cactus(-26f, 20f, 7f, 1, 2); cactus(-8f, 28f, 9f, 1, 2); cactus(12f, 40f, 11f, 2, 2); cactus(29f, 22f, 7f, 1, 2)
+            listOf(-34f, -18f, 2f, 22f, 34f).forEach { x -> drawCircle(Color(0xFFFFB3CF), 1.8f, Offset(x, 39f)) } }
+    }
+}
+
+// --- Созвездие: ночной круг, звёзды и линии между ними ---
+
+private val SKY_STARS = listOf(Offset(-18f, -2f), Offset(-6f, -14f), Offset(8f, -8f), Offset(18f, -20f), Offset(26f, -4f), Offset(14f, 8f), Offset(-2f, 12f))
+
+private fun DrawScope.star(o: Offset, r: Float, glow: Boolean = false) {
+    if (glow) drawCircle(Color(0x55BFD7FF), r * 3.2f, o)
+    withTransform({ translate(o.x, o.y); scale(r, r, Offset.Zero) }) {
+        drawPath(svg("M0 -2L.5 -.5 2 0 .5 .5 0 2-.5 .5-2 0-.5-.5z"), Color(0xFFFFF6D8))
+    }
+}
+
+private fun DrawScope.constellation(stage: Int) {
+    drawCircle(Brush.radialGradient(listOf(Color(0xFF26305A), Color(0xFF121833)), Offset(0f, -4f), 44f), 42f, Offset(0f, -2f))
+    if (stage >= 6) withTransform({ rotate(-24f, Offset.Zero) }) { drawOval(Color(0x2AE6E0FF), Offset(-44f, -9f), androidx.compose.ui.geometry.Size(88f, 18f)) }
+    if (stage >= 7) { drawCircle(Color(0x44A98BFF), 14f, Offset(-20f, 20f)); drawCircle(Color(0x33FF8AB8), 10f, Offset(-12f, 24f)) }
+    if (stage >= 8) for (k in 0 until 40) {
+        val a = k * .45; val r = 2 + k * .55
+        drawCircle(Color(0xCCE6E0FF), .8f, Offset(22f + (cos(a) * r * .9).toFloat(), 22f + (sin(a) * r * .5).toFloat()))
+    }
+    if (stage >= 9) for (k in 0 until 26) drawCircle(Color(0xAAFFFFFF), .7f + (k % 3) * .3f, Offset(((k * 37) % 70 - 35).toFloat(), ((k * 53) % 60 - 34).toFloat()))
+    val count = when (stage) { 0, 1 -> 1; 2 -> 2; 3 -> 3; else -> SKY_STARS.size }
+    val lines = when (stage) { 0, 1 -> 0; 2 -> 1; 3 -> 3; else -> SKY_STARS.size - 1 }
+    val stroke = Color(0x88BFD7FF)
+    for (k in 0 until lines) {
+        val a = SKY_STARS[k % count]; val b = SKY_STARS[(k + 1) % count]
+        drawLine(stroke, a, b, .9f)
+    }
+    if (stage >= 5) drawLine(stroke, SKY_STARS[6], SKY_STARS[0], .9f)
+    for (k in 0 until count) star(SKY_STARS[k], if (stage == 0) .9f else 1.3f + (if (k == 2) .6f else 0f) + stage * .05f, glow = stage >= 5 || k == 0)
+    if (stage >= 10) drawCircle(Color(0x33FFF3C4), 40f, Offset(0f, -2f), style = Stroke(2f))
+}
+
+// --- Замок: от камня до королевства ---
+
+private val STONE = Color(0xFF9AA0AA)
+private val STONE_DARK = Color(0xFF6C727D)
+
+private fun DrawScope.wall(x: Float, w: Float, h: Float) {
+    drawRect(STONE, Offset(x, 40 - h), androidx.compose.ui.geometry.Size(w, h))
+    var cx = x
+    while (cx < x + w - 2) { drawRect(STONE, Offset(cx, 40 - h - 3), androidx.compose.ui.geometry.Size(3f, 3f)); cx += 6 }
+    drawLine(STONE_DARK, Offset(x, 40 - h / 2), Offset(x + w, 40 - h / 2), .7f)
+}
+
+private fun DrawScope.tower(x: Float, w: Float, h: Float, flag: Boolean, roof: Boolean = false) {
+    drawRect(STONE, Offset(x - w / 2, 40 - h), androidx.compose.ui.geometry.Size(w, h))
+    drawRect(STONE_DARK, Offset(x - w / 2, 40 - h), androidx.compose.ui.geometry.Size(w, h), style = Stroke(.7f))
+    if (roof) drawPath(svg("M${x - w / 2 - 2} ${40 - h}L$x ${40 - h - w}L${x + w / 2 + 2} ${40 - h}z"), Color(0xFFB0453A))
+    else for (k in 0 until 3) drawRect(STONE, Offset(x - w / 2 + k * w / 2.5f, 40 - h - 3), androidx.compose.ui.geometry.Size(w / 5, 3f))
+    drawRoundRect(Color(0xFF2A2F3A), Offset(x - 1.5f, 40 - h * .7f), androidx.compose.ui.geometry.Size(3f, 5f), androidx.compose.ui.geometry.CornerRadius(1.5f, 1.5f))
+    if (flag) {
+        val top = 40 - h - (if (roof) w else 3f)
+        drawLine(Color(0xFF5A4636), Offset(x, top), Offset(x, top - 10), 1f)
+        drawPath(svg("M$x ${top - 10}l8 2.5-8 2.5z"), Color(0xFFE5484D))
+    }
+}
+
+private fun DrawScope.house(x: Float) {
+    drawRect(Color(0xFFE8D8B8), Offset(x - 4, 34f), androidx.compose.ui.geometry.Size(8f, 6f))
+    drawPath(svg("M${x - 5} 34L$x 29L${x + 5} 34z"), Color(0xFFB0453A))
+}
+
+private fun DrawScope.castle(stage: Int) {
+    when (stage) {
+        0 -> drawRoundRect(STONE, Offset(-4f, 35f), androidx.compose.ui.geometry.Size(8f, 5f), androidx.compose.ui.geometry.CornerRadius(1.5f, 1.5f))
+        1 -> for (k in 0 until 5) drawRect(if (k % 2 == 0) STONE else STONE_DARK, Offset(-15f + k * 6, 36f), androidx.compose.ui.geometry.Size(6f, 4f))
+        2 -> wall(-16f, 32f, 9f)
+        3 -> { wall(-18f, 24f, 9f); tower(12f, 10f, 22f, false) }
+        4 -> { wall(-12f, 24f, 10f); tower(-16f, 10f, 22f, false); tower(16f, 10f, 22f, false) }
+        5 -> { wall(-12f, 24f, 12f); drawPath(svg("M-4 40v-6a4 4 0 0 1 8 0v6z"), Color(0xFF3A2A1A)); tower(-16f, 10f, 24f, false); tower(16f, 10f, 24f, false) }
+        6 -> { wall(-12f, 24f, 12f); tower(0f, 12f, 32f, false, roof = true); tower(-17f, 10f, 24f, false); tower(17f, 10f, 24f, false) }
+        7 -> { wall(-12f, 24f, 12f); tower(0f, 12f, 32f, true, roof = true); tower(-17f, 10f, 24f, true); tower(17f, 10f, 24f, true) }
+        8 -> { wall(-30f, 60f, 12f); tower(0f, 13f, 34f, true, roof = true); tower(-20f, 10f, 26f, true); tower(20f, 10f, 26f, true); tower(-32f, 8f, 18f, false); tower(32f, 8f, 18f, false) }
+        else -> {
+            wall(-30f, 60f, 12f); tower(0f, 14f, 36f, true, roof = true); tower(-20f, 10f, 27f, true, roof = stage >= 10); tower(20f, 10f, 27f, true, roof = stage >= 10)
+            tower(-32f, 8f, 18f, false); tower(32f, 8f, 18f, false)
+            listOf(-26f, -14f, 14f, 26f).forEach { house(it) }
+            if (stage >= 10) { drawPath(svg("M-7 -10l2-6 3 3 2-5 2 5 3-3 2 6z"), Color(0xFFFFD86B)); drawCircle(Color(0x33FFD86B), 12f, Offset(0f, -12f)) }
+        }
+    }
+}
+
+// --- Коралловый риф: вода, песок, кораллы, рыбки ---
+
+private fun DrawScope.coral(x: Float, s: Float, color: Color) {
+    val st = Stroke(1.6f + s * .5f, cap = StrokeCap.Round)
+    drawPath(svg("M$x 40v${-6 * s}M$x ${40 - 3 * s}l${-3 * s} ${-3 * s}M$x ${40 - 4 * s}l${3 * s} ${-4 * s}M${x - 3 * s} ${40 - 6 * s}v${-2 * s}M${x + 3 * s} ${40 - 8 * s}v${-1.5f * s}"), color, style = st)
+    drawCircle(color, .9f + s * .3f, Offset(x, 40 - 6 * s))
+}
+
+private fun DrawScope.fish(x: Float, y: Float, color: Color, left: Boolean = false) {
+    withTransform({ translate(x, y); scale(if (left) -1f else 1f, 1f, Offset.Zero) }) {
+        drawOval(color, Offset(-4f, -2f), androidx.compose.ui.geometry.Size(8f, 4f))
+        drawPath(svg("M-4 0l-3-2.5v5z"), color)
+        drawCircle(Color(0xFF16202A), .6f, Offset(2f, -.4f))
+    }
+}
+
+private fun DrawScope.reef(stage: Int) {
+    drawCircle(Brush.verticalGradient(listOf(Color(0x332E7DD6), Color(0x552E7DD6)), -40f, 44f), 42f, Offset(0f, -2f))
+    drawOval(Color(0xFFC9A86A), Offset(-34f, 36f), androidx.compose.ui.geometry.Size(68f, 8f))
+    val pink = Color(0xFFFF7A93); val orange = Color(0xFFFF9A3D); val violet = Color(0xFFB49CFF)
+    when (stage) {
+        0 -> drawCircle(pink, 2f, Offset(0f, 38f))
+        1 -> coral(0f, 1f, pink)
+        2 -> coral(0f, 1.8f, pink)
+        3 -> coral(0f, 2.8f, pink)
+        4 -> { coral(0f, 3f, pink); fish(14f, 10f, orange) }
+        else -> {
+            if (stage >= 5) listOf(-26f, 24f).forEach { x -> drawPath(svg("M$x 40q-3-8 0-14t0-14"), Color(0xFF3AA65C), style = Stroke(1.6f, cap = StrokeCap.Round)) }
+            coral(0f, 3.2f, pink)
+            if (stage >= 6) { coral(-14f, 2.2f, violet); coral(14f, 2.4f, orange) }
+            if (stage >= 7) listOf(-8f, 20f).forEach { x -> drawPath(svg("M${x - 3} 40a3 3 0 0 1 6 0z"), Color(0xFFF1E6D0)) }
+            if (stage >= 8) { drawOval(Color(0xFF3A8F6A), Offset(-30f, -14f), androidx.compose.ui.geometry.Size(14f, 9f)); drawCircle(Color(0xFF6BC28F), 2.6f, Offset(-14f, -10f)) }
+            if (stage >= 9) { coral(-24f, 1.8f, orange); coral(26f, 2f, violet) }
+            fish(14f, 6f, orange)
+            if (stage >= 6) fish(-12f, -4f, Color(0xFFFFD86B), left = true)
+            if (stage >= 10) { fish(18f, -16f, Color(0xFF7FD3FF), left = true); fish(-4f, -22f, pink)
+                listOf(Offset(4f, -8f), Offset(6f, -14f), Offset(3f, -20f)).forEach { drawCircle(Color(0x88FFFFFF), 1.2f, it, style = Stroke(.6f)) } }
+        }
     }
 }

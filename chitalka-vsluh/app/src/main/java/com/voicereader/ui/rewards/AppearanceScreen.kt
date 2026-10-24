@@ -39,7 +39,7 @@ import com.voicereader.rewards.ReaderFont
 import com.voicereader.rewards.Reward
 import com.voicereader.rewards.RewardKind
 import com.voicereader.rewards.Rewards
-import com.voicereader.rewards.VoiceManner
+import com.voicereader.rewards.AnimKind
 import com.voicereader.tts.VoiceCatalog
 import com.voicereader.tts.VoiceKind
 
@@ -76,19 +76,29 @@ fun AppearanceScreen(onBack: () -> Unit) {
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-            // Предпросмотр страницы с выбранным оформлением
-            Column(
+            // Предпросмотр страницы с выбранным оформлением и анимациями
+            Box(
                 Modifier
                     .padding(horizontal = 14.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(look.background ?: Brush.linearGradient(listOf(Color(0xFF101216), Color(0xFF101216))))
                     .border(1.dp, Color(0xFF2E3542), RoundedCornerShape(20.dp))
-                    .padding(16.dp, 12.dp)
             ) {
-                Text(stringResource(R.string.preview).uppercase(), fontSize = 11.sp, letterSpacing = 1.5.sp, color = Muted.copy(alpha = 0.7f))
-                Spacer(Modifier.height(6.dp))
-                Text(stringResource(R.string.preview_text), color = look.text ?: Color(0xFFE6EAF2), fontFamily = look.font, fontSize = 17.sp, lineHeight = 25.sp)
+                look.live?.let { LiveBackground(it, Modifier.matchParentSize()) }
+                Column(Modifier.padding(16.dp, 12.dp)) {
+                    Text(stringResource(R.string.preview).uppercase(), fontSize = 11.sp, letterSpacing = 1.5.sp, color = (look.text ?: Muted).copy(alpha = 0.7f))
+                    Spacer(Modifier.height(6.dp))
+                    var tick by remember { mutableIntStateOf(0) }
+                    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(2600); tick++ } }
+                    Text(
+                        stringResource(R.string.preview_text),
+                        color = look.text ?: Color(0xFFE6EAF2), fontFamily = look.font, fontSize = 17.sp, lineHeight = 25.sp,
+                        modifier = Modifier
+                            .sentenceHighlight(look.highlight, true, tick, Color(0x268AB4F8))
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
             }
 
             Section(stringResource(R.string.kind_background), "${count(RewardKind.BACKGROUND)} / ${of(RewardKind.BACKGROUND).size}")
@@ -141,23 +151,6 @@ fun AppearanceScreen(onBack: () -> Unit) {
             player.installProgress?.let {
                 LinearProgressIndicator(progress = { it }, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp).fillMaxWidth())
             }
-            Text(stringResource(R.string.manner_title), fontSize = 13.sp, color = Muted, modifier = Modifier.padding(start = 14.dp, top = 8.dp, bottom = 4.dp))
-            TileRow {
-                VoiceManner.entries.forEach { manner ->
-                    val reward = rewards.firstOrNull { it.manner == manner }
-                    val unlocked = reward == null || state.unlocked(reward)
-                    item {
-                        Tile(stringResource(manner.title), reward?.rarity, state.manner == manner, unlocked, {
-                            Rewards.edit { it.copy(manner = manner) }; PlayerEngine.applyVoiceSettingsNow()
-                        }, onPlay = if (unlocked) ({ PlayerEngine.previewVoice(active.neuralVoiceId, manner) }) else null) {
-                            Box(Modifier.fillMaxSize().background(Color(0xFF272042)), contentAlignment = Alignment.Center) {
-                                Text(when (manner) { VoiceManner.NORMAL -> "1×"; VoiceManner.STORYTELLER -> "0.9× …"; VoiceManner.ANNOUNCER -> "1.1×" }, color = Color(0xFFE8DEFF), fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
-                }
-            }
-
             Section(stringResource(R.string.kind_grow_long), "")
             TileRow {
                 GrowKind.entries.forEach { kind ->
@@ -166,6 +159,20 @@ fun AppearanceScreen(onBack: () -> Unit) {
                         Tile(stringResource(kind.title), reward?.rarity, state.growKind == kind, state.unlocked(kind), { Rewards.edit { it.copy(growKind = kind) } }) {
                             Box(Modifier.fillMaxSize().background(Color(0xFF16201A)), contentAlignment = Alignment.Center) { GrowthArt(kind, 5, Modifier.size(56.dp)) }
                         }
+                    }
+                }
+            }
+
+            AnimKind.entries.forEach { kind ->
+                val list = of(RewardKind.ANIM).filter { it.anim == kind }
+                Section(stringResource(kind.title), "${list.count { state.unlocked(it) }} / ${list.size}")
+                Text(stringResource(kind.hint), fontSize = 12.sp, color = Muted, modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 6.dp))
+                TileRow {
+                    item { Tile(stringResource(R.string.anim_none), null, state.anims[kind] == null, true, { Rewards.edit { it.copy(anims = it.anims - kind) } }) {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF1B2029)), contentAlignment = Alignment.Center) { Text("—", color = Muted) } } }
+                    list.forEach { r ->
+                        item { Tile(stringResource(r.title), r.rarity, state.anims[kind] == r.id, state.unlocked(r), { Rewards.edit { it.copy(anims = it.anims + (kind to r.id)) } }) {
+                            AnimPreview(r, Modifier.fillMaxSize()) } }
                     }
                 }
             }

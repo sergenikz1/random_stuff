@@ -1,6 +1,10 @@
 package com.voicereader
 
+import com.voicereader.rewards.AnimKind
 import com.voicereader.rewards.DailyCatalog
+import com.voicereader.rewards.GrowKind
+import com.voicereader.rewards.Rarity
+import com.voicereader.rewards.ReaderFont
 import com.voicereader.rewards.FocusCatalog
 import com.voicereader.rewards.RanksCatalog
 import com.voicereader.rewards.RewardEvent
@@ -37,16 +41,21 @@ class RewardsEngineTest {
     }
 
     @Test
-    fun readingEmitsMedalAndCountsTheDay() {
+    fun readingEmitsMedalAndCountsTheDayAfterOneMinute() {
         val events = ArrayList<RewardEvent>()
-        val s = read(RewardsState(), 10 * 60, events)
-        assertEquals(10 * 60, s.sessionSeconds)
-        assertEquals(10 * 60, s.dayLog[day.toString()])
-        assertTrue(events.any { it is RewardEvent.MedalUp && it.medal == 0 })
+        var s = read(RewardsState(), 59, events)
+        assertEquals(0, s.growthDays)
+        assertTrue(events.none { it is RewardEvent.DayCounted })
+        s = read(s, 1, events)
+        assertEquals(60, DailyCatalog.DAY_GOAL_SECONDS)
         assertEquals(1, s.growthDays)
         assertEquals(day.toString(), s.lastCountedDay)
-        assertTrue(events.any { it is RewardEvent.DayCounted })
-        assertEquals(RewardsEngine.MARATHON_POINTS.toLong(), s.points) // бонус за 10 минут
+        assertEquals(1, events.count { it is RewardEvent.DayCounted })
+        assertTrue(events.any { it is RewardEvent.MedalUp && it.medal == 0 })
+        s = read(s, 9 * 60, events)
+        assertEquals(10 * 60, s.dayLog[day.toString()])
+        assertEquals(1, events.count { it is RewardEvent.DayCounted })   // день засчитывается один раз
+        assertEquals(RewardsEngine.MARATHON_POINTS.toLong(), s.points)  // бонус за 10 минут
     }
 
     @Test
@@ -94,14 +103,38 @@ class RewardsEngineTest {
     }
 
     @Test
-    fun ranksCatalogHas30RanksAndAlternatingRewards() {
-        assertEquals(30, RanksCatalog.COUNT)
-        assertEquals(29, RanksCatalog.REWARDS.size)
-        assertEquals((1..29).toList(), RanksCatalog.REWARDS.map { it.rank })
+    fun ranksCatalogHas100RanksAndAlternatingRewards() {
+        assertEquals(100, RanksCatalog.COUNT)
+        assertEquals(99, RanksCatalog.REWARDS.size)
+        assertEquals((1..99).toList(), RanksCatalog.REWARDS.map { it.rank })
         assertEquals(RewardKind.entries.toSet(), RanksCatalog.REWARDS.map { it.kind }.toSet())
+        assertEquals(AnimKind.entries.toSet(), RanksCatalog.REWARDS.mapNotNull { it.anim }.toSet())
+        assertEquals(RanksCatalog.REWARDS.size, RanksCatalog.REWARDS.map { it.id }.toSet().size)
         // Подряд не идут две награды одного вида.
         RanksCatalog.REWARDS.zipWithNext().forEach { (a, b) -> assertTrue("${a.rank}", a.kind != b.kind) }
-        assertEquals(29, RanksCatalog.rankFor(1_000_000))
+        // Легендарные — на каждом десятом ранге и в самом конце.
+        assertEquals(listOf(10, 20, 30, 40, 50, 60, 70, 80, 90, 99), RanksCatalog.REWARDS.filter { it.rarity == Rarity.LEGENDARY }.map { it.rank })
+        // Каждый шрифт и каждый новый вид «что растёт» можно получить.
+        assertEquals(ReaderFont.entries.toSet() - ReaderFont.DEFAULT, RanksCatalog.REWARDS.mapNotNull { it.font }.toSet())
+        assertEquals(GrowKind.entries.toSet() - GrowKind.TREE, RanksCatalog.REWARDS.mapNotNull { it.grow }.toSet())
+        assertEquals(99, RanksCatalog.rankFor(1_000_000))
+    }
+
+    @Test
+    fun rankPointsGrowFromMinutesToHours() {
+        assertEquals(0L, RanksCatalog.POINTS[0])
+        assertEquals(50L, RanksCatalog.POINTS[1])
+        assertEquals(229_030L, RanksCatalog.POINTS[99])
+        RanksCatalog.POINTS.toList().zipWithNext().forEach { (a, b) -> assertTrue(b > a) }
+        assertEquals(5, RanksCatalog.titleOf(25)); assertEquals(0, RanksCatalog.stepOf(25)); assertEquals(1, RanksCatalog.eraOf(25))
+    }
+
+    @Test
+    fun selectedAnimationsNeedTheirRank() {
+        val snow = RanksCatalog.REWARDS.first { it.effect == "SNOW" }
+        val s = RewardsState(anims = mapOf(AnimKind.LIVE to snow.id))
+        assertNull(s.anim(AnimKind.LIVE))
+        assertEquals(snow, s.copy(points = RanksCatalog.POINTS[snow.rank]).anim(AnimKind.LIVE))
     }
 
     @Test

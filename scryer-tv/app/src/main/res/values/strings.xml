@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Scryer TV</string>
+    <string name="browse_title">Scryer</string>
+    <string name="loading">Загрузка…</string>
+    <string name="action_retry">Повторить</string>
+    <string name="error_network">Не удалось связаться с сервером Scryer</string>
+    <string name="session_expired">Ключ доступа больше не действует — войдите заново</string>
+
+    <string name="row_queue">Загрузки</string>
+    <string name="row_calendar">Скоро выйдет</string>
+    <string name="row_movies">Новое в фильмах</string>
+    <string name="row_series">Новое в сериалах</string>
+    <string name="row_anime">Новое в аниме</string>
+    <string name="row_menu">Меню</string>
+    <string name="row_similar">Похожее</string>
+
+    <string name="action_search">Поиск</string>
+    <string name="action_settings">Настройки</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_queue">Загрузки</string>
+
+    <string name="search_results_library">В библиотеке</string>
+    <string name="search_empty">Ничего не найдено по запросу «%1$s»</string>
+    <string name="search_empty_hint">Попробуйте другое название или оригинальное на английском</string>
+</resources>

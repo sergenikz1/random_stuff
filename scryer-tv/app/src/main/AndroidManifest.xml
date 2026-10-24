@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- голосовой поиск на пульте -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Приложение рассчитано на ТВ, но ставится и на обычные Android-боксы -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+
+    <!-- Scryer обычно работает в домашней сети по http -->
+    <application
+        android:name=".ScryerTvApp"
+        android:allowBackup="false"
+        android:banner="@drawable/app_banner"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.ScryerTV">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ScryerTV.Browse"
+            android:screenOrientation="landscape"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.SetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV.GuidedStep"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustPan" />
+
+        <activity
+            android:name=".ui.SearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.DetailsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV.Details"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.LibraryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV.VerticalGrid"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.QueueActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV.VerticalGrid"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScryerTV.GuidedStep"
+            android:screenOrientation="landscape" />
+    </application>
+</manifest>

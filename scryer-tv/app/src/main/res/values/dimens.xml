@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- постер 2:3 -->
+    <dimen name="poster_width">150dp</dimen>
+    <dimen name="poster_height">225dp</dimen>
+    <!-- широкая карточка 16:9: загрузки, календарь, меню -->
+    <dimen name="wide_width">252dp</dimen>
+    <dimen name="wide_height">142dp</dimen>
+</resources>

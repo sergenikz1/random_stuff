@@ -30,9 +30,12 @@
   var DEFAULTS = {
     apiBase: 'https://e.mail.ru/api/v1/',
     pageSize: 200,        // писем за один запрос списка
-    delayMs: 250,         // пауза между запросами (щадим бэкенд)
+    delayMs: 700,         // пауза между запросами (щадим бэкенд)
+    format: 'both',       // что скачать: 'csv' (для Excel/агента), 'ndjson' (для analyze.py) или 'both'
     maxPages: 20000,      // предохранитель от бесконечного цикла
     folders: null,        // null = все папки; иначе массив id, напр. [0, 500000]
+    sinceDays: null,      // выгружать только письма за последние N дней (напр. 183 ≈ полгода)
+    since: null,          // или явная граница: '2026-04-28' / Date; приоритетнее sinceDays
     withBodies: false,    // тянуть ли полные тела писем (1 запрос на письмо!)
     bodyLimit: 300,       // максимум писем, для которых тянуть тело
     keepRaw: false,       // сохранять ли сырой ответ API рядом с нормализованным
@@ -483,6 +486,40 @@
     return records.map(function (r) { return JSON.stringify(r); }).join('\n') + '\n';
   }
 
+  var CSV_COLUMNS = [
+    'id', 'thread_id', 'folder_id', 'folder_name', 'date', 'subject', 'snippet',
+    'from_name', 'from_email', 'to', 'cc', 'has_attachments', 'attachment_names',
+    'read', 'flagged', 'draft', 'answered', 'forwarded', 'size', 'body_text'
+  ];
+
+  function csvCell(v) {
+    if (v === null || v === undefined) return '';
+    var s = String(v);
+    return /[",\r\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function addrEmails(list) {
+    return (list || []).map(function (a) { return a.email; }).join(' ');
+  }
+
+  function csvRow(m) {
+    var f = m.flags || {};
+    return [
+      m.id, m.thread_id, m.folder_id, m.folder_name, m.date, m.subject, m.snippet,
+      m.from && m.from.name, m.from && m.from.email, addrEmails(m.to), addrEmails(m.cc),
+      m.has_attachments ? 1 : 0,
+      (m.attachments || []).map(function (a) { return a.name; }).join(' | '),
+      f.read ? 1 : 0, f.flagged ? 1 : 0, f.draft ? 1 : 0, f.answered ? 1 : 0, f.forwarded ? 1 : 0,
+      m.size, m.body_text
+    ].map(csvCell).join(',');
+  }
+
+  function toCsv(records, withHeader) {
+    var lines = records.map(csvRow);
+    if (withHeader) lines.unshift(CSV_COLUMNS.join(','));
+    return lines.join('\r\n') + '\r\n';
+  }
+
   async function download() {
     var all = await dbGetAll();
     if (!all.length) {
@@ -492,6 +529,9 @@
     all.sort(function (a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; });
 
     var stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    var fmt = DEFAULTS.format;
+    var wantCsv = fmt === 'csv' || fmt === 'both';
+    var wantNdjson = fmt === 'ndjson' || fmt === 'both';
     var meta = {
       _meta: true,
       account: state.email,
@@ -503,14 +543,21 @@
     var chunks = Math.max(1, Math.ceil(all.length / DEFAULTS.chunkSize));
     for (var i = 0; i < chunks; i++) {
       var slice = all.slice(i * DEFAULTS.chunkSize, (i + 1) * DEFAULTS.chunkSize);
-      var head = i === 0 ? JSON.stringify(meta) + '\n' : '';
-      var name = chunks === 1
-        ? 'mailru-export-' + stamp + '.ndjson'
-        : 'mailru-export-' + stamp + '-part' + (i + 1) + '.ndjson';
-      saveBlob(new Blob([head + toNdjson(slice)], { type: 'application/x-ndjson' }), name);
-      await sleep(400); // браузер не любит пачку одновременных скачиваний
+      var base = chunks === 1
+        ? 'mailru-export-' + stamp
+        : 'mailru-export-' + stamp + '-part' + (i + 1);
+      if (wantNdjson) {
+        var head = i === 0 ? JSON.stringify(meta) + '\n' : '';
+        saveBlob(new Blob([head + toNdjson(slice)], { type: 'application/x-ndjson' }), base + '.ndjson');
+        await sleep(400); // браузер не любит пачку одновременных скачиваний
+      }
+      if (wantCsv) {
+        // BOM, чтобы Excel правильно открыл кириллицу
+        saveBlob(new Blob(['﻿' + toCsv(slice, true)], { type: 'text/csv;charset=utf-8' }), base + '.csv');
+        await sleep(400);
+      }
     }
-    log('Скачано писем:', all.length, 'файлов:', chunks);
+    log('Скачано писем:', all.length, 'файлов:', chunks * (wantCsv && wantNdjson ? 2 : 1));
     return all.length;
   }
 
@@ -546,6 +593,12 @@
       }
       log('Папок к обработке:', folders.length, folders.map(function (f) { return f.name; }));
 
+      var cutoff = null;
+      if (DEFAULTS.since) cutoff = new Date(DEFAULTS.since).getTime();
+      else if (DEFAULTS.sinceDays) cutoff = Date.now() - DEFAULTS.sinceDays * 86400000;
+      if (cutoff !== null && isNaN(cutoff)) { warn('Некорректная граница since — выгружаю всё.'); cutoff = null; }
+      if (cutoff !== null) log('Только письма новее', new Date(cutoff).toISOString().slice(0, 10));
+
       var seen = Object.create(null);
       (await dbGetAll()).forEach(function (m) { seen[m.id] = true; });
       var bodiesLeft = DEFAULTS.withBodies ? DEFAULTS.bodyLimit : 0;
@@ -569,10 +622,13 @@
           if (!rawList.length) break;
 
           var batch = [];
+          var newerInPage = 0;
           for (var i = 0; i < rawList.length; i++) {
             var msg = normalize(rawList[i], folder);
             if (!msg) continue;
             state.stats.fetched++;
+            if (cutoff !== null && msg.date && new Date(msg.date).getTime() < cutoff) continue;
+            newerInPage++;
             if (seen[msg.id]) continue;
             seen[msg.id] = true;
             batch.push(msg);
@@ -596,6 +652,11 @@
             log('   ' + folder.name + ': ' + offset + ' просмотрено, всего сохранено ' + state.stats.saved);
           }
           if (rawList.length < DEFAULTS.pageSize) break;
+          // сортировка по убыванию даты: если вся страница старше границы, дальше только старее
+          if (cutoff !== null && newerInPage === 0) {
+            log('   ' + folder.name + ': дошли до границы по дате, папка закончена');
+            break;
+          }
           await sleep(DEFAULTS.delayMs);
         }
         state.stats.folders++;

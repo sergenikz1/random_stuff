@@ -29,7 +29,7 @@
 
   var DEFAULTS = {
     apiBase: null,        // null = API на том же адресе, где открыта почта (иначе CSP блокирует запросы)
-    pageSize: 200,        // писем за один запрос списка
+    pageSize: 50,         // писем за один запрос списка (столько же просит сама почта)
     delayMs: 700,         // пауза между запросами (щадим бэкенд)
     format: 'both',       // что скачать: 'csv' (для Excel/агента), 'ndjson' (для analyze.py) или 'both'
     maxPages: 20000,      // предохранитель от бесконечного цикла
@@ -48,6 +48,7 @@
 
   var state = {
     token: null,
+    accessToken: null,
     tokenSource: null,    // 'sniffed' (из запросов самой почты), 'page' (догадка по HTML/глобалам), 'manual'
     email: null,
     running: false,
@@ -109,7 +110,7 @@
   function tokenFromResourceTimings() {
     // Самый надёжный способ: браузер помнит полные URL уже выполненных
     // XHR-запросов самой почты, а в них есть и token, и email.
-    var found = { token: null, email: null };
+    var found = { token: null, accessToken: null, email: null };
     var entries = [];
     try { entries = performance.getEntriesByType('resource') || []; } catch (e) { /* noop */ }
     for (var i = entries.length - 1; i >= 0; i--) {
@@ -118,10 +119,12 @@
       var qs;
       try { qs = new URL(name).searchParams; } catch (e) { continue; }
       var t = qs.get('token');
+      var at = qs.get('access_token');
       var e2 = qs.get('email');
       if (t && TOKEN_RE.test(t) && !found.token) found.token = t;
+      if (at && TOKEN_RE.test(at) && !found.accessToken) found.accessToken = at;
       if (e2 && e2.indexOf('@') > 0 && !found.email) found.email = e2;
-      if (found.token && found.email) break;
+      if (found.token && found.accessToken && found.email) break;
     }
     return found;
   }
@@ -163,6 +166,9 @@
   function discoverCredentials() {
     var fromTimings = tokenFromResourceTimings();
     if (fromTimings.token && !sniffed.token) sniffed.token = fromTimings.token;
+    // Новая почта требует вместе с token ещё и access_token — без него API отвечает 403 "token".
+    if (fromTimings.accessToken && !sniffed.accessToken) sniffed.accessToken = fromTimings.accessToken;
+    state.accessToken = sniffed.accessToken || state.accessToken;
     if (state.tokenSource !== 'manual') {
       if (sniffed.token) {
         state.token = sniffed.token;
@@ -184,8 +190,10 @@
 
     function take(params) {
       var t = params.get('token');
+      var at = params.get('access_token');
       var e = params.get('email');
       if (t && TOKEN_RE.test(t)) sniffed.token = t;
+      if (at && TOKEN_RE.test(at)) sniffed.accessToken = at;
       if (e && e.indexOf('@') > 0) sniffed.email = e;
     }
 
@@ -228,6 +236,7 @@
     var url = new URL(apiBase() + path);
     var p = Object.assign({ htmlencoded: false, _: Date.now() }, params || {});
     if (state.token) p.token = state.token;
+    if (state.accessToken) p.access_token = state.accessToken;
     if (state.email) p.email = state.email;
     Object.keys(p).forEach(function (k) {
       var v = p[k];
@@ -240,8 +249,11 @@
   /** Есть ли пойманный из запросов почты токен, отличный от текущего, — переключаемся на него. */
   async function recoverToken() {
     discoverCredentials();
-    if (state.tokenSource === 'manual' || !sniffed.token || sniffed.token === state.token) return false;
-    state.token = sniffed.token;
+    var fresh = (sniffed.token && sniffed.token !== state.token) ||
+      (sniffed.accessToken && sniffed.accessToken !== state.accessToken);
+    if (state.tokenSource === 'manual' || !fresh) return false;
+    state.token = sniffed.token || state.token;
+    state.accessToken = sniffed.accessToken || state.accessToken;
     state.tokenSource = 'sniffed';
     log('Токен отклонён, беру токен из запросов почты и повторяю.');
     return true;
@@ -278,6 +290,7 @@
           var form = new URLSearchParams();
           var p2 = Object.assign({}, params || {});
           if (state.token) p2.token = state.token;
+          if (state.accessToken) p2.access_token = state.accessToken;
           if (state.email) p2.email = state.email;
           Object.keys(p2).forEach(function (k) {
             var v = p2[k];
@@ -428,33 +441,39 @@
 
   function normalize(raw, folderMeta) {
     var flags = raw.flags || {};
-    var id = String(pick(raw, ['id', 'uidl', 'message_id', 'msg_id']) || '');
+    var corr = raw.correspondents || {};
+    // В threads/status/smart элемент — цепочка; если в ней одно письмо, его id лежит в `last`.
+    var isThread = raw.correspondents !== undefined && raw.length !== undefined;
+    var id = String((isThread && raw.length === 1 && raw.last) ||
+      pick(raw, ['id', 'uidl', 'message_id', 'msg_id']) || '');
     if (!id) return null;
 
     var msg = {
       id: id,
-      thread_id: pick(raw, ['thread_id', 'threadId', 'thread.id']) || null,
+      thread_id: pick(raw, ['thread_id', 'threadId', 'thread.id']) || (isThread ? raw.id : null),
+      thread_length: isThread ? raw.length : null,
       folder_id: raw.folder !== undefined ? raw.folder : (folderMeta && folderMeta.id),
       folder_name: (folderMeta && folderMeta.name) || null,
       date: toIso(pick(raw, ['date', 'time', 'timestamp', 'received_date'])),
       subject: String(pick(raw, ['subject', 'title']) || ''),
       snippet: String(pick(raw, ['snippet', 'preview', 'short_body', 'text']) || ''),
-      from: normAddr(pick(raw, ['from', 'sender'])),
-      to: normAddrList(raw.to),
-      cc: normAddrList(raw.cc),
-      bcc: normAddrList(raw.bcc),
+      from: normAddr(pick(raw, ['from', 'sender', 'correspondents.from.0'])),
+      to: normAddrList(raw.to || corr.to),
+      cc: normAddrList(raw.cc || corr.cc),
+      bcc: normAddrList(raw.bcc || corr.bcc),
       reply_to: normAddrList(raw.reply_to || raw.replyTo),
       size: pick(raw, ['size', 'bytes']) || null,
       has_attachments: Boolean(
-        pick(raw, ['attaches.has', 'attaches.total', 'has_attach', 'attachments_count'])
+        pick(raw, ['attaches.has', 'attaches.total', 'has_attach', 'attachments_count']) || flags.attach
       ),
       attachments: [],
       flags: {
         read: !(flags.unread === true || raw.unread === true),
         flagged: Boolean(flags.flagged || raw.flagged),
         draft: Boolean(flags.draft || raw.draft),
-        answered: Boolean(flags.answered || raw.answered),
-        forwarded: Boolean(flags.forwarded || raw.forwarded)
+        answered: Boolean(flags.answered || flags.reply || raw.answered),
+        forwarded: Boolean(flags.forwarded || flags.forward || raw.forwarded),
+        newsletter: Boolean(flags.newsletter)
       },
       body_text: null
     };
@@ -503,15 +522,34 @@
     }).filter(function (f) { return f.id !== undefined && f.id !== null; });
   }
 
+  // Старой ручки `messages` в новой почте нет (404); список берём там же, где сама почта.
   async function fetchFolderPage(folderId, offset) {
     var params = {
       folder: folderId,
       limit: DEFAULTS.pageSize,
       offset: offset,
+      filters: {},
       sort: { type: 'date', order: 'desc' }
     };
-    var body = await api('messages', params);
-    return extractList(body, ['messages', 'list', 'items', 'threads']);
+    var body = await api('threads/status/smart', params);
+    return extractList(body, ['threads', 'messages', 'list', 'items']);
+  }
+
+  // Цепочку из нескольких писем пробуем раскрыть. Если ручка не ответила —
+  // оставляем цепочку одной строкой (thread_length покажет, сколько в ней писем).
+  var threadExpandBroken = false;
+  async function expandThread(threadId) {
+    if (threadExpandBroken) return null;
+    try {
+      var body = await api('threads/thread', { id: threadId, offset: 0, limit: 200 });
+      var list = extractList(body, ['messages', 'list', 'items']);
+      return list.length ? list : null;
+    } catch (err) {
+      threadExpandBroken = true;
+      warn('Не удалось раскрыть цепочку писем (' + err.message + '). ' +
+           'Дальше цепочки сохраняются одной строкой, длина — в колонке thread_length.');
+      return null;
+    }
   }
 
   async function fetchBody(id) {
@@ -551,7 +589,7 @@
   var CSV_COLUMNS = [
     'id', 'thread_id', 'folder_id', 'folder_name', 'date', 'subject', 'snippet',
     'from_name', 'from_email', 'to', 'cc', 'has_attachments', 'attachment_names',
-    'read', 'flagged', 'draft', 'answered', 'forwarded', 'size', 'body_text'
+    'read', 'flagged', 'draft', 'answered', 'forwarded', 'newsletter', 'thread_length', 'size', 'body_text'
   ];
 
   function csvCell(v) {
@@ -572,7 +610,7 @@
       m.has_attachments ? 1 : 0,
       (m.attachments || []).map(function (a) { return a.name; }).join(' | '),
       f.read ? 1 : 0, f.flagged ? 1 : 0, f.draft ? 1 : 0, f.answered ? 1 : 0, f.forwarded ? 1 : 0,
-      m.size, m.body_text
+      f.newsletter ? 1 : 0, m.thread_length, m.size, m.body_text
     ].map(csvCell).join(',');
   }
 
@@ -691,6 +729,8 @@
 
     try {
       var folders = await listFolders();
+      var folderById = {};
+      folders.forEach(function (f) { folderById[String(f.id)] = f; });
       if (DEFAULTS.folders) {
         var want = DEFAULTS.folders.map(String);
         folders = folders.filter(function (f) { return want.indexOf(String(f.id)) !== -1; });
@@ -712,6 +752,7 @@
         var folder = folders[fi];
         var offset = 0;
         var pages = 0;
+        var prevPageKey = null;
         log('→ Папка «' + folder.name + '» (id=' + folder.id + ')');
 
         while (!state.abort && pages < DEFAULTS.maxPages) {
@@ -724,11 +765,27 @@
             break;
           }
           if (!rawList.length) break;
+          // если сервер проигнорировал offset и вернул ту же страницу — выходим
+          var pageKey = String(rawList[0] && rawList[0].id);
+          if (pages > 0 && pageKey === prevPageKey) break;
+          prevPageKey = pageKey;
+
+          var items = [];
+          for (var r = 0; r < rawList.length; r++) {
+            var it = rawList[r];
+            var inner = (it && it.length > 1 && it.correspondents) ? await expandThread(it.id) : null;
+            if (inner) {
+              inner.forEach(function (m) { items.push({ raw: m, folder: folderById[String(m.folder)] || folder }); });
+              await sleep(DEFAULTS.delayMs);
+            } else {
+              items.push({ raw: it, folder: folder });
+            }
+          }
 
           var batch = [];
           var newerInPage = 0;
-          for (var i = 0; i < rawList.length; i++) {
-            var msg = normalize(rawList[i], folder);
+          for (var i = 0; i < items.length; i++) {
+            var msg = normalize(items[i].raw, items[i].folder);
             if (!msg) continue;
             state.stats.fetched++;
             if (cutoff !== null && msg.date && new Date(msg.date).getTime() < cutoff) continue;
@@ -794,6 +851,7 @@
       var out = {
         token: creds.token ? creds.token.slice(0, 8) + '…' : null,
         tokenSource: state.tokenSource,
+        accessToken: Boolean(state.accessToken),
         email: creds.email,
         host: location.host,
         apiBase: apiBase(),

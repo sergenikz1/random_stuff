@@ -48,11 +48,19 @@
 
   var state = {
     token: null,
+    tokenSource: null,    // 'sniffed' (из запросов самой почты), 'page' (догадка по HTML/глобалам), 'manual'
     email: null,
     running: false,
     abort: false,
     stats: { fetched: 0, saved: 0, bodies: 0, errors: 0, folders: 0 }
   };
+
+  // Сниффер живёт на window, чтобы пережить повторную вставку скрипта,
+  // а свои запросы шлём через исходный fetch — иначе сниффер «поймал» бы наш же токен.
+  window.__mailAuditSniffed = window.__mailAuditSniffed || { token: null, email: null };
+  window.__mailAuditNativeFetch = window.__mailAuditNativeFetch || window.fetch;
+  var sniffed = window.__mailAuditSniffed;
+  function nativeFetch(url, init) { return window.__mailAuditNativeFetch.call(window, url, init); }
 
   // ───────────────────────────── утилиты ─────────────────────────────
 
@@ -150,10 +158,21 @@
     return null;
   }
 
+  // Токен из настоящих запросов почты надёжнее догадки по HTML: если он есть,
+  // он всегда главнее (кроме заданного вручную).
   function discoverCredentials() {
     var fromTimings = tokenFromResourceTimings();
-    state.token = state.token || fromTimings.token || tokenFromGlobals() || tokenFromHtml();
-    state.email = state.email || fromTimings.email || emailFromPage();
+    if (fromTimings.token && !sniffed.token) sniffed.token = fromTimings.token;
+    if (state.tokenSource !== 'manual') {
+      if (sniffed.token) {
+        state.token = sniffed.token;
+        state.tokenSource = 'sniffed';
+      } else if (!state.token) {
+        state.token = tokenFromGlobals() || tokenFromHtml();
+        state.tokenSource = state.token ? 'page' : null;
+      }
+    }
+    state.email = state.email || sniffed.email || fromTimings.email || emailFromPage();
     return { token: state.token, email: state.email };
   }
 
@@ -163,26 +182,39 @@
     if (window.__mailAuditSniffer) return;
     window.__mailAuditSniffer = true;
 
-    function absorb(url) {
+    function take(params) {
+      var t = params.get('token');
+      var e = params.get('email');
+      if (t && TOKEN_RE.test(t)) sniffed.token = t;
+      if (e && e.indexOf('@') > 0) sniffed.email = e;
+    }
+
+    // Токен бывает и в URL, и в теле POST-запроса — смотрим оба места.
+    function absorb(url, body) {
       try {
         var u = new URL(url, location.origin);
-        var t = u.searchParams.get('token');
-        var e = u.searchParams.get('email');
-        if (t && TOKEN_RE.test(t)) state.token = state.token || t;
-        if (e && e.indexOf('@') > 0) state.email = state.email || e;
+        if (u.pathname.indexOf('/api/') === -1) return;
+        take(u.searchParams);
+        if (typeof body === 'string') take(new URLSearchParams(body));
+        else if (body instanceof URLSearchParams || body instanceof FormData) take(body);
       } catch (err) { /* noop */ }
     }
 
     var origFetch = window.fetch;
-    window.fetch = function (input) {
-      absorb(typeof input === 'string' ? input : (input && input.url) || '');
+    window.fetch = function (input, init) {
+      absorb(typeof input === 'string' ? input : (input && input.url) || '', init && init.body);
       return origFetch.apply(this, arguments);
     };
 
     var origOpen = XMLHttpRequest.prototype.open;
+    var origSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function (method, url) {
-      absorb(url);
+      this.__mailAuditUrl = url;
       return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      absorb(this.__mailAuditUrl || '', body);
+      return origSend.apply(this, arguments);
     };
   }
 
@@ -205,16 +237,38 @@
     return url.toString();
   }
 
+  /** Есть ли пойманный из запросов почты токен, отличный от текущего, — переключаемся на него. */
+  async function recoverToken() {
+    discoverCredentials();
+    if (state.tokenSource === 'manual' || !sniffed.token || sniffed.token === state.token) return false;
+    state.token = sniffed.token;
+    state.tokenSource = 'sniffed';
+    log('Токен отклонён, беру токен из запросов почты и повторяю.');
+    return true;
+  }
+
+  function tokenError(path) {
+    var err = new Error(
+      'Почта отклонила токен (403 на ' + path + ').\n' +
+      'Кликните по паре папок в интерфейсе почты — скрипт возьмёт токен из её запросов — и повторите.\n' +
+      'Не помогло: DevTools → Network → фильтр api → любой запрос почты → Payload → token,\n' +
+      'затем MailAudit.setToken("<token>").'
+    );
+    err.tokenError = true;
+    return err;
+  }
+
   /** GET к API с ретраями; при 4xx пробует POST (некоторые ручки только POST). */
   async function api(path, params) {
     var lastErr = null;
     for (var attempt = 0; attempt <= DEFAULTS.retries; attempt++) {
       if (attempt > 0) await sleep(Math.min(8000, 500 * Math.pow(2, attempt)));
       try {
-        var res = await fetch(buildUrl(path, params), {
+        var res = await nativeFetch(buildUrl(path, params), {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         });
+        if (res.status === 403) { if (await recoverToken()) continue; throw tokenError(path); }
         if (res.status === 429 || res.status >= 500) {
           lastErr = new Error('HTTP ' + res.status + ' на ' + path);
           continue;
@@ -230,12 +284,13 @@
             if (v === undefined || v === null) return;
             form.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
           });
-          var res2 = await fetch(apiBase() + path, {
+          var res2 = await nativeFetch(apiBase() + path, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: form.toString()
           });
+          if (res2.status === 403) { if (await recoverToken()) continue; throw tokenError(path); }
           if (!res2.ok) {
             lastErr = new Error('HTTP ' + res.status + '/' + res2.status + ' на ' + path);
             continue;
@@ -243,12 +298,14 @@
           res = res2;
         }
         var json = await res.json();
+        if (json && json.status === 403) { if (await recoverToken()) continue; throw tokenError(path); }
         if (json && typeof json.status === 'number' && json.status >= 400) {
           lastErr = new Error('API status ' + json.status + ' на ' + path);
           continue;
         }
         return (json && json.body !== undefined) ? json.body : json;
       } catch (err) {
+        if (err.tokenError) throw err;
         lastErr = err;
       }
     }
@@ -725,7 +782,7 @@
     download: download,
     openMail: openMail,
     stop: function () { state.abort = true; log('Останавливаюсь после текущей страницы…'); },
-    setToken: function (t) { state.token = t; log('Токен задан вручную.'); return t; },
+    setToken: function (t) { state.token = t; state.tokenSource = 'manual'; log('Токен задан вручную.'); return t; },
     setEmail: function (e) { state.email = e; return e; },
     reset: async function () { await dbClear(); log('Локальная база очищена.'); },
     stats: async function () {
@@ -736,6 +793,7 @@
       var creds = discoverCredentials();
       var out = {
         token: creds.token ? creds.token.slice(0, 8) + '…' : null,
+        tokenSource: state.tokenSource,
         email: creds.email,
         host: location.host,
         apiBase: apiBase(),
@@ -762,7 +820,9 @@
   log(
     'Загружено. Запуск:  await MailAudit.run()\n' +
     'Диагностика:        await MailAudit.diagnose()\n' +
-    'Токен ' + (state.token ? 'найден ✓' : 'НЕ найден — кликните по папке и повторите') +
+    'Токен ' + (state.tokenSource === 'sniffed' ? 'найден ✓'
+      : state.token ? 'найден в коде страницы — если будет 403, кликните по папке и повторите'
+      : 'НЕ найден — кликните по папке и повторите') +
     (state.email ? (', ящик: ' + state.email) : '')
   );
 })();

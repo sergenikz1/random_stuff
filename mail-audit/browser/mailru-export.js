@@ -566,11 +566,53 @@
     return all.length;
   }
 
+  // ─────────────────────── обёртка VK WorkSpace ───────────────────────
+  //
+  // В WorkSpace (app.workspace.vk.ru) почта — это iframe с e.mail.ru. Страница
+  // WorkSpace не может ни читать этот iframe (same-origin policy), ни ходить
+  // в API e.mail.ru (CSP). Скрипт обязан выполняться внутри самой почты.
+
+  function onMailHost() {
+    return /(^|\.)mail\.ru$/i.test(location.hostname);
+  }
+
+  function findMailFrameUrl() {
+    var frames = document.querySelectorAll('iframe');
+    for (var i = 0; i < frames.length; i++) {
+      var src = frames[i].src || '';
+      if (/^https:\/\/([a-z0-9-]+\.)*mail\.ru\//i.test(src)) return src;
+    }
+    return null;
+  }
+
+  function wrongContext() {
+    if (onMailHost() || DEFAULTS.apiBase) return false;
+    var frameUrl = findMailFrameUrl();
+    warn(
+      'Скрипт запущен на ' + location.host + ', а почта здесь — встроенное окно e.mail.ru.\n' +
+      'Отсюда браузер не даст прочитать письма. Варианты:\n' +
+      '  1) В Console слева вверху переключите контекст «top» на e.mail.ru,\n' +
+      '     вставьте скрипт туда и запустите заново.\n' +
+      '  2) MailAudit.openMail() — откроет почту отдельной вкладкой' +
+      (frameUrl ? '' : ' (окно почты на странице не найдено, откроется e.mail.ru/inbox/)') + ',\n' +
+      '     и уже там вставьте скрипт.'
+    );
+    return true;
+  }
+
+  function openMail() {
+    var url = findMailFrameUrl() || 'https://e.mail.ru/inbox/';
+    var w = window.open(url, '_blank');
+    if (!w) warn('Браузер заблокировал новую вкладку. Откройте вручную: ' + url);
+    return url;
+  }
+
   // ───────────────────────────── основной цикл ─────────────────────────────
 
   async function run(options) {
     if (state.running) { warn('Выгрузка уже идёт. MailAudit.stop() чтобы прервать.'); return; }
     Object.assign(DEFAULTS, options || {});
+    if (wrongContext()) return;
 
     installSniffer();
     discoverCredentials();
@@ -681,6 +723,7 @@
     config: DEFAULTS,
     run: run,
     download: download,
+    openMail: openMail,
     stop: function () { state.abort = true; log('Останавливаюсь после текущей страницы…'); },
     setToken: function (t) { state.token = t; log('Токен задан вручную.'); return t; },
     setEmail: function (e) { state.email = e; return e; },
@@ -700,6 +743,10 @@
         folders: null,
         error: null
       };
+      if (wrongContext()) {
+        out.error = 'Не та страница: запустите скрипт внутри почты (см. предупреждение выше)';
+        return out;
+      }
       if (creds.token) {
         try { out.folders = await listFolders(); } catch (e) { out.error = e.message; }
       }
@@ -709,6 +756,7 @@
   };
 
   window.MailAudit = MailAudit;
+  if (wrongContext()) return;
   installSniffer();
   discoverCredentials();
   log(

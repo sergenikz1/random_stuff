@@ -48,6 +48,8 @@ await MailAudit.run()
 await MailAudit.diagnose()          // что найдено: токен, ящик, список папок
 MailAudit.setToken('abc123…')       // задать токен вручную, если не нашёлся
 await MailAudit.run({ folders: [0] })            // только «Входящие»
+await MailAudit.run({ sinceDays: 183 })          // только за последние ~полгода
+await MailAudit.run({ since: '2026-04-28' })     // или с конкретной даты
 await MailAudit.run({ withBodies: true, bodyLimit: 500 })  // + тела 500 писем
 await MailAudit.stats()             // сколько уже выгружено
 MailAudit.stop()                    // мягко прервать

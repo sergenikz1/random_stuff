@@ -28,7 +28,7 @@
   // ───────────────────────────── конфиг ─────────────────────────────
 
   var DEFAULTS = {
-    apiBase: 'https://e.mail.ru/api/v1/',
+    apiBase: null,        // null = API на том же адресе, где открыта почта (иначе CSP блокирует запросы)
     pageSize: 200,        // писем за один запрос списка
     delayMs: 700,         // пауза между запросами (щадим бэкенд)
     format: 'both',       // что скачать: 'csv' (для Excel/агента), 'ndjson' (для analyze.py) или 'both'
@@ -95,7 +95,8 @@
   // в зависимости от версии фронта, поэтому пробуем по очереди несколько
   // источников — от самого надёжного к самому грубому.
 
-  var TOKEN_RE = /^[0-9a-f]{20,80}$/i;
+  // Раньше токен был hex, сейчас бывает длинной base64-подобной строкой.
+  var TOKEN_RE = /^[A-Za-z0-9._~+\/=:%-]{20,1000}$/;
 
   function tokenFromResourceTimings() {
     // Самый надёжный способ: браузер помнит полные URL уже выполненных
@@ -132,7 +133,7 @@
   function tokenFromHtml() {
     var html = '';
     try { html = document.documentElement.innerHTML; } catch (e) { return null; }
-    var m = html.match(/"(?:csrf_?)?token"\s*:\s*"([0-9a-f]{20,80})"/i);
+    var m = html.match(/"(?:csrf_?)?token"\s*:\s*"([A-Za-z0-9._~+\/=:%-]{20,1000})"/i);
     return m ? m[1] : null;
   }
 
@@ -187,8 +188,12 @@
 
   // ───────────────────────────── HTTP слой ─────────────────────────────
 
+  function apiBase() {
+    return DEFAULTS.apiBase || (location.origin + '/api/v1/');
+  }
+
   function buildUrl(path, params) {
-    var url = new URL(DEFAULTS.apiBase + path);
+    var url = new URL(apiBase() + path);
     var p = Object.assign({ htmlencoded: false, _: Date.now() }, params || {});
     if (state.token) p.token = state.token;
     if (state.email) p.email = state.email;
@@ -225,7 +230,7 @@
             if (v === undefined || v === null) return;
             form.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
           });
-          var res2 = await fetch(DEFAULTS.apiBase + path, {
+          var res2 = await fetch(apiBase() + path, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -689,7 +694,8 @@
       var out = {
         token: creds.token ? creds.token.slice(0, 8) + '…' : null,
         email: creds.email,
-        apiBase: DEFAULTS.apiBase,
+        host: location.host,
+        apiBase: apiBase(),
         inDb: await dbCount(),
         folders: null,
         error: null

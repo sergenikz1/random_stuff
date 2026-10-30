@@ -41,6 +41,8 @@ class SettingsFragment : GuidedStepSupportFragment() {
         )
 
     override fun onCreateActions(actions: MutableList<GuidedAction>, savedInstanceState: Bundle?) {
+        actions.add(GuidedAction.Builder(requireContext()).id(6L).title("Обновить приложение")
+            .description("Новая версия Scryer TV с GitHub").build())
         actions.add(info(ACTION_SERVER, "Сервер", prefs.serverUrl))
         actions.add(info(ACTION_USER, "Пользователь", prefs.username.ifBlank { "—" }))
         actions.add(info(ACTION_VERSION, "Версия Scryer", "проверяю…"))
@@ -89,6 +91,7 @@ class SettingsFragment : GuidedStepSupportFragment() {
             .build()
 
     override fun onGuidedActionClicked(action: GuidedAction) {
+        if (action.id == 6L) startActivity(android.content.Intent(requireContext(), org.scryertv.client.update.UpdateActivity::class.java))
         if (action.id == ACTION_LOGOUT) {
             prefs.clearSession()
             Nav.toSetup(requireActivity())

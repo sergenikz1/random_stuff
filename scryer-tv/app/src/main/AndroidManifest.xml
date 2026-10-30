@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- голосовой поиск на пульте -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -83,5 +84,11 @@
             android:screenOrientation="landscape" />
         <activity android:name=".streaming.StreamPlayerActivity" android:exported="false"
             android:screenOrientation="landscape" />
+        <activity android:name=".update.UpdateActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
     </application>
 </manifest>

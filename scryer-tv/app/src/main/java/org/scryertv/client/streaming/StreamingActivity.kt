@@ -125,6 +125,7 @@ class StreamingFragment : BrowseSupportFragment() {
                     104 -> startActivity(Intent(requireContext(),
                         if (Prefs.get(requireContext()).token.isNotBlank()) MainActivity::class.java else SetupActivity::class.java))
                     105 -> loadCatalog()
+                    106 -> startActivity(Intent(requireContext(), org.scryertv.client.update.UpdateActivity::class.java))
                 }
                 is VideoItem -> StreamActions.show(this, item, playlistFor(item)) { render() }
             }
@@ -145,7 +146,8 @@ class StreamingFragment : BrowseSupportFragment() {
             MenuCard(102, "Открыть ссылку", "Rutube, MP4, HLS, DASH или M3U"),
             MenuCard(103, "Настройки плеера", "Автопереход, качество, история"),
             MenuCard(104, "Загрузки Scryer", "Библиотека и торрент-загрузки"),
-            MenuCard(105, "Обновить плейлист", "Загрузить сохранённый M3U заново")
+            MenuCard(105, "Обновить плейлист", "Загрузить сохранённый M3U заново"),
+            MenuCard(106, "Обновить приложение", "Проверить новую версию на GitHub")
         )) }
         rows.add(ListRow(HeaderItem(0, "Онлайн без скачивания"), menu))
         fun row(name: String, items: List<VideoItem>) {
@@ -191,13 +193,14 @@ class StreamingFragment : BrowseSupportFragment() {
     }
 
     private fun settings() {
-        val labels = arrayOf("Автопереход: ${if (store.autoplay) "вкл" else "выкл"}", "Качество: ${if (store.maxHeight == 0) "авто" else "${store.maxHeight}p"}", "Очистить историю")
+        val labels = arrayOf("Автопереход: ${if (store.autoplay) "вкл" else "выкл"}", "Качество: ${if (store.maxHeight == 0) "авто" else "${store.maxHeight}p"}", "Очистить историю", "Обновить приложение")
         AlertDialog.Builder(requireContext()).setTitle("Настройки онлайн-плеера").setItems(labels) { _, index ->
             when (index) {
                 0 -> { store.autoplay = !store.autoplay; settings() }
                 1 -> AlertDialog.Builder(requireContext()).setTitle("Максимальное качество")
                     .setItems(arrayOf("Авто", "360p", "480p", "720p", "1080p")) { _, value -> store.maxHeight = listOf(0,360,480,720,1080)[value] }.show()
                 2 -> { store.clearHistory(); render() }
+                3 -> startActivity(Intent(requireContext(), org.scryertv.client.update.UpdateActivity::class.java))
             }
         }.setNegativeButton("Закрыть", null).show()
     }

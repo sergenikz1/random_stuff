@@ -11,6 +11,7 @@ coroutines = "1.8.1"
 lifecycle = "2.8.7"
 
 [libraries]
+androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-leanback = { module = "androidx.leanback:leanback", version.ref = "leanback" }

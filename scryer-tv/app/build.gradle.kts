@@ -11,13 +11,13 @@ android {
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         vectorDrawables.useSupportLibrary = true
     }
 
     // Релизная сборка подписывается ключом из переменных окружения (см. CI).
-    // Если ключа нет — используется отладочный, чтобы APK всё равно можно было установить.
+    // Без ключа release остаётся неподписанным: случайный debug-ключ ломает обновления.
     val keystorePath: String? = System.getenv("SCRYERTV_KEYSTORE_FILE")
     signingConfigs {
         if (!keystorePath.isNullOrBlank()) {
@@ -35,7 +35,7 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.leanback)
     implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.androidx.lifecycle.viewmodel)
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)

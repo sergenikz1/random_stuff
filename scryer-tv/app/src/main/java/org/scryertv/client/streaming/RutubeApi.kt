@@ -5,6 +5,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,6 +36,7 @@ object RutubeApi {
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
+            .cookieJar(StreamCookieJar())
             .build()
     }
 
@@ -129,17 +131,14 @@ object RutubeApi {
 
         val liveUrl = live?.let { extractUrl(it.opt("hls")) }
         if (!liveUrl.isNullOrBlank()) {
-            return PlaybackInfo(liveUrl, true, o.optString("title").ifBlank { null })
+            return PlaybackInfo(liveUrl, true, o.optString("title").ifBlank { null }, "application/x-mpegURL")
         }
 
         val streamUrl = balancer?.let { b ->
-            val keys = listOf("m3u8", "default", "json", "hls")
-            keys.asSequence()
-                .mapNotNull { extractUrl(b.opt(it)) }
-                .firstOrNull { it.contains(".m3u8") }
+            listOf("m3u8", "hls").asSequence().mapNotNull { extractUrl(b.opt(it)) }.firstOrNull()
                 ?: b.keys().asSequence()
                     .mapNotNull { extractUrl(b.opt(it)) }
-                    .firstOrNull { it.contains(".m3u8") || it.contains(".mpd") }
+                    .firstOrNull { it.contains(".m3u8", true) || it.contains(".mpd", true) }
         }
 
         if (streamUrl.isNullOrBlank()) {
@@ -147,12 +146,13 @@ object RutubeApi {
             if (o.optBoolean("is_deleted")) throw ApiException("Видео удалено")
             throw ApiException("Для этого видео нет доступного потока")
         }
-        return PlaybackInfo(streamUrl, false, o.optString("title").ifBlank { null })
+        val mime = if (streamUrl.toHttpUrlOrNull()?.encodedPath.orEmpty().endsWith(".mpd", true)) "application/dash+xml" else "application/x-mpegURL"
+        return PlaybackInfo(streamUrl, false, o.optString("title").ifBlank { null }, mime)
     }
 
     private fun extractUrl(value: Any?): String? = when (value) {
         null, JSONObject.NULL -> null
-        is String -> value.ifBlank { null }
+        is String -> (if (value.startsWith("//")) "https:$value" else value).toHttpUrlOrNull()?.toString()
         is JSONObject -> extractUrl(value.opt("url")) ?: extractUrl(value.opt("hls"))
         is JSONArray -> (0 until value.length()).asSequence()
             .mapNotNull { extractUrl(value.opt(it)) }

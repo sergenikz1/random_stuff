@@ -13,7 +13,15 @@ object StreamRepository {
     }
 
     suspend fun resolve(video: VideoItem): PlaybackInfo = withContext(Dispatchers.IO) {
-        video.streamUrl?.let { PlaybackInfo(it, video.isLive, video.title) } ?: RutubeApi.playback(video.id)
+        video.streamUrl?.let {
+            val path = it.toHttpUrlOrNull()?.encodedPath.orEmpty().lowercase()
+            val mime = when {
+                path.endsWith(".m3u8") -> "application/x-mpegURL"
+                path.endsWith(".mpd") -> "application/dash+xml"
+                else -> null
+            }
+            PlaybackInfo(it, video.isLive, video.title, mime)
+        } ?: RutubeApi.playback(video.id)
     }
 
     suspend fun episodes(video: VideoItem): List<VideoItem> = withContext(Dispatchers.IO) {

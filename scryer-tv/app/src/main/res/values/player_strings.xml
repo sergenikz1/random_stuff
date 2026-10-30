@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="player_next_countdown">Следующая серия через %1$d с\n%2$s</string>
+    <string name="player_next_manual">Следующая серия · автопереход выключен\n%1$s</string>
+    <string name="player_next_now">Включить сейчас</string>
+    <string name="player_next_cancel">Отменить автопереход</string>
+    <string name="player_next_remote_hint">↑ или ↓ — выбрать действие · OK — нажать</string>
+    <string name="player_next_not_found">%1$s · Не удалось найти следующую серию</string>
+    <string name="player_recovering">Повторяю запуск видео…</string>
+    <string name="player_failed">Не удалось запустить видео.\n%1$s\nНажмите «Повторить», чтобы получить свежий адрес потока.</string>
+</resources>

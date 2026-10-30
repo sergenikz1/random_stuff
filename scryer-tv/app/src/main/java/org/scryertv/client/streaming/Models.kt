@@ -70,5 +70,6 @@ data class Page(
 data class PlaybackInfo(
     val url: String,
     val isLive: Boolean,
-    val title: String?
+    val title: String?,
+    val mimeType: String? = null
 )

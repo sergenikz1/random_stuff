@@ -11,8 +11,8 @@ android {
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.1"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -52,6 +52,8 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         buildConfig = true
     }
@@ -71,6 +73,9 @@ android {
     }
 }
 
+val robolectricSdk by configurations.creating
+val robolectricSdk28 by configurations.creating
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -84,8 +89,24 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.datasource.okhttp)
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    add(robolectricSdk28.name, "org.robolectric:android-all-instrumented:9-robolectric-4913185-2-i7")
+    add(robolectricSdk.name, "org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
+    testImplementation("org.mockito:mockito-core:4.11.0")
     testImplementation("org.json:json:20240303")
     implementation(libs.okhttp)
     implementation(libs.glide)
     implementation(libs.kotlinx.coroutines.android)
+}
+
+// Resolve test Android SDKs through Gradle, without writing to the user's home directory.
+val prepareRobolectricSdk by tasks.registering(Sync::class) {
+    from(robolectricSdk)
+    from(robolectricSdk28)
+    into(layout.buildDirectory.dir("robolectric-sdk"))
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(prepareRobolectricSdk)
+    systemProperty("robolectric.dependency.dir", layout.buildDirectory.dir("robolectric-sdk").get().asFile.absolutePath)
+    systemProperty("robolectric.offline", "true")
 }

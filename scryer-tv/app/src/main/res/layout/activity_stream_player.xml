@@ -43,18 +43,39 @@
         android:layout_margin="32dp"
         android:padding="12dp"
         android:orientation="vertical"
+        android:descendantFocusability="afterDescendants"
         android:background="#EE1C1730"
         android:visibility="gone">
+        <TextView
+            android:id="@+id/next_label"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:maxLines="3" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/player_next_remote_hint"
+            android:textColor="@color/text_secondary" />
         <Button
             android:id="@+id/play_next"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Следующая серия" />
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@id/player_view"
+            android:nextFocusDown="@id/cancel_next"
+            android:text="@string/player_next_now" />
         <Button
             android:id="@+id/cancel_next"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Отменить автопереход" />
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@id/play_next"
+            android:nextFocusDown="@id/player_view"
+            android:text="@string/player_next_cancel" />
     </LinearLayout>
 
     <ProgressBar

@@ -10,6 +10,7 @@
 | [`chitalka-vsluh/`](chitalka-vsluh) | **Читалка вслух** | Android-читалка книг с офлайн-озвучкой нейросетевыми голосами, быстрым чтением и наградами за чтение | APK в [релизах](../../releases?q=chitalka) |
 | [`limit-pulse/`](limit-pulse) | **Limit Pulse** | Android-приложение и виджеты: остаток лимитов подписок Codex и Claude, отсчёт до сброса, напоминания | APK в [релизах](../../releases?q=limit-pulse) |
 | [`rutv/`](rutv) | **RuTV** | Клиент Rutube для Android TV без рекламы | APK в релизе [`apk-latest`](../../releases/tag/apk-latest) |
+| [`scryer-tv/`](scryer-tv) | **Scryer TV** | Клиент медиаменеджера [Scryer](https://github.com/scryer-media/scryer) для Android TV: библиотека, загрузки, календарь, поиск и добавление фильмов и сериалов с пульта | APK в релизе [`scryer-tv-latest`](../../releases/tag/scryer-tv-latest) |
 | [`flowvoice/`](flowvoice) | **FlowVoice** | Аналог Wispr Flow: голосовой ввод на русском и английском прямо туда, где стоит курсор. Windows (трей) и Android (голосовая клавиатура) | exe и APK в релизе [`flowvoice-latest`](../../releases/tag/flowvoice-latest) |
 | [`scan-to-1c/`](scan-to-1c) | **Сканы → 1С** | Windows-программа: распознаёт сканы счетов, УПД, накладных и актов и загружает их в 1С:Предприятие | exe в [релизах](../../releases?q=scan2onec) |
 | [`mail-audit/`](mail-audit) | **mail-audit** | Выгрузка рабочей почты Mail.ru и анализ потока писем: кто пишет, о чём, скорость ответов, доля рутины | Скрипты, сборок нет |
@@ -25,6 +26,7 @@
 | `chitalka-vsluh-release.yml` | Читалка вслух | push в `main` с изменениями в `chitalka-vsluh/`, тег `chitalka-v*` | Релиз `chitalka-v<версия>` |
 | `limit-pulse.yml` | Limit Pulse | push и PR с изменениями в `limit-pulse/`; публикация — вручную | Релиз `limit-pulse-v<версия>` из заранее подписанного APK |
 | `rutv.yml` | RuTV | push и PR с изменениями в `rutv/` | Предрелиз `apk-latest` (только из `main`) |
+| `scryer-tv.yml` | Scryer TV | push и PR с изменениями в `scryer-tv/` | Предрелиз `scryer-tv-latest` (только из `main`) |
 | `flowvoice.yml` | FlowVoice | push с изменениями в `flowvoice/` | Предрелиз `flowvoice-latest` (только из `main`) |
 | `scan-to-1c.yml` | Сканы → 1С | push в `main` и PR с изменениями в `scan-to-1c/`, тег `scan2onec-v*` | Релиз `scan2onec-v<версия>` |
 | `releases-cleanup.yml` | все | вручную и при изменении самого файла | Удаляет старые версии релизов |
@@ -38,7 +40,7 @@
   Запускайте его вручную после выхода новой версии: Actions → «Чистка релизов» → Run workflow.
 - Проект определяется по тегу релиза без номера версии: `chitalka-v1.3` → `chitalka`,
   `limit-pulse-v0.3.0` → `limit-pulse`, `scan2onec-v1.0.0` → `scan2onec`.
-- Релизы без номера версии (`apk-latest`, `flowvoice-latest`) — «плавающие»: каждая сборка из `main` перезаписывает
+- Релизы без номера версии (`apk-latest`, `flowvoice-latest`, `scryer-tv-latest`) — «плавающие»: каждая сборка из `main` перезаписывает
   в них файлы, поэтому у них всегда одна, свежая версия.
 - 23.10.2026 удалены старые версии: Читалка вслух 1.0–1.2 и Limit Pulse 0.1.0–0.2.0.
 

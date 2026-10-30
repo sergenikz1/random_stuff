@@ -1,0 +1,82 @@
+package org.scryertv.client.ui
+
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.fragment.app.FragmentActivity
+import org.scryertv.client.R
+import org.scryertv.client.data.Prefs
+import org.scryertv.client.data.ScryerApi
+
+/** Экран во весь экран умеет показывать «загрузка» и «ошибка + повторить». */
+interface StatusHost {
+    fun showLoading()
+    fun showError(message: String, onRetry: () -> Unit)
+    fun hideStatus()
+}
+
+class MainActivity : FragmentActivity(), StatusHost {
+
+    private lateinit var panel: View
+    private lateinit var progress: ProgressBar
+    private lateinit var message: TextView
+    private lateinit var retry: Button
+
+    private var retryAction: (() -> Unit)? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val prefs = Prefs.get(this)
+        if (!prefs.isConfigured || prefs.token.isBlank()) {
+            startActivity(android.content.Intent(this, org.scryertv.client.streaming.StreamingActivity::class.java))
+            finish()
+            return
+        }
+        ScryerApi.configure(prefs.serverUrl, prefs.token)
+
+        setContentView(R.layout.activity_main)
+        panel = findViewById(R.id.status_panel)
+        findViewById<Button>(R.id.status_online).setOnClickListener {
+            startActivity(android.content.Intent(this, org.scryertv.client.streaming.StreamingActivity::class.java))
+        }
+        progress = findViewById(R.id.status_progress)
+        message = findViewById(R.id.status_text)
+        retry = findViewById(R.id.status_retry)
+        retry.setOnClickListener {
+            val action = retryAction
+            hideStatus()
+            action?.invoke()
+        }
+
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.main_container, MainFragment())
+                .commit()
+        }
+    }
+
+    override fun showLoading() {
+        retryAction = null
+        message.setText(R.string.loading)
+        progress.visibility = View.VISIBLE
+        retry.visibility = View.GONE
+        panel.visibility = View.VISIBLE
+    }
+
+    override fun showError(message: String, onRetry: () -> Unit) {
+        retryAction = onRetry
+        this.message.text = message
+        progress.visibility = View.GONE
+        retry.visibility = View.VISIBLE
+        panel.visibility = View.VISIBLE
+        retry.requestFocus()
+    }
+
+    override fun hideStatus() {
+        retryAction = null
+        panel.visibility = View.GONE
+    }
+}

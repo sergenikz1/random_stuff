@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_title">Обновление Scryer TV</string>
+    <string name="update_installed_version">Установлена версия %1$s</string>
+    <string name="update_check">Проверить обновления</string>
+    <string name="update_download_install">Скачать и установить</string>
+    <string name="update_install">Установить обновление</string>
+    <string name="update_cancel">Отменить загрузку</string>
+    <string name="update_allow_install">Разрешите Scryer TV установку приложений и вернитесь на этот экран.</string>
+    <string name="update_no_settings">Откройте настройки Android и разрешите установку приложений из Scryer TV.</string>
+    <string name="update_verifying">Проверяю APK перед установкой…</string>
+    <string name="update_confirm_install">Подтвердите обновление в установщике Android. После установки откройте Scryer TV снова.</string>
+    <string name="update_no_installer">На устройстве не найден установщик APK.</string>
+    <string name="update_failed">Не удалось установить обновление.</string>
+    <string name="update_explanation">Обновления загружаются из GitHub Releases этого приложения. Android попросит подтвердить установку; настройки и история сохранятся.</string>
+</resources>

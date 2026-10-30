@@ -31,13 +31,17 @@ class MainActivity : FragmentActivity(), StatusHost {
 
         val prefs = Prefs.get(this)
         if (!prefs.isConfigured || prefs.token.isBlank()) {
-            Nav.toSetup(this)
+            startActivity(android.content.Intent(this, org.scryertv.client.streaming.StreamingActivity::class.java))
+            finish()
             return
         }
         ScryerApi.configure(prefs.serverUrl, prefs.token)
 
         setContentView(R.layout.activity_main)
         panel = findViewById(R.id.status_panel)
+        findViewById<Button>(R.id.status_online).setOnClickListener {
+            startActivity(android.content.Intent(this, org.scryertv.client.streaming.StreamingActivity::class.java))
+        }
         progress = findViewById(R.id.status_progress)
         message = findViewById(R.id.status_text)
         retry = findViewById(R.id.status_retry)

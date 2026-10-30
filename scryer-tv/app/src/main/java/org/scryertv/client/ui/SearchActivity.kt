@@ -40,6 +40,7 @@ class SearchActivity : FragmentActivity() {
     }
 
     /** Пока открыта экранная клавиатура, «Назад» закрывает её, а не экран поиска. */
+    @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
             if (Ime.hideIfVisible(this)) return true

@@ -144,6 +144,7 @@ class TitleDetailsFragment : DetailsSupportFragment() {
 
     private fun rebuildActions() {
         actionsAdapter.clear()
+        actionsAdapter.add(Action(99L, "Смотреть онлайн", "Найти на Rutube"))
         if (item.inLibrary) {
             item.playbackLinks.forEachIndexed { index, link ->
                 actionsAdapter.add(Action(ACTION_PLAY_BASE + index, "Смотреть", link.serverName))
@@ -167,6 +168,7 @@ class TitleDetailsFragment : DetailsSupportFragment() {
         when {
             id >= ACTION_PLAY_BASE -> item.playbackLinks.getOrNull((id - ACTION_PLAY_BASE).toInt())
                 ?.let { openLink(it.href) }
+            id == 99L -> startActivity(Intent(requireContext(), org.scryertv.client.streaming.StreamSearchActivity::class.java).putExtra("query", item.name))
             id == ACTION_ADD_ALL -> runBusy { add(onlyFuture = false) }
             id == ACTION_ADD_FUTURE -> runBusy { add(onlyFuture = true) }
             id == ACTION_SEARCH_RELEASE -> runBusy {

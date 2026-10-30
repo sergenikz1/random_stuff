@@ -45,7 +45,7 @@ jobs:
 
       - name: Build APK
         working-directory: scryer-tv
-        run: ./gradlew --no-daemon --stacktrace assembleRelease
+        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleRelease
 
       - name: Rename APK
         working-directory: scryer-tv

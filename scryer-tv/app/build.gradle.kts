@@ -11,8 +11,8 @@ android {
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -77,6 +77,13 @@ dependencies {
     implementation(libs.androidx.leanback)
     implementation(libs.androidx.lifecycle.runtime)
 
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.exoplayer.dash)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.datasource.okhttp)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation(libs.okhttp)
     implementation(libs.glide)
     implementation(libs.kotlinx.coroutines.android)

@@ -88,9 +88,10 @@ class MenuCardPresenter : CardPresenter(R.dimen.wide_width, R.dimen.wide_height)
     override fun bind(card: MediaCardView, item: Any) {
         val menu = item as? MenuCard ?: return
         val icon = when (menu.action) {
-            MenuCard.ACTION_SEARCH -> R.drawable.ic_search
-            MenuCard.ACTION_SETTINGS -> R.drawable.ic_settings
-            MenuCard.ACTION_QUEUE -> R.drawable.ic_download
+            MenuCard.ACTION_SEARCH, 101 -> R.drawable.ic_search
+            MenuCard.ACTION_SETTINGS, 103 -> R.drawable.ic_settings
+            MenuCard.ACTION_QUEUE, 104 -> R.drawable.ic_download
+            MenuCard.ACTION_ONLINE, 102 -> R.drawable.ic_tv
             MenuCard.ACTION_LIBRARY_MOVIE -> R.drawable.ic_movie
             MenuCard.ACTION_LIBRARY_SERIES -> R.drawable.ic_tv
             MenuCard.ACTION_LIBRARY_ANIME -> R.drawable.ic_star

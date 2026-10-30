@@ -72,6 +72,7 @@ class MainFragment : BrowseSupportFragment() {
     private fun onMenuCard(card: MenuCard) {
         val context = requireContext()
         when (card.action) {
+            MenuCard.ACTION_ONLINE -> startActivity(Intent(context, org.scryertv.client.streaming.StreamingActivity::class.java))
             MenuCard.ACTION_SEARCH -> startActivity(Intent(context, SearchActivity::class.java))
             MenuCard.ACTION_QUEUE -> startActivity(Intent(context, QueueActivity::class.java))
             MenuCard.ACTION_SETTINGS -> startActivity(Intent(context, SettingsActivity::class.java))
@@ -174,6 +175,7 @@ class MainFragment : BrowseSupportFragment() {
         row(
             getString(R.string.row_menu),
             listOf(
+                MenuCard(MenuCard.ACTION_ONLINE, "Смотреть онлайн", "Фильмы и сериалы без скачивания"),
                 MenuCard(MenuCard.ACTION_SEARCH, getString(R.string.action_search), "Найти и добавить фильм или сериал"),
                 MenuCard(MenuCard.ACTION_LIBRARY_MOVIE, Facet.MOVIE.plural, counts?.let { "В библиотеке: ${it.movies}" } ?: "Вся библиотека"),
                 MenuCard(MenuCard.ACTION_LIBRARY_SERIES, Facet.SERIES.plural, counts?.let { "В библиотеке: ${it.series}" } ?: "Вся библиотека"),

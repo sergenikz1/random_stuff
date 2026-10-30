@@ -55,6 +55,7 @@ class SetupFragment : GuidedStepSupportFragment() {
         )
 
     override fun onCreateActions(actions: MutableList<GuidedAction>, savedInstanceState: Bundle?) {
+        actions.add(button(10L, "Смотреть онлайн без сервера", "Поиск фильмов и сериалов, встроенный плеер"))
         actions.add(field(ID_SERVER, "Адрес сервера", server, InputType.TYPE_TEXT_VARIATION_URI))
         actions.add(field(ID_USER, "Логин", username, InputType.TYPE_TEXT_VARIATION_NORMAL))
         actions.add(field(ID_PASSWORD, "Пароль", "", InputType.TYPE_TEXT_VARIATION_PASSWORD))
@@ -120,6 +121,7 @@ class SetupFragment : GuidedStepSupportFragment() {
 
     override fun onGuidedActionClicked(action: GuidedAction) {
         when (action.id) {
+            10L -> { startActivity(Intent(requireContext(), org.scryertv.client.streaming.StreamingActivity::class.java)); requireActivity().finish() }
             ID_LOGIN -> {
                 if (username.isBlank() || password.isEmpty()) {
                     setStatus("Введите логин и пароль")

@@ -108,5 +108,6 @@ data class MenuCard(val action: Int, val title: String, val subtitle: String) : 
         const val ACTION_LIBRARY_SERIES = 6
         const val ACTION_LIBRARY_ANIME = 7
         const val ACTION_INFO = 8
+        const val ACTION_ONLINE = 9
     }
 }

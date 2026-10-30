@@ -105,6 +105,10 @@ Workflow `.github/workflows/scryer-tv.yml` собирает APK на кажды�
 
 Запустить вручную: **Actions → Scryer TV — сборка APK → Run workflow**.
 
+Для отдельной тестовой версии отправьте тег `scryer-tv-v<версия>`:
+workflow проверит тесты, соберёт APK и опубликует prerelease с контрольной суммой.
+Это позволяет установить новую онлайн-версию до слияния её ветки в `main`.
+
 ### Локально
 
 Нужен JDK 17 и Android SDK (`ANDROID_HOME`), сеть до `dl.google.com` и

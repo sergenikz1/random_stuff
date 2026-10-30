@@ -2,6 +2,10 @@ name: Scryer TV — сборка APK
 
 on:
   push:
+    branches:
+      - "**"
+    tags:
+      - "scryer-tv-v*"
     paths:
       - "scryer-tv/**"
       - ".github/workflows/scryer-tv.yml"
@@ -79,3 +83,19 @@ jobs:
           gh release view scryer-tv-latest --json assets --jq '.assets[].name' |
             while read -r name; do gh release delete-asset scryer-tv-latest "$name" --yes; done
           gh release upload scryer-tv-latest scryer-tv/out/*.apk --clobber
+
+      - name: Publish tagged preview APK
+        if: startsWith(github.ref, 'refs/tags/scryer-tv-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd scryer-tv/out
+          sha256sum *.apk > SHA256SUMS.txt
+          cd ../..
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Scryer TV — $RELEASE_TAG" \
+            --notes-file .github/release-notes-scryer-tv.md \
+            --prerelease --latest=false
+          gh release upload "$RELEASE_TAG" scryer-tv/out/*.apk scryer-tv/out/SHA256SUMS.txt --clobber

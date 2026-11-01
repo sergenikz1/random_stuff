@@ -1,4 +1,4 @@
-<title>Лоу-поли рыцарь</title>
+<title>__TITLE__</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -111,12 +111,12 @@ a { color: var(--gold); }
 
 <div class="wrap">
   <header>
-    <h1>Лоу-поли <span>рыцарь</span></h1>
-    <p class="lede">Рыцарь с двуручным мечом и щитом в духе игр PlayStation&nbsp;1: плоские грани, одна текстура-палитра 64×64, дрожащие вершины и дизеринг в&nbsp;15-битном цвете.</p>
+    <h1>__TITLE_HTML__</h1>
+    <p class="lede">__LEDE__</p>
   </header>
 
   <div class="screen" id="screen">
-    <canvas id="view" aria-label="Трёхмерная модель рыцаря, её можно вращать мышью или пальцем"></canvas>
+    <canvas id="view" aria-label="Трёхмерная модель, её можно вращать мышью или пальцем"></canvas>
     <div class="scan" id="scan"></div>
     <div class="osd" id="osd">320×240</div>
     <div class="hint">тяните, чтобы вращать</div>
@@ -137,8 +137,8 @@ a { color: var(--gold); }
         <dt>Треугольников</dt><dd id="s-tris">—</dd>
         <dt>Вершин (с разбивкой граней)</dt><dd id="s-verts">—</dd>
         <dt>Цветов в палитре</dt><dd id="s-cols">—</dd>
-        <dt>Рост до макушки шлема</dt><dd id="s-h">—</dd>
-        <dt>Высота с рогами</dt><dd id="s-h2">—</dd>
+        <dt>Высота</dt><dd id="s-h">—</dd>
+        <dt>Ширина × глубина</dt><dd id="s-wd">—</dd>
         <dt>Текстура-палитра</dt><dd>64×64 px</dd>
       </dl>
     </section>
@@ -147,11 +147,11 @@ a { color: var(--gold); }
       <ul class="swatches" id="swatches"></ul>
     </section>
     <section class="card">
-      <h2>Файлы в папке ps1-knight</h2>
+      <h2>Файлы в папке ps1-models/__FOLDER__</h2>
       <ul class="files">
-        <li><code>knight.glb</code><span>для Blender, Godot, Unity, three.js; палитра уже внутри</span></li>
-        <li><code>knight.obj</code> + <code>knight.mtl</code> + <code>palette.png</code><span>то же самое в OBJ</span></li>
-        <li><code>build_knight.py</code><span>генератор: правите позу или пропорции и пересобираете</span></li>
+        <li><code>__FILE__.glb</code><span>для Blender, Godot, Unity, three.js; палитра уже внутри</span></li>
+        <li><code>__FILE__.obj</code> + <code>__FILE__.mtl</code> + <code>palette.png</code><span>то же самое в OBJ</span></li>
+        <li><code>../__FILE__.py</code><span>описание модели: правите позу или пропорции и пересобираете через build.py</span></li>
       </ul>
     </section>
   </div>
@@ -162,43 +162,24 @@ a { color: var(--gold); }
 (function () {
   "use strict";
   const data = JSON.parse(document.getElementById("mesh-data").textContent);
-  const NAMES_RU = {
-    steel: "сталь", steel_dark: "тёмная сталь", steel_light: "светлая сталь",
-    gold: "золото", gold_dark: "тёмное золото", red: "красный", red_dark: "тёмно-красный",
-    mail: "кольчуга", cloth: "сукно", leather: "кожа", leather_dark: "тёмная кожа",
-    black: "прорезь", blade: "клинок"
-  };
+
 
   // ---------- статистика и палитра
   const triCount = data.col.length;
-  let maxY = 0, helmY = 0;
-  for (let i = 1; i < data.pos.length; i += 3) maxY = Math.max(maxY, data.pos[i]);
-  for (let t = 0; t < triCount; t++) {
-    if (data.names[data.col[t]] !== "steel_light") continue;
-    for (let k = 0; k < 3; k++) {
-      const x = data.pos[t * 9 + k * 3], y = data.pos[t * 9 + k * 3 + 1];
-      if (Math.abs(x) < 200 && y > 1500) helmY = Math.max(helmY, y);
-    }
-  }
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < data.pos.length; i++) { const a = i % 3; lo[a] = Math.min(lo[a], data.pos[i]); hi[a] = Math.max(hi[a], data.pos[i]); }
   const fmt = (n) => n.toLocaleString("ru-RU");
   document.getElementById("s-tris").textContent = fmt(triCount);
   document.getElementById("s-verts").textContent = fmt(triCount * 3);
   document.getElementById("s-cols").textContent = data.names.length;
-  document.getElementById("s-h").textContent = (helmY / 1000).toFixed(2).replace(".", ",") + " ед.";
-  let hornY = 0;
-  for (let t = 0; t < triCount; t++) {
-    if (data.names[data.col[t]] !== "gold") continue;
-    for (let k = 0; k < 3; k++) {
-      const x = data.pos[t * 9 + k * 3], y = data.pos[t * 9 + k * 3 + 1];
-      if (Math.abs(x) < 320 && y > 1900) hornY = Math.max(hornY, y);
-    }
-  }
-  document.getElementById("s-h2").textContent = (hornY / 1000).toFixed(2).replace(".", ",") + " ед.";
+  const m = (v) => (v / 1000).toFixed(2).replace(".", ",");
+  document.getElementById("s-h").textContent = m(hi[1] - lo[1]) + " м";
+  document.getElementById("s-wd").textContent = m(hi[0] - lo[0]) + " × " + m(hi[2] - lo[2]) + " м";
   const sw = document.getElementById("swatches");
   data.names.forEach((n, i) => {
     const li = document.createElement("li");
     const c = data.palette[i];
-    li.innerHTML = '<i style="background:rgb(' + c.join(",") + ')"></i>' + (NAMES_RU[n] || n);
+    li.innerHTML = '<i style="background:rgb(' + c.join(",") + ')"></i>' + (data.names_ru[i] || n);
     sw.appendChild(li);
   });
 
@@ -293,7 +274,7 @@ void main() {
     return { pos: mk(b.p), nrm: mk(b.n), col: mk(b.c), count, lpos: mk(lines), lnrm: mk(lineN), lcol: mk(lineC), lcount: lines.length / 3 };
   }
 
-  // рыцарь
+  // модель
   const kb = new Builder();
   const pal = data.palette.map((c) => c.map((v) => v / 255));
   for (let t = 0; t < triCount; t++) {
@@ -301,7 +282,7 @@ void main() {
     kb.tri([P[o] / 1000, P[o + 1] / 1000, P[o + 2] / 1000], [P[o + 3] / 1000, P[o + 4] / 1000, P[o + 5] / 1000],
       [P[o + 6] / 1000, P[o + 7] / 1000, P[o + 8] / 1000], pal[data.col[t]]);
   }
-  const knight = upload(kb);
+  const model = upload(kb);
 
   // окружение: трава, ели, скала, небо
   let seed = 7;
@@ -338,7 +319,7 @@ void main() {
   env.tri(m1, m4, m3, rock2); env.tri(m4, peak, m3, rock); env.tri(m3, peak, m2, rock2); env.tri(m1, peak, m4, rock);
   const envMesh = upload(env);
 
-  // тень-пятно под рыцарем
+  // тень-пятно под моделью
   const sh = new Builder();
   for (let k = 0; k < 10; k++) {
     const a0 = (k / 10) * Math.PI * 2, a1 = ((k + 1) / 10) * Math.PI * 2;
@@ -382,7 +363,8 @@ void main() {
 
   // ---------- состояние
   const RES = [[320, 240], [640, 480]];
-  const state = { yaw: -0.38, pitch: 0.12, dist: 4.6, spin: true, ps1: true, res: 0, wire: false };
+  const modelH = (hi[1] - lo[1]) / 1000;
+  const state = { yaw: -0.38, pitch: 0.12, dist: Math.max(3.2, modelH * 1.9), spin: true, ps1: true, res: 0, wire: false };
   const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduceMotion) state.spin = false;
 
@@ -444,7 +426,7 @@ void main() {
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     gl.viewport(0, 0, w, h);
 
-    const target = [0, 1.05, 0];
+    const target = [0, modelH * 0.46, 0];
     const eye = [target[0] + Math.sin(state.yaw) * Math.cos(state.pitch) * state.dist,
       target[1] + Math.sin(state.pitch) * state.dist,
       target[2] + Math.cos(state.yaw) * Math.cos(state.pitch) * state.dist];
@@ -486,13 +468,13 @@ void main() {
     gl.enable(gl.CULL_FACE);
     gl.depthMask(true); gl.disable(gl.BLEND); gl.uniform1f(U.uAlpha, 1);
 
-    // рыцарь
+    // модель
     gl.uniform1f(U.uLit, 1); gl.uniform1f(U.uFogNear, 9); gl.uniform1f(U.uFogFar, 30);
-    bind(knight, false); gl.drawArrays(gl.TRIANGLES, 0, knight.count);
+    bind(model, false); gl.drawArrays(gl.TRIANGLES, 0, model.count);
     if (state.wire) {
       gl.uniform1f(U.uLit, 0); gl.disable(gl.DEPTH_TEST);
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(U.uAlpha, 0.55);
-      bind(knight, true); gl.drawArrays(gl.LINES, 0, knight.lcount);
+      bind(model, true); gl.drawArrays(gl.LINES, 0, model.lcount);
       gl.disable(gl.BLEND); gl.uniform1f(U.uAlpha, 1); gl.enable(gl.DEPTH_TEST);
     }
     requestAnimationFrame(frame);

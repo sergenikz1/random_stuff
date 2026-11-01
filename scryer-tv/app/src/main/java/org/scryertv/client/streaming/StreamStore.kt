@@ -16,6 +16,45 @@ class StreamStore(context: Context) {
         get() = sp.getString("catalog_url", "").orEmpty()
         set(value) { sp.edit().putString("catalog_url", value).apply() }
 
+    /** Источники пользователя в порядке добавления. */
+    fun sources(): List<StreamSource> {
+        migrateCatalog()
+        return try {
+            val array = JSONArray(sp.getString("sources", "[]"))
+            (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let(StreamSource::fromJson) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun saveSource(source: StreamSource) {
+        val list = sources()
+        val updated = if (list.any { it.id == source.id }) list.map { if (it.id == source.id) source else it } else list + source
+        writeSources(updated)
+    }
+
+    fun removeSource(source: StreamSource) {
+        writeSources(sources().filter { it.id != source.id })
+        sp.edit().remove(SourceRepository.itemsKey(source)).apply()
+    }
+
+    private fun writeSources(list: List<StreamSource>) {
+        val array = JSONArray()
+        list.forEach { array.put(it.toJson()) }
+        sp.edit().putString("sources", array.toString()).apply()
+    }
+
+    /** До 1.3 был один сохранённый плейлист — превращаем его в обычный источник. */
+    private fun migrateCatalog() {
+        val url = catalogUrl
+        if (url.isBlank() || sp.contains("sources")) return
+        val source = StreamSource("legacy-playlist", url, "Мой плейлист", StreamSource.Kind.PLAYLIST)
+        val array = JSONArray().put(source.toJson())
+        sp.edit()
+            .putString("sources", array.toString())
+            .putString(SourceRepository.itemsKey(source), sp.getString("catalog", "[]"))
+            .remove("catalog")
+            .apply()
+    }
+
     fun videos(key: String): List<VideoItem> = try {
         val array = JSONArray(sp.getString(key, "[]"))
         (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let(VideoItem::fromJson) }

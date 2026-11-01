@@ -11,8 +11,8 @@ android {
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.2.1"
+        versionCode = 5
+        versionName = "1.3.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -94,6 +94,7 @@ dependencies {
     add(robolectricSdk.name, "org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
     testImplementation("org.mockito:mockito-core:4.11.0")
     testImplementation("org.json:json:20240303")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     implementation(libs.okhttp)
     implementation(libs.glide)
     implementation(libs.kotlinx.coroutines.android)

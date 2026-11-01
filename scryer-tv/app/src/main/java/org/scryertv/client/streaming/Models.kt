@@ -3,7 +3,7 @@ package org.scryertv.client.streaming
 import java.io.Serializable
 import org.json.JSONObject
 
-/** Online video from Rutube or a user-supplied direct stream. */
+/** Online video: Rutube, a direct stream from a playlist or a title from a user-added addon. */
 data class VideoItem(
     val id: String,
     val title: String,
@@ -17,8 +17,29 @@ data class VideoItem(
     val published: String? = null,
     val isLive: Boolean = false,
     val streamUrl: String? = null,
-    val group: String = ""
+    val group: String = "",
+    /** Дополнение, из каталога которого пришла карточка (адрес без /manifest.json). */
+    val addonBase: String? = null,
+    /** Тип и id по протоколу дополнений: movie/series, «tt0111161», «tt0944947:1:2». */
+    val contentType: String? = null,
+    val metaId: String? = null,
+    val videoId: String? = null,
+    /** Дополнение и подпись ссылки, выбранной пользователем: по ним автопереход берёт ту же озвучку/качество. */
+    val streamAddonBase: String? = null,
+    val streamHint: String? = null,
+    val requestHeaders: Map<String, String> = emptyMap(),
+    val season: Int = 0,
+    val episode: Int = 0
 ) : Serializable {
+
+    /** Видео Rutube: адрес потока узнаём у Rutube в момент запуска. */
+    val isRutube: Boolean get() = streamUrl == null && addonBase == null
+
+    /** Карточка из дополнения: ссылки на поток запрашиваются у источников. */
+    val isAddon: Boolean get() = addonBase != null && streamUrl == null
+
+    /** Сериал целиком: сначала выбирают серию, ссылки бывают только у серии. */
+    val isShow: Boolean get() = isAddon && videoId == null
 
     val pageUrl: String get() = streamUrl ?: "https://rutube.ru/video/$id/"
 
@@ -36,6 +57,15 @@ data class VideoItem(
         put("is_live", isLive)
         put("stream_url", streamUrl ?: "")
         put("group", group)
+        put("addon_base", addonBase ?: "")
+        put("content_type", contentType ?: "")
+        put("meta_id", metaId ?: "")
+        put("video_id", videoId ?: "")
+        put("stream_addon_base", streamAddonBase ?: "")
+        put("stream_hint", streamHint ?: "")
+        put("headers", JSONObject(requestHeaders))
+        put("season", season)
+        put("episode", episode)
     }
 
     companion object {
@@ -54,7 +84,18 @@ data class VideoItem(
             published = o.optString("published").ifBlank { null },
             isLive = o.optBoolean("is_live"),
             streamUrl = o.optString("stream_url").ifBlank { null },
-            group = o.optString("group")
+            group = o.optString("group"),
+            addonBase = o.optString("addon_base").ifBlank { null },
+            contentType = o.optString("content_type").ifBlank { null },
+            metaId = o.optString("meta_id").ifBlank { null },
+            videoId = o.optString("video_id").ifBlank { null },
+            streamAddonBase = o.optString("stream_addon_base").ifBlank { null },
+            streamHint = o.optString("stream_hint").ifBlank { null },
+            requestHeaders = o.optJSONObject("headers")?.let { h ->
+                h.keys().asSequence().associateWith { h.optString(it) }
+            } ?: emptyMap(),
+            season = o.optInt("season"),
+            episode = o.optInt("episode")
         )
     }
 }
@@ -71,5 +112,7 @@ data class PlaybackInfo(
     val url: String,
     val isLive: Boolean,
     val title: String?,
-    val mimeType: String? = null
+    val mimeType: String? = null,
+    /** Заголовки, которых требует источник (например, Referer). */
+    val headers: Map<String, String> = emptyMap()
 )

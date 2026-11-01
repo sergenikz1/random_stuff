@@ -28,7 +28,7 @@ internal object DefaultPlaybackServices : PlaybackServices {
     override suspend fun episodes(video: VideoItem) = StreamRepository.episodes(video)
 
     override fun player(context: Context, video: VideoItem, maxHeight: Int, decoderMode: Int): Player {
-        val headers = if (video.streamUrl == null) mapOf("Referer" to RutubeApi.REFERER) else emptyMap()
+        val headers = if (video.isRutube) mapOf("Referer" to RutubeApi.REFERER) else video.requestHeaders
         val source = OkHttpDataSource.Factory(RutubeApi.http)
             .setUserAgent(RutubeApi.USER_AGENT).setDefaultRequestProperties(headers)
         val tracks = DefaultTrackSelector(context).apply {

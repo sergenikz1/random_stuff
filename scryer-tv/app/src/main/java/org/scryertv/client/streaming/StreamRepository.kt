@@ -13,18 +13,27 @@ object StreamRepository {
     }
 
     suspend fun resolve(video: VideoItem): PlaybackInfo = withContext(Dispatchers.IO) {
-        video.streamUrl?.let {
-            val path = it.toHttpUrlOrNull()?.encodedPath.orEmpty().lowercase()
-            val mime = when {
-                path.endsWith(".m3u8") -> "application/x-mpegURL"
-                path.endsWith(".mpd") -> "application/dash+xml"
-                else -> null
-            }
-            PlaybackInfo(it, video.isLive, video.title, mime)
-        } ?: RutubeApi.playback(video.id)
+        video.streamUrl?.let { directInfo(it, video.isLive, video.title, video.requestHeaders) }
+            ?: if (video.isAddon) SourceRepository.resolve(video) else RutubeApi.playback(video.id)
+    }
+
+    internal fun directInfo(url: String, isLive: Boolean, title: String?, headers: Map<String, String> = emptyMap()): PlaybackInfo {
+        val path = url.toHttpUrlOrNull()?.encodedPath.orEmpty().lowercase()
+        val mime = when {
+            path.endsWith(".m3u8") -> "application/x-mpegURL"
+            path.endsWith(".mpd") -> "application/dash+xml"
+            else -> null
+        }
+        return PlaybackInfo(url, isLive, title, mime, headers)
     }
 
     suspend fun episodes(video: VideoItem): List<VideoItem> = withContext(Dispatchers.IO) {
+        if (video.isAddon) {
+            // Серии из того же сериала по порядку; выбранная озвучка переходит на следующие серии.
+            return@withContext SourceRepository.episodes(video.copy(videoId = null))
+                .map { it.copy(streamAddonBase = video.streamAddonBase, streamHint = video.streamHint) }
+                .ifEmpty { listOf(video) }
+        }
         val number = EpisodeOrder.parse(video.title) ?: return@withContext listOf(video)
         if (video.streamUrl != null) return@withContext listOf(video)
         val candidates = mutableListOf<VideoItem>()
@@ -43,24 +52,32 @@ object StreamRepository {
             RutubeApi.parseVideoId(url.toString())?.let { return@withContext listOf(RutubeApi.video(it)) }
         }
         val path = url.encodedPath.lowercase()
-        if (path.endsWith(".m3u") || path.endsWith(".m3u8")) {
-            val request = Request.Builder().url(url).header("User-Agent", RutubeApi.USER_AGENT).build()
-            RutubeApi.http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Плейлист: HTTP ${response.code}")
-                val body = response.body ?: throw IOException("Пустой плейлист")
-                val bytes = body.byteStream().use { it.readBytesLimited(2 * 1024 * 1024) }
-                val text = bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
-                // An HLS manifest is one video, never a list of episode segments.
-                if (text.lineSequence().any { it.startsWith("#EXT-X-") }) {
-                    return@withContext listOf(direct(url.toString(), "Онлайн-видео"))
-                }
-                return@withContext Playlist.parse(text, response.request.url.toString())
-            }
-        }
+        if (path.endsWith(".m3u") || path.endsWith(".m3u8")) return@withContext fetchPlaylist(url.toString())
         if (listOf(".mp4", ".mkv", ".webm", ".mpd").any(path::endsWith)) {
             return@withContext listOf(direct(url.toString(), url.pathSegments.last().ifBlank { "Онлайн-видео" }))
         }
-        throw IOException("Поддерживаются ссылки Rutube, прямые MP4/HLS/DASH и M3U-плейлисты. Страница сайта с веб-плеером не является видеопотоком.")
+        throw IOException("Поддерживаются ссылки Rutube, прямые MP4/HLS/DASH, M3U-плейлисты и дополнения (manifest.json). Страница сайта с веб-плеером не является видеопотоком.")
+    }
+
+    /** M3U-плейлист → список видео; HLS-поток по той же ссылке → одно видео. */
+    fun fetchPlaylist(input: String): List<VideoItem> {
+        val url = input.trim().toHttpUrlOrNull() ?: throw IOException("Введите HTTP/HTTPS-ссылку")
+        val request = Request.Builder().url(url).header("User-Agent", RutubeApi.USER_AGENT).build()
+        RutubeApi.http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("Плейлист: HTTP ${response.code}")
+            val body = response.body ?: throw IOException("Пустой плейлист")
+            val bytes = body.byteStream().use { it.readBytesLimited(2 * 1024 * 1024) }
+            val text = bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
+            // An HLS manifest is one video, never a list of episode segments.
+            if (text.lineSequence().any { it.startsWith("#EXT-X-") }) {
+                return listOf(direct(url.toString(), "Онлайн-видео"))
+            }
+            return try {
+                Playlist.parse(text, response.request.url.toString())
+            } catch (e: IllegalArgumentException) {
+                throw IOException(e.message ?: "Это не M3U-плейлист")
+            }
+        }
     }
 
     internal fun direct(url: String, title: String, group: String = "", logo: String? = null): VideoItem {

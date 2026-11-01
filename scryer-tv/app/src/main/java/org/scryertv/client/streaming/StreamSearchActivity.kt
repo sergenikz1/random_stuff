@@ -36,13 +36,18 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private var more = false
     private var job: Job? = null
     private var pageJob: Job? = null
+    private var sourcesJob: Job? = null
     private var generation = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setSearchResultProvider(this)
-        setOnItemViewClickedListener(OnItemViewClickedListener { _, item, _, _ ->
-            (item as? VideoItem)?.let { StreamActions.show(this, it) }
+        setOnItemViewClickedListener(OnItemViewClickedListener { _, item, _, row ->
+            val video = item as? VideoItem ?: return@OnItemViewClickedListener
+            // У видео из плейлиста очередь автоперехода — его полка в выдаче.
+            val shelf = (row as? ListRow)?.adapter?.takeIf { it !== results && video.streamUrl != null }
+            val playlist = shelf?.let { a -> (0 until a.size()).mapNotNull { a.get(it) as? VideoItem } }.orEmpty()
+            StreamActions.show(this, video, playlist)
         })
         setOnItemViewSelectedListener(OnItemViewSelectedListener { _, item, _, _ ->
             if (item is VideoItem && results.indexOf(item) >= results.size() - 5) loadPage()
@@ -57,7 +62,7 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     override fun onQueryTextSubmit(query: String): Boolean { search(query, 0); return true }
 
     private fun search(text: String, delayMs: Long) {
-        job?.cancel(); pageJob?.cancel()
+        job?.cancel(); pageJob?.cancel(); sourcesJob?.cancel()
         val request = ++generation
         query = text.trim(); page = 0; more = false
         rows.clear(); results.clear()
@@ -67,6 +72,21 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
             if (request != generation) return@launch
             rows.add(ListRow(HeaderItem(0, "Ищу на Rutube: $query…"), results))
             more = true; loadPage()
+            searchSources(query, request)
+        }
+    }
+
+    /** Выдача источников пользователя — отдельными полками под Rutube. */
+    private fun searchSources(text: String, request: Int) {
+        val context = context ?: return
+        sourcesJob = lifecycleScope.launch {
+            val found = try { SourceRepository.search(StreamStore(context), text) }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { emptyList() }
+            if (generation != request) return@launch
+            found.forEach { row ->
+                rows.add(ListRow(HeaderItem(rows.size().toLong(), row.title),
+                    ArrayObjectAdapter(StreamCardPresenter()).apply { addAll(0, row.items) }))
+            }
         }
     }
 

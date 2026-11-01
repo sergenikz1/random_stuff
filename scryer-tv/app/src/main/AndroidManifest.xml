@@ -84,6 +84,8 @@
             android:screenOrientation="landscape" />
         <activity android:name=".streaming.StreamPlayerActivity" android:exported="false"
             android:screenOrientation="landscape" />
+        <activity android:name=".streaming.SourcesActivity" android:exported="false"
+            android:screenOrientation="landscape" android:theme="@style/Theme.ScryerTV.GuidedStep" />
         <activity android:name=".update.UpdateActivity" android:exported="false"
             android:screenOrientation="landscape" />
         <provider android:name="androidx.core.content.FileProvider"

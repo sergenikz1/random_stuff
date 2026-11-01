@@ -121,7 +121,9 @@ class StreamPlayerActivity : FragmentActivity() {
 
     private fun startPlayer(info: PlaybackInfo) {
         val video = current ?: return
-        val exo = services.player(this, video, store.maxHeight, decoderMode)
+        // Источник может требовать свои заголовки (Referer и т. п.) — они приходят вместе с адресом.
+        val withHeaders = if (info.headers.isEmpty()) video else video.copy(requestHeaders = info.headers)
+        val exo = services.player(this, withHeaders, store.maxHeight, decoderMode)
         live = info.isLive || video.isLive
         player = exo; view.player = exo
         exo.addListener(object : Player.Listener {
@@ -196,8 +198,15 @@ class StreamPlayerActivity : FragmentActivity() {
         val request = generation
         discoveryJob = lifecycleScope.launch {
             try {
-                if (video.streamUrl != null) {
-                    val index = queue.indexOfFirst { it.id == video.id }
+                if (!video.isRutube) {
+                    var index = queue.indexOfFirst { it.id == video.id }
+                    if (index < 0 && video.isAddon && video.season + video.episode > 0) {
+                        // Серию открыли из истории: список серий берём у источника заново.
+                        val candidates = services.episodes(video)
+                        if (request != generation) return@launch
+                        queue = candidates
+                        index = queue.indexOfFirst { it.id == video.id }
+                    }
                     next = if (index >= 0) queue.getOrNull(index + 1) else null
                 } else {
                     // An explicitly selected episode list remains usable when search is temporarily unavailable.

@@ -34,8 +34,9 @@ class SourcesFragment : GuidedStepSupportFragment() {
     override fun onCreateGuidance(savedInstanceState: Bundle?): GuidanceStylist.Guidance =
         GuidanceStylist.Guidance(
             "Источники видео",
-            "Плейлисты M3U и дополнения в формате Stremio (ссылка на manifest.json). " +
-                "Когда у видео несколько ссылок, приложение спросит, откуда смотреть. " +
+            "Подходит любая ссылка: плейлист M3U, дополнение в формате Stremio (manifest.json), " +
+                "прямая ссылка на видео (MP4, HLS, DASH), видео Rutube или страница сайта, " +
+                "где видео лежит в открытом виде. Когда у видео несколько ссылок, приложение спросит, откуда смотреть. " +
                 "Торрент-ссылки не воспроизводятся. Добавляйте только источники, " +
                 "которыми вам разрешено пользоваться.",
             "Scryer TV · Онлайн",
@@ -52,7 +53,7 @@ class SourcesFragment : GuidedStepSupportFragment() {
         list += GuidedAction.Builder(context)
             .id(ID_ADD)
             .title("Добавить источник")
-            .description("https://…/manifest.json или ссылка на .m3u")
+            .description("Любая ссылка: плейлист, видео, страница, manifest.json")
             .editDescription("")
             .descriptionEditable(true)
             .descriptionEditInputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)

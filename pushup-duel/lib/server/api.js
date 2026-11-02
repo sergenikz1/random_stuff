@@ -1,5 +1,6 @@
 // REST API: всё, что не требует живого соединения. Next.js отдаёт сюда запросы из app/api/[...path].
 import { authenticate, refFrom } from './auth.js';
+import { unlockChest, openChest, claimRoad, buy } from './economy.js';
 import {
   privateProfile, publicCard, applyActivity, pushHistory, updateProfile, UserError, CLAN_EMOJI,
 } from './store.js';
@@ -82,6 +83,24 @@ export class Api {
           s.save();
           return { profile: privateProfile(p, s) };
         case 'solo': return this.solo(p, body);
+        // Сундуки: POST chests/<слот>/unlock · chests/<слот>/open { gems }
+        case 'chests': {
+          const slot = Number(b);
+          if (!(slot >= 0 && slot < 4)) throw new UserError('Нет такого слота');
+          if (c === 'unlock') { unlockChest(p, slot); s.save(); return { profile: privateProfile(p, s) }; }
+          if (c === 'open') { const loot = openChest(p, slot, { gems: !!body.gems }); s.save(); return { loot, profile: privateProfile(p, s) }; }
+          return undefined;
+        }
+        case 'road': {
+          const r = claimRoad(p, b);
+          s.save();
+          return { ...r, profile: privateProfile(p, s) };
+        }
+        case 'shop': {
+          const r = buy(p, String(b || ''));
+          s.save();
+          return { ...r, profile: privateProfile(p, s) };
+        }
         case 'premium': {
           if (!this.premium) throw new UserError('Покупки отключены');
           if (b === 'invoice') return this.premium.invoice(p);

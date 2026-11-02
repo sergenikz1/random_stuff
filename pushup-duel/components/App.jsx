@@ -17,14 +17,21 @@ import Lobby from './Lobby.jsx';
 import Game from './Game.jsx';
 import Result from './Result.jsx';
 import { PlayerSheet, ClanSheet, ChallengedSheet } from './Sheets.jsx';
+import Shop from './Shop.jsx';
+import { ChestOpenModal, TrophyRoad } from './Economy.jsx';
+import { Sheet } from './ui.jsx';
 
-const TABS = [['home', '🏠', 'Главная'], ['top', '🏆', 'Рейтинг'], ['clan', '🛡️', 'Клан'], ['pass', '🎖️', 'Пропуск'], ['me', '👤', 'Профиль']];
+const TABS = [['shop', '🛒', 'Магазин'], ['pass', '🎖️', 'Пропуск'], ['home', '⚔️', 'Бой'], ['clan', '🛡️', 'Клан'], ['top', '🏆', 'Рейтинг']];
 
 export default function App() {
   const [settings, updateSettings] = useSettings();
   const socketRef = useRef(null);
   const [status, setStatus] = useState('connecting');
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfileRaw] = useState(null);
+  // Отметка времени получения профиля — от неё идут таймеры сундуков.
+  const setProfile = useCallback((pr) => setProfileRaw(pr ? { ...pr, _at: Date.now() } : pr), []);
+  const [loot, setLoot] = useState(null);
+  const [ecoBusy, setEcoBusy] = useState(false);
   const [config, setConfig] = useState({});
   const [stats, setStats] = useState(null);
   const [community, setCommunity] = useState(null);
@@ -204,6 +211,28 @@ export default function App() {
     } catch (e) { toast(e.message); }
   };
 
+  // ---- Экономика ----
+  const ecoCall = async (path, body, after) => {
+    setEcoBusy(true);
+    try {
+      const r = await api(path, { method: 'POST', body });
+      setProfile(r.profile);
+      if (after) after(r);
+    } catch (e) { toast(e.message); } finally { setEcoBusy(false); }
+  };
+  const unlockChest = (slot) => ecoCall(`chests/${slot}/unlock`, null, () => { haptic('select'); toast('Сундук открывается ⏳'); });
+  const openChest = (slot, withGems, gems) => {
+    if (withGems) { setSheet({ kind: 'chestGems', slot, gems }); return; }
+    ecoCall(`chests/${slot}/open`, {}, (r) => setLoot(r.loot));
+  };
+  const claimRoad = (at) => ecoCall(`road/${at}/claim`, null, () => { sfx.level(); haptic('success'); toast('Награда получена 🏆'); });
+  const shopBuy = (id) => ecoCall(`shop/${id}`, null, (r) => {
+    haptic('success');
+    if (r.loot) setLoot(r.loot);
+    else if (r.name) toast(`Куплено: ${r.name}`);
+    else if (r.boostUntil) toast('Буст ×2 активирован ⚡');
+  });
+
   const refLink = () => appLink(config, `ref_${profile?.id || ''}`);
   const doShare = async (url, text) => {
     const r = await share(url, text);
@@ -272,8 +301,9 @@ export default function App() {
           onJoin={(code) => { setFlow({ kind: 'join', code }); send({ t: 'room_join', code }); }} />
       ) : (
         <div className="shell">
+          {tab === 'shop' && <Shop profile={profile} onBuy={shopBuy} onPremium={buyPremium} busy={ecoBusy} />}
           {tab === 'home' && (
-            <Home profile={profile} stats={stats} community={community} feed={feed} status={status}
+            <Home profile={profile} onUnlockChest={unlockChest} onOpenChest={openChest} onRoad={() => setSheet({ kind: 'road' })} onProfile={() => setTab('me')} stats={stats} community={community} feed={feed} status={status}
               onRanked={startRanked} onFriend={startFriend} onJoinCode={startJoin} onTraining={startTraining} onBot={startBot}
               goTab={setTab} />
           )}
@@ -291,6 +321,17 @@ export default function App() {
         </div>
       )}
 
+      {sheet?.kind === 'road' && <TrophyRoad eco={profile?.eco} onClose={closeSheet} onClaim={claimRoad} />}
+      {sheet?.kind === 'chestGems' && (
+        <Sheet onClose={closeSheet} center>
+          <h2 className="center">Открыть сейчас?</h2>
+          <p className="center muted" style={{ fontWeight: 700 }}>Сундук откроется мгновенно за {sheet.gems} 💎 (у вас {profile?.eco?.gems ?? 0})</p>
+          <button className="gel xl violet" disabled={ecoBusy || (profile?.eco?.gems ?? 0) < sheet.gems}
+            onClick={() => { const slot = sheet.slot; setSheet(null); ecoCall(`chests/${slot}/open`, { gems: true }, (r) => setLoot(r.loot)); }}>💎 {sheet.gems} — открыть</button>
+          <button className="glass-btn" onClick={closeSheet}>Подождать</button>
+        </Sheet>
+      )}
+      {loot && <ChestOpenModal loot={loot} onClose={() => setLoot(null)} />}
       {sheet?.kind === 'player' && <PlayerSheet id={sheet.id} onClose={closeSheet} toast={toast} canChallenge={status === 'online'} onChallenge={challenge} />}
       {sheet?.kind === 'clan' && <ClanSheet id={sheet.id} invite={sheet.invite} onClose={closeSheet} toast={toast} openPlayer={openPlayer} onJoined={() => { setVersion((v) => v + 1); setTab('clan'); }} />}
       {sheet?.kind === 'challenged' && (

@@ -50,6 +50,10 @@ export const COSMETICS = {
     galaxy:  { name: 'Галактика' },
     legion:  { name: 'Легион' },
     crown:   { name: 'Звёздная корона' },
+    ruby:     { name: 'Рубин' },
+    emerald:  { name: 'Изумруд' },
+    sapphire: { name: 'Сапфир' },
+    obsidian: { name: 'Обсидиан' },
   },
   // Скин — костюм, который рисуется поверх игрока по точкам тела во время боя.
   skin: {
@@ -101,6 +105,9 @@ export const COSMETICS = {
     captain: { name: 'Капитан клана' },
     community: { name: 'Плечом к плечу' },
     patron:  { name: 'Звёздный' },
+    lucky:   { name: 'Везунчик' },
+    collector: { name: 'Коллекционер' },
+    chesty:  { name: 'Сундучник' },
   },
   music: {
     none:      { name: 'Без музыки' },
@@ -119,7 +126,7 @@ export const COSMETICS = {
   },
   avatar: Object.fromEntries(
     ['🦊', '🐻', '🐯', '🦁', '🐺', '🐼', '🐸', '🦖', '🐙', '🦍', '🤖', '🥷',
-     '🦄', '🐉', '💀', '👑', '⚡', '🔥', '🤝', '🦸', '💎'].map((a) => [a, { name: a }]),
+     '🦄', '🐉', '💀', '👑', '⚡', '🔥', '🤝', '🦸', '💎', '🦈', '🦉', '🐝', '🦩', '🐧', '🦬', '🐊', '🦥'].map((a) => [a, { name: a }]),
   ),
 };
 
@@ -263,6 +270,7 @@ export const badgeById = (id) => BADGES.find((b) => b.id === id);
 
 export function cosmeticName(key) {
   const [cat, id] = key.split(':');
+  if (cat === 'avatar') return `Аватар ${id}`;
   const c = COSMETICS[cat]?.[id];
   return c ? c.name : key;
 }

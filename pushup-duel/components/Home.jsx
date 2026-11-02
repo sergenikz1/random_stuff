@@ -2,6 +2,7 @@
 import { Avatar, Bar, Card, ago, plural } from './ui.jsx';
 import { PASS_REWARDS, cosmeticName } from '../lib/pass.js';
 import { RewardIcon } from './Pass.jsx';
+import { ArenaCard, ChestSlots, Currency } from './Economy.jsx';
 
 function greeting() {
   const h = new Date().getHours();
@@ -11,11 +12,21 @@ function greeting() {
   return 'Добрый вечер';
 }
 
-export default function Home({ profile, stats, community, feed, status, onRanked, onFriend, onJoinCode, onTraining, onBot, goTab, openPlayerByName }) {
+export default function Home({ profile, stats, community, feed, status, onRanked, onFriend, onJoinCode, onTraining, onBot, goTab, onUnlockChest, onOpenChest, onRoad, onProfile }) {
   const p = profile;
   const nextReward = p && !p.max ? Object.keys(PASS_REWARDS).map(Number).find((l) => l > p.level) : null;
   return (
     <div className="page">
+      {p && (
+        <div className="topbar">
+          <button className="topbar-me" onClick={onProfile} aria-label="Профиль">
+            <Avatar emoji={p.avatar} frame={p.equipped?.frame} size="sm" />
+            <span className="topbar-lvl">{p.level}</span>
+            <span className="topbar-name">{p.name}</span>
+          </button>
+          <Currency eco={p.eco} />
+        </div>
+      )}
       <div className="page-head">
         <h1>{greeting()}, {p?.name || 'атлет'}!</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -23,6 +34,8 @@ export default function Home({ profile, stats, community, feed, status, onRanked
           {!p?.playedToday && <span className="streak-pill">Отожмись сегодня, чтобы {p?.dayStreak ? 'не потерять' : 'начать'} серию</span>}
         </div>
       </div>
+
+      {p?.eco && <ArenaCard eco={p.eco} onRoad={onRoad} />}
 
       <Card className="hero" wave={['#4fdcc8', '#6fd36a']}>
         <div className="online">
@@ -39,6 +52,13 @@ export default function Home({ profile, stats, community, feed, status, onRanked
         </div>
         <button className="card-link" style={{ marginTop: 8 }} onClick={onJoinCode}>У меня есть код комнаты</button>
       </Card>
+
+      {p?.eco && (
+        <Card title="Сундуки" icon="🧰" tone="orange">
+          <ChestSlots eco={p.eco} profileAt={p._at || Date.now()} onUnlock={onUnlockChest} onOpen={onOpenChest} />
+          <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Сундук — за каждую победу в рейтинговой дуэли. Открывается по таймеру, по одному.</p>
+        </Card>
+      )}
 
       {p && (
         <Card title="Боевой пропуск" icon="🎖️" tone="gold" link="Награды" onLink={() => goTab('pass')}>

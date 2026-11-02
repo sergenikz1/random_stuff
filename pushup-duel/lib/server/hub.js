@@ -6,6 +6,7 @@ import {
 } from './store.js';
 import { eloDelta } from '../duel.js';
 import { winStreakElo } from '../pass.js';
+import { awardWinChest } from './economy.js';
 
 const DURATIONS = [30, 60, 90, 120];
 
@@ -335,6 +336,9 @@ export class Hub {
         // Бонус Эло за серию побед считаем после applyActivity: там обновилась серия.
         if (res === 'win') streakBonus[i] = winStreakElo(p.winStreak);
         p.rating = Math.max(100, p.rating + deltas[i] + streakBonus[i]);
+        p.bestRating = Math.max(p.bestRating || 0, p.rating);
+        // Сундук за победу в рейтинге (если есть свободный слот).
+        if (res === 'win') s.chest = awardWinChest(p);
       }
       if (m.mode === 'friend') addFriend(p, o.player);
       pushHistory(p, {
@@ -367,6 +371,7 @@ export class Hub {
         },
         opp: { ...publicCard(o.player, this.store), reps: o.reps.length, ratingBefore: ratingsBefore[1 - i], delta: deltas[1 - i] + streakBonus[1 - i] },
         progress: s.progress,
+        chest: s.chest || null,
         profile: privateProfile(s.player, this.store),
       });
     });

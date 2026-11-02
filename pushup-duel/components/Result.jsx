@@ -6,6 +6,8 @@ import { haptic, bindBackButton } from '../lib/client/tg.js';
 import { cosmeticName, levelInfo } from '../lib/pass.js';
 import { Avatar, Bar, Card, fmtTime } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
+import { ChestIcon } from './Economy.jsx';
+import { CHESTS } from '../lib/economy.js';
 
 const TITLES = { win: 'Победа!', loss: 'Поражение', draw: 'Ничья' };
 const REASONS = { forfeit: 'соперник сдался', disconnect: 'соперник отключился' };
@@ -75,6 +77,19 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
           </div>
         )}
       </Card>
+
+      {data.chest && (
+        <Card>
+          {data.chest.full ? (
+            <div className="row"><span style={{ fontSize: 26 }}>🧰</span><div className="grow"><div className="title">Все слоты сундуков заняты</div><div className="sub">Откройте сундук, чтобы получать новые за победы</div></div></div>
+          ) : (
+            <div className="row new-reward" style={{ border: 0 }}>
+              <ChestIcon type={data.chest.type} size={56} className="bounce" />
+              <div className="grow"><div className="title">{CHESTS[data.chest.type].name} сундук!</div><div className="sub">Ждёт на главной в слоте {data.chest.slot + 1}</div></div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {progress ? (
         <Card title={`+${progress.total} опыта`} icon="⭐" tone="gold">

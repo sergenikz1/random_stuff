@@ -10,6 +10,8 @@ import {
   PREMIUM_PRICE_STARS, isGift, giftStars, earnedBadges, showcaseBadges,
 } from '../pass.js';
 import { rankOf, START_RATING, AVATARS } from '../duel.js';
+import { QUEST_GEMS } from '../economy.js';
+import { ecoView, ensureEco, boostActive } from './economy.js';
 
 const CLAN_MAX = 30;
 const FEED_MAX = 80;
@@ -326,6 +328,7 @@ export function privateProfile(p, store) {
     unlocked: unlockedOf(p), equipped: p.equipped,
     winStreak: p.winStreak, dayStreak: streak, multiplier: dayStreakMultiplier(Math.max(1, streak)),
     playedToday: p.lastDay === dayKey(),
+    eco: ecoView(p),
     weekReps: store ? store.weekReps(p) : 0,
     quests, history: p.history.slice(0, 30),
     invites: p.invites, friends: p.friends.length,
@@ -403,6 +406,7 @@ export function applyActivity(p, act, store) {
   if (isPremium(p) && boosted > 0) {
     items.push({ label: `Премиум ★ ×${PREMIUM_XP_MULT}`, xp: Math.round(boosted * (PREMIUM_XP_MULT - 1)) });
   }
+  if (boostActive(p) && boosted > 0) items.push({ label: 'Буст опыта ×2 ⚡', xp: boosted });
 
   // Задания.
   const prog = p.quests.prog;
@@ -418,7 +422,9 @@ export function applyActivity(p, act, store) {
   for (const q of questsForDay(p.quests.day)) {
     if (!p.quests.done.includes(q.id) && (prog[q.kind] || 0) >= q.goal) {
       p.quests.done.push(q.id);
-      questsDone.push({ text: q.text, xp: q.xp });
+      questsDone.push({ text: q.text, xp: q.xp, gems: QUEST_GEMS });
+      ensureEco(p);
+      p.gems += QUEST_GEMS;
       items.push({ label: `Задание: ${q.text}`, xp: q.xp });
     }
   }

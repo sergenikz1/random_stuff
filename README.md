@@ -14,6 +14,7 @@
 | [`flowvoice/`](flowvoice) | **FlowVoice** | Аналог Wispr Flow: голосовой ввод на русском и английском прямо туда, где стоит курсор. Windows (трей) и Android (голосовая клавиатура) | exe и APK в релизе [`flowvoice-latest`](../../releases/tag/flowvoice-latest) |
 | [`scan-to-1c/`](scan-to-1c) | **Сканы → 1С** | Windows-программа: распознаёт сканы счетов, УПД, накладных и актов и загружает их в 1С:Предприятие | exe в [релизах](../../releases?q=scan2onec) |
 | [`mail-audit/`](mail-audit) | **mail-audit** | Выгрузка рабочей почты Mail.ru и анализ потока писем: кто пишет, о чём, скорость ответов, доля рутины | Скрипты, сборок нет |
+| [`pushup-duel/`](pushup-duel) | **PushDuel** | Telegram Mini App: онлайн-дуэли на отжиманиях, повторы считает камера (MediaPipe Pose). Рейтинг, кланы, боевой пропуск за Telegram Stars с подарками, скины поверх тела. Next.js + WebSocket на одном сервере, Dockerfile | Сборок нет, Docker-образ собирается из папки |
 | [`vibrate-tg/`](vibrate-tg) | **Vibrate** | Telegram Mini App: телефон вибрирует раз в секунду, экран не гаснет; кнопка «Стоп/Старт». Маленький Node.js-сервер и Dockerfile | Сборок нет |
 
 ## Сборки
@@ -29,6 +30,7 @@
 | `scryer-tv.yml` | Scryer TV | push и PR с изменениями в `scryer-tv/` | Предрелиз `scryer-tv-latest` (только из `main`) |
 | `flowvoice.yml` | FlowVoice | push с изменениями в `flowvoice/` | Предрелиз `flowvoice-latest` (только из `main`) |
 | `scan-to-1c.yml` | Сканы → 1С | push в `main` и PR с изменениями в `scan-to-1c/`, тег `scan2onec-v*` | Релиз `scan2onec-v<версия>` |
+| `pushup-duel.yml` | PushDuel | push и PR с изменениями в `pushup-duel/` | Ничего: тесты, сборка Next.js и Docker-образа |
 | `releases-cleanup.yml` | все | вручную и при изменении самого файла | Удаляет старые версии релизов |
 
 Каждая сборка следит только за папкой своего проекта: правка в `rutv/` не пересобирает остальные проекты.

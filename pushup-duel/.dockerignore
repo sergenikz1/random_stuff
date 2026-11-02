@@ -1,0 +1,7 @@
+node_modules
+.next
+data
+public/mediapipe
+.env
+.env.local
+test

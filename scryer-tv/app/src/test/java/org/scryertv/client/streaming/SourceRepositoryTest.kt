@@ -51,6 +51,12 @@ class SourceRepositoryTest {
                         {"name":"B","url":"https://cdn.example/s1e2-b.mp4","behaviorHints":{"bingeGroup":"voice-b"}}]}"""
                     "/one.m3u" -> "#EXTM3U\n#EXTINF:-1 group-title=\"Кино\",Фильм (2024)\nhttps://cdn.example/one.mp4\n#EXTINF:-1 group-title=\"Кино\",Другое\nhttps://cdn.example/other.mp4\n"
                     "/two.m3u" -> "#EXTM3U\n#EXTINF:-1,фильм 2024\nhttps://mirror.example/film.mp4\n"
+                    "/page" -> """<html><head><title>Страница с фильмом</title></head>
+                        <body><video src="/files/film.mp4"></video></body></html>"""
+                    "/text" -> "<html><head><title>Без видео</title></head><body>Текст</body></html>"
+                    "/stream" -> return MockResponse().setHeader("Content-Type", "application/vnd.apple.mpegurl")
+                        .setBody("#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:10,\nseg1.ts\n")
+                    "/file" -> return MockResponse().setHeader("Content-Type", "video/mp4").setBody("....")
                     else -> return MockResponse().setResponseCode(404)
                 }
                 return MockResponse().setBody(body)
@@ -114,6 +120,41 @@ class SourceRepositoryTest {
         assertEquals(listOf("https://cdn.example/one.mp4", "https://mirror.example/film.mp4"),
             SourceRepository.streams(store, film).map { it.url })
         assertEquals(2, SourceRepository.search(store, "ФИЛЬМ").size)
+    }
+
+    @Test fun anyLinkCanBeASource() = runBlocking {
+        val page = SourceRepository.add(store, server.url("/page").toString())
+        assertEquals(StreamSource.Kind.LINK, page.kind)
+        assertEquals("Страница с фильмом", page.name)
+        val film = SourceRepository.rows(store).single { it.title == "Страница с фильмом" }.items.single()
+        assertEquals(server.url("/files/film.mp4").toString(), film.streamUrl)
+        assertEquals(server.url("/page").toString(), StreamRepository.resolve(film).headers["Referer"])
+
+        // HLS без .m3u8 в адресе: формат берём из ответа сервера, иначе плеер его не узнает.
+        val stream = SourceRepository.add(store, server.url("/stream").toString())
+        val live = store.videos(SourceRepository.itemsKey(stream)).single()
+        assertEquals(LinkInspector.MIME_HLS, StreamRepository.resolve(live).mimeType)
+
+        val file = SourceRepository.add(store, server.url("/file").toString())
+        assertEquals(server.url("/file").toString(), store.videos(SourceRepository.itemsKey(file)).single().streamUrl)
+
+        // Обновление перечитывает страницу.
+        assertEquals(StreamSource.Kind.LINK, SourceRepository.refresh(store, page).kind)
+        assertEquals(3, store.sources().size)
+    }
+
+    @Test fun pageWithoutOpenVideoIsRefusedWithAReason() = runBlocking {
+        try {
+            SourceRepository.add(store, server.url("/text").toString()); fail("страница без видео")
+        } catch (e: IOException) {
+            assertTrue(e.message!!.contains("нет видео в открытом виде"))
+        }
+        try {
+            SourceRepository.add(store, server.url("/missing").toString()); fail("404")
+        } catch (e: IOException) {
+            assertTrue(e.message!!.contains("404"))
+        }
+        assertTrue(store.sources().isEmpty())
     }
 
     @Test fun oldSavedPlaylistBecomesASource() {

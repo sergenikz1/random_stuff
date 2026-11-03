@@ -46,7 +46,8 @@ data class StreamOption(
     val label: String,
     val url: String,
     val headers: Map<String, String>,
-    val bingeGroup: String?
+    val bingeGroup: String?,
+    val mime: String? = null
 ) {
     /** По этой подписи автопереход находит ту же раздачу/озвучку у следующей серии. */
     val hint: String get() = bingeGroup ?: label

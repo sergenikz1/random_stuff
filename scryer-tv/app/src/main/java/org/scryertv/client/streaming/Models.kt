@@ -28,6 +28,8 @@ data class VideoItem(
     val streamAddonBase: String? = null,
     val streamHint: String? = null,
     val requestHeaders: Map<String, String> = emptyMap(),
+    /** Формат потока, если по адресу его не понять (HLS/DASH без расширения). */
+    val streamMime: String? = null,
     val season: Int = 0,
     val episode: Int = 0
 ) : Serializable {
@@ -64,6 +66,7 @@ data class VideoItem(
         put("stream_addon_base", streamAddonBase ?: "")
         put("stream_hint", streamHint ?: "")
         put("headers", JSONObject(requestHeaders))
+        put("stream_mime", streamMime ?: "")
         put("season", season)
         put("episode", episode)
     }
@@ -94,6 +97,7 @@ data class VideoItem(
             requestHeaders = o.optJSONObject("headers")?.let { h ->
                 h.keys().asSequence().associateWith { h.optString(it) }
             } ?: emptyMap(),
+            streamMime = o.optString("stream_mime").ifBlank { null },
             season = o.optInt("season"),
             episode = o.optInt("episode")
         )

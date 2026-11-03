@@ -151,7 +151,7 @@ object StreamActions {
             fun pin(item: VideoItem) = item.copy(streamAddonBase = option.addonBase, streamHint = option.hint)
             play(context, pin(video), playlist.map(::pin))
         } else {
-            play(context, video.copy(streamUrl = option.url, requestHeaders = option.headers), playlist)
+            play(context, video.copy(streamUrl = option.url, requestHeaders = option.headers, streamMime = option.mime), playlist)
         }
     }
 
@@ -260,7 +260,7 @@ class StreamingFragment : BrowseSupportFragment() {
         val menu = ArrayObjectAdapter(MenuCardPresenter()).apply { addAll(0, listOf(
             MenuCard(101, "Найти онлайн", status),
             MenuCard(107, "Источники", sourcesSummary()),
-            MenuCard(102, "Открыть ссылку", "Rutube, MP4, HLS, DASH, M3U или manifest.json"),
+            MenuCard(102, "Открыть ссылку", "Видео, плейлист, страница с видео или manifest.json"),
             MenuCard(103, "Настройки плеера", "Автопереход, качество, история"),
             MenuCard(104, "Загрузки Scryer", "Библиотека и торрент-загрузки"),
             MenuCard(105, "Обновить источники", "Перечитать плейлисты и дополнения"),
@@ -289,7 +289,7 @@ class StreamingFragment : BrowseSupportFragment() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             hint = "https://…"; setSingleLine(true)
         }
-        AlertDialog.Builder(requireContext()).setTitle("Ссылка на видео или M3U-плейлист").setView(field)
+        AlertDialog.Builder(requireContext()).setTitle("Любая ссылка: видео, плейлист или страница").setView(field)
             .setPositiveButton("Открыть") { _, _ -> loadUrl(field.text.toString()) }
             .setNegativeButton("Отмена", null).show()
     }

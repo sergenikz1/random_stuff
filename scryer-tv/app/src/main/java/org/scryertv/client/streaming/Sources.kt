@@ -23,7 +23,10 @@ data class StreamSource(
     /** Последний загруженный manifest.json дополнения — чтобы экран открывался без сети. */
     val manifest: String? = null
 ) {
-    enum class Kind(val label: String) { PLAYLIST("Плейлист M3U"), ADDON("Дополнение") }
+    enum class Kind(val label: String) { PLAYLIST("Плейлист M3U"), ADDON("Дополнение"), LINK("Ссылка") }
+
+    /** Плейлист и ссылка хранят найденные видео у себя; дополнение отвечает на запросы. */
+    val hasItems: Boolean get() = kind != Kind.ADDON
 
     val addon: AddonManifest?
         get() = manifest?.let { runCatching { AddonClient.parseManifest(JSONObject(it)) }.getOrNull() }
@@ -69,10 +72,13 @@ object SourceRepository {
             }
             StreamSource(UUID.randomUUID().toString(), base, manifest.name, StreamSource.Kind.ADDON, manifest = json.toString())
         } else {
-            val videos = StreamRepository.fetchPlaylist(url)
-            val name = url.substringAfterLast('/').substringBefore('?').ifBlank { "Плейлист" }
-            StreamSource(UUID.randomUUID().toString(), url, name, StreamSource.Kind.PLAYLIST).also {
-                store.putVideos(itemsKey(it), videos)
+            // Любая другая ссылка: плейлист, прямой поток, видео Rutube или страница с видео.
+            val found = LinkInspector.inspect(url)
+            val name = if (found.kind == StreamSource.Kind.PLAYLIST) {
+                url.substringAfterLast('/').substringBefore('?').ifBlank { "Плейлист" }
+            } else found.title
+            StreamSource(UUID.randomUUID().toString(), url, name, found.kind).also {
+                store.putVideos(itemsKey(it), found.videos)
             }
         }
         store.saveSource(source)
@@ -83,9 +89,10 @@ object SourceRepository {
     suspend fun refresh(store: StreamStore, source: StreamSource): StreamSource = withContext(Dispatchers.IO) {
         val updated = when (source.kind) {
             StreamSource.Kind.ADDON -> source.copy(manifest = AddonClient.getJson(AddonClient.manifestUrl(source.url)).toString())
-            StreamSource.Kind.PLAYLIST -> {
-                store.putVideos(itemsKey(source), StreamRepository.fetchPlaylist(source.url))
-                source
+            StreamSource.Kind.PLAYLIST, StreamSource.Kind.LINK -> {
+                val found = LinkInspector.inspect(source.url)
+                store.putVideos(itemsKey(source), found.videos)
+                source.copy(kind = found.kind)
             }
         }
         store.saveSource(updated)
@@ -97,9 +104,9 @@ object SourceRepository {
     /** Полки главного экрана: группы плейлистов и каталоги дополнений (первая страница). */
     suspend fun rows(store: StreamStore): List<SourceRow> = coroutineScope {
         val sources = store.sources().filter { it.enabled }
-        val playlists = sources.filter { it.kind == StreamSource.Kind.PLAYLIST }.flatMap { source ->
+        val playlists = sources.filter { it.hasItems }.flatMap { source ->
             store.videos(itemsKey(source)).groupBy { it.group }.map { (group, items) ->
-                SourceRow(listOf(source.name, group).filter { it.isNotBlank() }.joinToString(" · "), items)
+                SourceRow(listOf(source.name, group).filter { it.isNotBlank() }.distinct().joinToString(" · "), items)
             }
         }
         val addons = sources.filter { it.kind == StreamSource.Kind.ADDON }.flatMap { source ->
@@ -120,7 +127,7 @@ object SourceRepository {
     suspend fun search(store: StreamStore, query: String): List<SourceRow> = coroutineScope {
         val sources = store.sources().filter { it.enabled }
         val needle = normalize(query)
-        val playlistHits = sources.filter { it.kind == StreamSource.Kind.PLAYLIST }.mapNotNull { source ->
+        val playlistHits = sources.filter { it.hasItems }.mapNotNull { source ->
             val hits = store.videos(itemsKey(source)).filter { normalize(it.title).contains(needle) }
             if (hits.isEmpty()) null else SourceRow(source.name, hits)
         }
@@ -158,11 +165,11 @@ object SourceRepository {
                 }.awaitAll().flatten()
         } else {
             val title = normalize(video.title)
-            val own = video.streamUrl?.let { listOf(StreamOption(video.group.ifBlank { "Плейлист" }, "", video.title, it, video.requestHeaders, null)) }.orEmpty()
-            own + sources.filter { it.kind == StreamSource.Kind.PLAYLIST }.flatMap { source ->
+            val own = video.streamUrl?.let { listOf(StreamOption(video.group.ifBlank { "Плейлист" }, "", video.title, it, video.requestHeaders, null, video.streamMime)) }.orEmpty()
+            own + sources.filter { it.hasItems }.flatMap { source ->
                 store.videos(itemsKey(source))
                     .filter { it.streamUrl != video.streamUrl && normalize(it.title) == title }
-                    .mapNotNull { other -> other.streamUrl?.let { StreamOption(source.name, "", other.title, it, other.requestHeaders, null) } }
+                    .mapNotNull { other -> other.streamUrl?.let { StreamOption(source.name, "", other.title, it, other.requestHeaders, null, other.streamMime) } }
             }
         }.distinctBy { it.url }
     }

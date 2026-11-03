@@ -30,14 +30,14 @@ class NativeSearchInterfaceTest {
         StreamSearchFragment.rutubeSearch = { query, page -> StreamRepository.search(query, page) }
     }
 
-    @Test fun websiteAndRutubeVideosShareCardsAndWebsiteSelectionLaunchesNativePlayer() {
+    @Test fun rutubeStaysAboveWebsiteResultsEvenWhenWebSearchFinishesFirst() {
         val app = RuntimeEnvironment.getApplication()
         shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
         app.getSharedPreferences("streaming", Context.MODE_PRIVATE).edit().clear().commit()
         val rutube = VideoItem("rutube-fixture", "Фильм на Rutube")
         val page = WebVideoSearch.page("https://example.org/movie", "Фильм")
         val extracted = page.copy(streamUrl = "https://cdn.example.org/movie.m3u8", streamMimeType = "application/x-mpegURL")
-        StreamSearchFragment.rutubeSearch = { _, _ -> Page(listOf(rutube), false, 1) }
+        StreamSearchFragment.rutubeSearch = { _, _ -> delay(200); Page(listOf(rutube), false, 1) }
         StreamSearchFragment.siteSearch = { object : SiteVideoSearch {
             override suspend fun search(query: String, found: (VideoItem) -> Unit, progress: (Int, Int) -> Unit) {
                 assertEquals("Игра престолов", query)
@@ -53,11 +53,16 @@ class NativeSearchInterfaceTest {
             fragment.onQueryTextSubmit("Игра престолов")
             shadowOf(Looper.getMainLooper()).idle()
             val rows = fragment.resultsAdapter
-            val cards = (rows[0] as ListRow).adapter
-            assertEquals(2, cards.size())
-            val values = (0 until cards.size()).map { cards[it] as VideoItem }
-            assertTrue(values.contains(rutube)); assertTrue(values.contains(extracted))
-            assertTrue(values.none { it.isWeb && it.streamUrl == null })
+            assertEquals(2, rows.size())
+            assertEquals(0, (rows[0] as ListRow).adapter.size())
+            assertEquals(extracted, (rows[1] as ListRow).adapter[0])
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250))
+            val top = rows[0] as ListRow
+            val bottom = rows[1] as ListRow
+            assertTrue(top.headerItem.name.startsWith("Rutube"))
+            assertTrue(bottom.headerItem.name.startsWith("Интернет"))
+            assertEquals(1, top.adapter.size()); assertEquals(rutube, top.adapter[0])
+            assertEquals(1, bottom.adapter.size()); assertEquals(extracted, bottom.adapter[0])
             assertFalse((rows[0] as ListRow).headerItem.name.contains("смотреть онлайн"))
             StreamActions.show(fragment, extracted)
             ShadowAlertDialog.getLatestAlertDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
@@ -83,7 +88,8 @@ class NativeSearchInterfaceTest {
             val fragment = activity.supportFragmentManager.findFragmentById(R.id.fragment_container) as StreamSearchFragment
             fragment.onQueryTextSubmit("old"); shadowOf(Looper.getMainLooper()).idle()
             fragment.onQueryTextSubmit("new"); shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1200))
-            val cards = (fragment.resultsAdapter[0] as ListRow).adapter
+            assertEquals(0, (fragment.resultsAdapter[0] as ListRow).adapter.size())
+            val cards = (fragment.resultsAdapter[1] as ListRow).adapter
             assertEquals(1, cards.size()); assertEquals("new", (cards[0] as VideoItem).title)
         } finally { controller.pause().stop().destroy() }
     }

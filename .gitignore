@@ -8,6 +8,8 @@ __pycache__/
 # Подписи и сборки Android — ключи и APK не храним в репозитории
 *.jks
 *.keystore
+*.p12
+*.pfx
 *.apk
 *.aab
 

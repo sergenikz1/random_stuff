@@ -8,7 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Retain the installed identity so existing users keep history and settings.
+        // Keep this identity stable for future updates; the 1.4.0 signer transition requires one reinstall.
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34

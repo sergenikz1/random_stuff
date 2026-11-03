@@ -10,7 +10,7 @@
 | [`chitalka-vsluh/`](chitalka-vsluh) | **Читалка вслух** | Android-читалка книг с офлайн-озвучкой нейросетевыми голосами, быстрым чтением и наградами за чтение | APK в [релизах](../../releases?q=chitalka) |
 | [`limit-pulse/`](limit-pulse) | **Limit Pulse** | Android-приложение и виджеты: остаток лимитов подписок Codex и Claude, отсчёт до сброса, напоминания | APK в [релизах](../../releases?q=limit-pulse) |
 | [`rutv/`](rutv) | **RuTV** | Клиент Rutube для Android TV без рекламы | APK в релизе [`apk-latest`](../../releases/tag/apk-latest) |
-| [`intergalactic-tv/`](intergalactic-tv) | **Intergalactic TV** | Видео на Android TV: поиск по первым шести сайтам, браузер с управлением с пульта, Rutube, плейлисты и библиотека Scryer | APK в релизе [`intergalactic-tv-latest`](../../releases/tag/intergalactic-tv-latest) |
+| [`intergalactic-tv/`](intergalactic-tv) | **Intergalactic TV** | Видео на Android TV: поиск по первым шести сайтам с фоновым извлечением видео, общий ТВ-плеер, Rutube, плейлисты и библиотека Scryer | APK в релизе [`intergalactic-tv-latest`](../../releases/tag/intergalactic-tv-latest) |
 | [`flowvoice/`](flowvoice) | **FlowVoice** | Аналог Wispr Flow: голосовой ввод на русском и английском прямо туда, где стоит курсор. Windows (трей) и Android (голосовая клавиатура) | exe и APK в релизе [`flowvoice-latest`](../../releases/tag/flowvoice-latest) |
 | [`scan-to-1c/`](scan-to-1c) | **Сканы → 1С** | Windows-программа: распознаёт сканы счетов, УПД, накладных и актов и загружает их в 1С:Предприятие | exe в [релизах](../../releases?q=scan2onec) |
 | [`mail-audit/`](mail-audit) | **mail-audit** | Выгрузка рабочей почты Mail.ru и анализ потока писем: кто пишет, о чём, скорость ответов, доля рутины | Скрипты, сборок нет |

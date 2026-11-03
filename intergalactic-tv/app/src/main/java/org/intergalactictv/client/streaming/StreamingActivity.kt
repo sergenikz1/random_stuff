@@ -64,7 +64,7 @@ object StreamActions {
         if (video.isWeb) {
             val context = fragment.requireContext()
             AlertDialog.Builder(context).setTitle(video.title)
-                .setMessage("${video.group} · просмотр во встроенном ТВ-браузере")
+                .setMessage(video.group)
                 .setPositiveButton("Смотреть") { _, _ -> play(context, video, playlist) }
                 .setNeutralButton("Избранное ±") { _, _ ->
                     StreamStore(context).toggleFavorite(video); onChanged()
@@ -186,12 +186,8 @@ object StreamActions {
     }
 
     fun play(context: Context, video: VideoItem, playlist: List<VideoItem> = emptyList()) {
-        if (video.isWeb) {
-            context.startActivity(Intent(context, WebPlayerActivity::class.java).putExtra("video", video))
-            return
-        }
         // Persist the queue instead of putting hundreds of descriptions in a Binder transaction.
-        StreamStore(context).putVideos("queue", playlist)
+        StreamStore(context).putVideos("queue", if (video.isWeb) emptyList() else playlist)
         context.startActivity(Intent(context, StreamPlayerActivity::class.java).putExtra("video", video))
     }
 }

@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
+import android.widget.TextView
+import android.view.View
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -19,7 +21,7 @@ import org.intergalactictv.client.R
 class StreamSearchActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_container)
+        setContentView(R.layout.activity_stream_search)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
@@ -39,6 +41,7 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private var sourcesJob: Job? = null
     private var webJob: Job? = null
     private var generation = 0
+    private var webVideos = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,13 +71,14 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private fun search(text: String, delayMs: Long) {
         job?.cancel(); pageJob?.cancel(); sourcesJob?.cancel(); webJob?.cancel()
         val request = ++generation
-        query = text.trim(); page = 0; more = false
+        query = text.trim(); page = 0; more = false; webVideos = 0
         rows.clear(); results.clear()
+        status("")
         if (query.length < 2) return
         job = lifecycleScope.launch {
             delay(delayMs)
             if (request != generation) return@launch
-            rows.add(ListRow(HeaderItem(0, "Ищу на Rutube: $query…"), results))
+            rows.add(ListRow(HeaderItem(0, "Видео · $query"), results))
             more = true; loadPage()
             searchSources(query, request)
             searchWeb(query, request)
@@ -82,25 +86,38 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     }
 
     private fun searchWeb(text: String, request: Int) {
-        val browser = WebVideoSearch.browserSearch(text)
-        val cards = ArrayObjectAdapter(StreamCardPresenter()).apply { add(browser) }
-        val pending = ListRow(HeaderItem(10_000, "Интернет · проверяю первые ${WebVideoSearch.MAX_PAGES} страниц…"), cards)
-        rows.add(0, pending)
+        status("Ищу видео на сайтах…")
         webJob = lifecycleScope.launch {
-            val label = try {
-                val result = WebVideoSearch().search(text)
-                if (generation != request) return@launch
-                cards.addAll(0, result.items)
-                "Интернет · ${result.inspected} сайтов" +
-                    if (result.unavailable > 0) " · часть страниц откроется в браузере" else ""
+            try {
+                siteSearch(requireActivity()).search(text, found = { video ->
+                    if (generation == request && video.streamUrl != null) {
+                        val known = (0 until results.size()).any { (results[it] as VideoItem).id == video.id }
+                        if (!known) { results.add(video); webVideos++ }
+                        updateResultsRow()
+                    }
+                }, progress = { checked, total ->
+                    if (generation == request) status("Сайты: $checked/$total · найдено видео: $webVideos")
+                })
+                if (generation == request) status(if (webVideos == 0)
+                    "На сайтах не найдено доступных видео. Попробуйте уточнить название."
+                    else "Найдено видео с сайтов: $webVideos")
             } catch (e: CancellationException) { throw e
-            } catch (_: Exception) {
-                "Интернет · откройте поиск в браузере"
+            } catch (e: Exception) {
+                if (generation == request) status(e.message ?: "Не удалось проверить сайты. Повторите поиск.")
             }
-            if (generation != request) return@launch
-            val index = rows.indexOf(pending)
-            if (index >= 0) rows.replace(index, ListRow(HeaderItem(10_000, label), cards))
         }
+    }
+
+    private fun status(text: String) {
+        activity?.findViewById<TextView>(R.id.web_search_status)?.apply {
+            this.text = text
+            visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        }
+    }
+
+    override fun onStop() {
+        webJob?.cancel()
+        super.onStop()
     }
 
     override fun onDestroyView() {
@@ -128,24 +145,29 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         val text = query
         pageJob = lifecycleScope.launch {
             try {
-                val result = StreamRepository.search(text, page + 1)
+                val result = rutubeSearch(text, page + 1)
                 if (generation != request) return@launch
                 page = result.page; more = result.hasNext && result.items.isNotEmpty()
                 val known = (0 until results.size()).map { (results[it] as VideoItem).id }.toMutableSet()
                 results.addAll(results.size(), result.items.filter { known.add(it.id) })
-                updateRutubeRow(if (results.size() == 0) "Rutube · ничего не найдено: $text" else "Rutube · $text")
+                updateResultsRow()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 if (generation != request) return@launch
                 more = false
-                updateRutubeRow("Rutube · ошибка · повторите поиск")
+                updateResultsRow()
                 Toast.makeText(context, e.message ?: "Ошибка сети", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private fun updateRutubeRow(title: String) {
+    private fun updateResultsRow() {
         val index = (0 until rows.size()).firstOrNull { (rows[it] as? ListRow)?.adapter === results } ?: return
-        rows.replace(index, ListRow(HeaderItem(0, title), results))
+        rows.replace(index, ListRow(HeaderItem(0, "Видео · $query · ${results.size()}"), results))
+    }
+
+    companion object {
+        internal var siteSearch: (android.app.Activity) -> SiteVideoSearch = { NativeWebVideoSearch(it) }
+        internal var rutubeSearch: suspend (String, Int) -> Page = { query, page -> StreamRepository.search(query, page) }
     }
 }

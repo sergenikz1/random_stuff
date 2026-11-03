@@ -1,6 +1,7 @@
 package org.intergalactictv.client.streaming
 
 import android.content.Context
+import android.app.Activity
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -18,6 +19,7 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 /** The activity uses the same playback path for search, history, playlists and automatic next. */
 internal interface PlaybackServices {
     suspend fun resolve(video: VideoItem): PlaybackInfo
+    suspend fun resolveWeb(activity: Activity, video: VideoItem): PlaybackInfo = resolve(video)
     suspend fun episodes(video: VideoItem): List<VideoItem>
     fun player(context: Context, video: VideoItem, maxHeight: Int, decoderMode: Int): Player
 }
@@ -25,6 +27,7 @@ internal interface PlaybackServices {
 @OptIn(markerClass = [UnstableApi::class])
 internal object DefaultPlaybackServices : PlaybackServices {
     override suspend fun resolve(video: VideoItem) = StreamRepository.resolve(video)
+    override suspend fun resolveWeb(activity: Activity, video: VideoItem) = NativeWebVideoSearch(activity).resolve(video)
     override suspend fun episodes(video: VideoItem) = StreamRepository.episodes(video)
 
     override fun player(context: Context, video: VideoItem, maxHeight: Int, decoderMode: Int): Player {

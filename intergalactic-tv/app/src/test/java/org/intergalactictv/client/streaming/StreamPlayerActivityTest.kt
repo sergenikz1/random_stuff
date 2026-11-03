@@ -71,6 +71,31 @@ class StreamPlayerActivityTest {
         activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
     }
 
+    @Test fun extractedWebsiteVideoUsesTheSameNativePlayerAndKeepsItsSourceInHistory() {
+        val web = WebVideoSearch.page("https://movie.example.org/film", "Фильм")
+            .copy(streamUrl = "https://cdn.example.org/movie.m3u8", streamMimeType = "application/x-mpegURL")
+        val app = RuntimeEnvironment.getApplication()
+        StreamStore(app).putVideos("queue", emptyList())
+        controller = Robolectric.buildActivity(StreamPlayerActivity::class.java,
+            Intent(app, StreamPlayerActivity::class.java).putExtra("video", web)).setup().visible()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(listOf(web.id), backend.started)
+        assertSame(backend.sessions.single().player, activity.findViewById<PlayerView>(R.id.player_view).player)
+        assertEquals(web.pageUrl, StreamStore(activity).videos("history").single().webPageUrl)
+    }
+
+    @Test fun websiteWithoutExtractableMediaShowsErrorWithoutOpeningBrowserOrRepeatedRetries() {
+        backend.webUnplayable = true
+        val web = WebVideoSearch.page("https://example.org/no-video", "Нет видео")
+        controller = Robolectric.buildActivity(StreamPlayerActivity::class.java,
+            Intent(RuntimeEnvironment.getApplication(), StreamPlayerActivity::class.java).putExtra("video", web)).setup().visible()
+        elapse(10_000)
+        assertEquals(listOf(web.id), backend.resolved)
+        assertTrue(backend.started.isEmpty())
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.player_error_panel).visibility)
+        assertNull(shadowOf(activity).nextStartedActivity)
+    }
+
     @Test fun timerAutomaticallyStartsNextEpisodeEvenWithoutPlayerEndEvent() {
         launch(); elapse(21_000)
         assertEquals(listOf("first", "second"), backend.started)
@@ -190,12 +215,14 @@ class StreamPlayerActivityTest {
     }
     private class Backend : PlaybackServices {
         var resolutionFailures = 0
+        var webUnplayable = false
         val started = mutableListOf<String>()
         val resolved = mutableListOf<String>()
         val sessions = mutableListOf<Session>()
         val decoderModes = mutableListOf<Int>()
         override suspend fun resolve(video: VideoItem): PlaybackInfo {
             resolved += video.id
+            if (video.isWeb && webUnplayable) throw NoWebVideoException()
             if (video.id == "first" && resolutionFailures > 0) { resolutionFailures--; throw IOException("Temporary resolution error") }
             return PlaybackInfo(video.streamUrl!!, false, video.title)
         }

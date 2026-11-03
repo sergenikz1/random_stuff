@@ -20,6 +20,7 @@ import { PlayerSheet, ClanSheet, ChallengedSheet } from './Sheets.jsx';
 import Shop from './Shop.jsx';
 import { PackOpenModal } from './Economy.jsx';
 import TrophyMap from './TrophyMap.jsx';
+import { shareClip, saveClip } from '../lib/client/clips.js';
 import { Glyph } from './Icon.jsx';
 import { AvatarEditor } from './Emblem.jsx';
 import { CardEditor } from './Stickers.jsx';
@@ -280,6 +281,19 @@ export default function App() {
       : `Сделал ${me} отжиманий в PushDuel. Сможешь больше? 💪`;
     doShare(refLink(), text);
   };
+  // Ролик боя: в Telegram — выбор чата с готовым сообщением и кнопкой-приглашением.
+  const [clipBusy, setClipBusy] = useState(false);
+  const sendClip = async (data) => {
+    if (!data.clip || clipBusy) return;
+    setClipBusy(true);
+    try {
+      const meta = { reps: data.me.reps, opp: data.opp?.name || '', oppReps: data.opp?.reps || 0 };
+      const r = await shareClip(data.clip, meta, { link: refLink(), text: 'Сможешь больше? Принимай вызов в PushDuel 💪' });
+      if (r === 'shared') { toast('Видео отправлено 🎬'); haptic('success'); }
+      else if (r === 'sent') toast('Видео в чате с ботом — перешлите его другу');
+      else if (r === 'downloaded') toast('Видео сохранено. Ссылка-приглашение — в «Поделиться»');
+    } catch (e) { toast(e.message); } finally { setClipBusy(false); }
+  };
   const again = (data) => {
     if (data.mode === 'ranked') startRanked();
     else if (data.mode === 'tournament' && data.run && !data.run.done) tourneyPlay(data.run.kind);
@@ -320,6 +334,7 @@ export default function App() {
     return (
       <>
         <Game key={flow.key} mode={flow.mode} durationMs={flow.durationMs} opponent={flow.opponent} belt={flow.belt}
+          inviteLabel={config?.botUsername ? `t.me/${config.botUsername}` : 'PushDuel в Telegram'}
           socket={socketRef.current} settings={settings} updateSettings={updateSettings} profile={profile}
           onDone={onGameDone} onCancel={onGameCancel} />
         <Toast text={toastText} />
@@ -332,6 +347,7 @@ export default function App() {
       <Sky />
       {flow?.kind === 'result' ? (
         <Result key={flow.data.at || flow.data.durationMs + flow.data.me.reps} data={flow.data} profile={profile}
+          onSendClip={() => sendClip(flow.data)} onSaveClip={() => saveClip(flow.data.clip)} clipBusy={clipBusy}
           onAgain={() => again(flow.data)} onHome={() => setFlow(null)} onShare={() => shareResult(flow.data)} onEquip={equip} />
       ) : flow ? (
         <Lobby flow={flow} profile={profile} stats={stats} onCancel={cancelLobby} onBot={startBot} onShareRoom={shareRoom}

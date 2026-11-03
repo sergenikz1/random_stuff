@@ -1,5 +1,5 @@
 'use client';
-import { Glyph, rich } from './Icon.jsx';
+import { Glyph, rich, Icon } from './Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { celebrate } from '../lib/client/effects.js';
 import { sfx } from '../lib/client/sound.js';
@@ -14,7 +14,7 @@ import { PACKS, ARENAS } from '../lib/economy.js';
 const TITLES = { win: 'Победа!', loss: 'Поражение', draw: 'Ничья' };
 const REASONS = { forfeit: 'соперник сдался', disconnect: 'соперник отключился' };
 
-export default function Result({ data, profile, onAgain, onHome, onShare, onEquip }) {
+export default function Result({ data, profile, onAgain, onHome, onShare, onEquip, onSendClip, onSaveClip, clipBusy }) {
   const canvasRef = useRef(null);
   const { mode, outcome, me, opp, progress } = data;
   const training = mode === 'training';
@@ -79,6 +79,17 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
           </div>
         )}
       </Card>
+
+      {data.clip && (
+        <Card title="Видео боя" icon="🎬">
+          <video className="clip-preview" src={data.clip.url} controls playsInline muted loop autoPlay />
+          <div className="row-actions" style={{ marginTop: 10 }}>
+            <button className="gel" disabled={clipBusy} onClick={onSendClip}><Icon name="share" size={22} /> {clipBusy ? 'Готовим…' : 'Отправить'}</button>
+            <button className="glass-btn" onClick={onSaveClip}>Сохранить</button>
+          </div>
+          <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>К видео прикрепится ваша ссылка-приглашение: друг откроет PushDuel, а вы получите бонус.</p>
+        </Card>
+      )}
 
       {(data.reward || data.belt || data.run || data.war) && (
         <Card>

@@ -18,7 +18,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
 
   return (
     <div className="page">
-      <Card wave={['#43a8ff', '#7ff2cf']}>
+      <Card>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <Avatar emoji={p.avatar} frame={p.equipped.frame} size="lg" />
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -39,7 +39,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         </div>
       </Card>
 
-      <Card title="Моя карточка" icon="🃏" tone="violet" wave={['#b06bff', '#43a8ff']}>
+      <Card title="Моя карточка" icon="🃏">
         <p className="small" style={{ fontWeight: 600, marginBottom: 12 }}>Её видит соперник в интро перед боем. Украсьте наклейками и выберите до трёх жетонов для витрины.</p>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><PlayerCard player={p} /></div>
         <button className="gel wide violet" style={{ marginBottom: 14 }} onClick={onEditCard}>✨ Наклейки на карточке</button>
@@ -66,7 +66,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
 
       <Album eco={p.eco} />
 
-      <Card title="Пригласить друзей" icon="🎁" tone="green" wave={['#6fe08a', '#5ee8d8']}>
+      <Card title="Пригласить друзей" icon="🎁">
         <p style={{ fontWeight: 600 }}>За каждого друга — <b>+{REFERRAL_XP.inviter} опыта</b>, другу — +{REFERRAL_XP.invitee}. И музыка для боя:</p>
         <div className="rows" style={{ marginTop: 8 }}>
           {[[1, '🌆 Синтвейв + аватар 🤝'], [3, '👾 8-бит + титул «Вербовщик»'], [5, '🥁 Драм-н-бейс'], [10, '⚔️ Эпик + рамка «Легион»']].map(([n, text]) => (
@@ -84,7 +84,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         <button className="gel wide green" onClick={onInvite}>📨 Позвать друга</button>
       </Card>
 
-      <Card title="Достижения" icon="🏅" tone="gold">
+      <Card title="Достижения" icon="🏅">
         <div className="rows">
           {p.achievements.map((a) => (
             <div key={a.id} className="row" style={a.done ? undefined : { opacity: 0.6 }}>
@@ -96,7 +96,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         </div>
       </Card>
 
-      <Card title="Имя и аватар" icon="🎭" tone="violet">
+      <Card title="Имя и аватар" icon="🎭">
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input className="input" maxLength={16} value={name} onChange={(e) => setName(e.target.value)} />
           <button className="gel" disabled={name.trim() === p.name || name.trim().length < 2} onClick={() => onSave({ name: name.trim() })}>OK</button>
@@ -109,7 +109,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Редкие аватары открываются в боевом пропуске и за приглашения.</p>
       </Card>
 
-      <Card title="История" icon="📜" tone="blue">
+      <Card title="История" icon="📜">
         {!p.history.length ? <div className="empty">Сыграйте первую дуэль</div> : (
           <div className="rows">
             {p.history.slice(0, 15).map((h, i) => (
@@ -126,7 +126,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         )}
       </Card>
 
-      <Card title="Настройки" icon="⚙️" tone="teal">
+      <Card title="Настройки" icon="⚙️">
         <div className="field" style={{ marginBottom: 12 }}>
           <span>Тренировка и бот</span>
           <Seg value={settings.soloSec} onChange={(v) => updateSettings({ soloSec: v })} options={[[30, '0:30'], [60, '1:00'], [90, '1:30'], [120, '2:00']]} />

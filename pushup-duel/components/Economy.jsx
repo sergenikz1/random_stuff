@@ -1,8 +1,9 @@
 'use client';
-// Валюта, арена, дорога трофеев и описание наборов.
+// Валюта и описание наборов.
 import { PACKS } from '../lib/economy.js';
-import { Bar, Card } from './ui.jsx';
+import { Card } from './ui.jsx';
 import { PackIcon } from './Stickers.jsx';
+import { Icon } from './Icon.jsx';
 
 export { fmtLeft, PackSlots, PackOpenModal } from './Stickers.jsx';
 
@@ -10,33 +11,15 @@ export function Currency({ eco }) {
   if (!eco) return null;
   return (
     <div className="currency">
-      <span className="cur-pill">🪙 <b>{eco.coins}</b></span>
-      <span className="cur-pill">💎 <b>{eco.gems}</b></span>
+      <span className="cur-pill"><Icon name="coin" size={22} /><b>{eco.coins}</b></span>
+      <span className="cur-pill"><Icon name="gem" size={22} /><b>{eco.gems}</b></span>
     </div>
-  );
-}
-
-export function ArenaCard({ eco, onRoad }) {
-  if (!eco) return null;
-  const { arena, nextArena, trophies } = eco;
-  const ready = eco.road.filter((r) => r.status === 'ready').length;
-  return (
-    <button className="arena-card" onClick={onRoad} style={{ '--a1': arena.colors[0], '--a2': arena.colors[1] }}>
-      <span className="arena-emoji">{arena.emoji}</span>
-      <div className="grow" style={{ textAlign: 'left' }}>
-        <div className="arena-name">Арена {arena.id} · {arena.name}</div>
-        <div className="arena-sub">🏆 {trophies}{nextArena ? ` / ${nextArena.min} до «${nextArena.name}»` : ' · высшая арена'}</div>
-        {nextArena && <div style={{ marginTop: 6 }}><Bar value={trophies - arena.min} max={nextArena.min - arena.min} tone="gold" /></div>}
-      </div>
-      {ready > 0 && <span className="badge-dot">{ready}</span>}
-      <span className="arena-go">›</span>
-    </button>
   );
 }
 
 export function PackInfo() {
   return (
-    <Card title="Наборы наклеек" icon="🎴" tone="orange">
+    <Card title="Наборы наклеек" icon="🎴">
       <div className="rows">
         {Object.entries(PACKS).map(([id, c]) => (
           <div key={id} className="row">

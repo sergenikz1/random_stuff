@@ -11,6 +11,7 @@ import { Avatar } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
 import { PackIcon } from './Stickers.jsx';
 import { roman } from './Greek.jsx';
+import { Glyph, Icon } from './Icon.jsx';
 
 const W = 390;          // ширина карты в её собственных координатах (дальше масштабируем под экран)
 const H = 920;         // высота участка одной арены
@@ -48,11 +49,11 @@ const CLOUDS = bounds.flatMap((b, i) => [0, 1, 2].map((j) => {
 }));
 
 function rewardInfo(r) {
-  if (r.coins) return { icon: '🪙', text: `${r.coins} монет` };
-  if (r.gems) return { icon: '💎', text: `${r.gems} кристаллов` };
+  if (r.coins) return { icon: 'coin', text: `${r.coins} монет` };
+  if (r.gems) return { icon: 'gem', text: `${r.gems} кристаллов` };
   if (r.pack) return { pack: r.pack, text: PACKS[r.pack].name };
   if (r.item) return { item: r.item, text: cosmeticName(r.item) };
-  return { icon: '🎁', text: 'Награда' };
+  return { icon: 'gift', text: 'Награда' };
 }
 
 export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
@@ -89,10 +90,13 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
     <div className={`tmap ${dark ? 'dark' : ''}`} ref={ref}>
       <div className="tmap-canvas" style={{ height: total * k }}>
         <div className="tmap-inner" style={{ width: W, height: total, transform: `scale(${k})` }}>
-          {/* Полотно: арены снизу вверх, края растворяются в общем небе */}
+          {/* Полотно: арены снизу вверх на общем небе; каждая стоит на своей земле, под ней фриз-меандр */}
           {bounds.map((b, i) => (
-            <div key={b.id} className="tmap-art" style={{ top: baseOf(i) - 90 - ART_H, height: ART_H }}
-              dangerouslySetInnerHTML={{ __html: arts[i] }} />
+            <div key={b.id}>
+              <div className="tmap-art" style={{ top: baseOf(i) - 90 - ART_H, height: ART_H }} dangerouslySetInnerHTML={{ __html: arts[i] }} />
+              <div className="tmap-ground" style={{ top: baseOf(i) - 91, height: i === 0 ? BOTTOM + 91 : 91 }} />
+              <div className="tmap-frieze" style={{ top: baseOf(i) - 9 }} />
+            </div>
           ))}
           <div className="tmap-olymp" style={{ height: TOP + 260 }} />
           {/* Облака (в «Амфоре» — дым Везувия) заполняют небо между аренами */}
@@ -118,7 +122,7 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
             return (
               <div key={`g${b.id}`} className={`tmap-gate ${reached ? 'on' : ''}`} style={{ top: baseOf(i) - GATE + 14 }}>
                 <div className="gate-plate">
-                  <span className="tile" style={{ '--t1': b.colors[0], '--t2': b.colors[1] }}>{b.emoji}</span>
+                  <span className="tile"><Glyph e={b.emoji} size={50} /></span>
                   <div className="grow">
                     <div className="gate-num">Арена {roman(b.id)}</div>
                     <div className="greek-title">{b.name}</div>
@@ -140,7 +144,7 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
                 <div className={`tmap-link ${r.status}`} style={{ top: y - 1.5, left: x + 14, width: W * 0.51 - x - 14 }} />
                 <div className={`tmap-node ${r.status}`} style={{ left: x - 19, top: y - 19 }}>{r.status === 'claimed' ? '✓' : r.at}</div>
                 <div className={`tmap-reward ${r.status}`} style={{ top: y - 32 }}>
-                  {t.pack ? <PackIcon type={t.pack} size={36} /> : t.item ? <RewardIcon k={t.item} /> : <span className="rw-ico">{t.icon}</span>}
+                  {t.pack ? <PackIcon type={t.pack} size={36} /> : t.item ? <RewardIcon k={t.item} /> : <span className="rw-ico"><Icon name={t.icon} size={34} /></span>}
                   <div className="grow">
                     <div className="title">{t.text}</div><div className="sub">{r.at} 🏆</div>
                     {r.status === 'ready' && <button className="gel green" onClick={() => onClaim(r.at)}>Забрать</button>}
@@ -154,7 +158,7 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
 
           {/* Вершина */}
           <div className={`tmap-summit ${best >= MAX_T ? 'on' : ''}`} style={{ left: xOf(TOP - 50) - 60, top: TOP - 150 }}>
-            <span className="summit-ico">🏛️</span>
+            <Icon name="temple" size={44} />
             <span className="greek-title">Вершина Олимпа</span>
             <span className="small">{MAX_T} 🏆 · статуя в Пантеоне</span>
           </div>

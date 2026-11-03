@@ -20,14 +20,15 @@ import { PlayerSheet, ClanSheet, ChallengedSheet } from './Sheets.jsx';
 import Shop from './Shop.jsx';
 import { PackOpenModal } from './Economy.jsx';
 import TrophyMap from './TrophyMap.jsx';
+import { Glyph } from './Icon.jsx';
 import { CardEditor } from './Stickers.jsx';
 import { startTilt } from '../lib/client/tilt.js';
 import { Sheet } from './ui.jsx';
 import { VolcanoSheet, ModeSheet } from './Greek.jsx';
 import { InboxCard } from './Compete.jsx';
 
-// Вкладки: плитка-иконка с глянцем (тон задаёт цвет), подпись.
-const TABS = [['shop', '🏺', 'Агора', 'orange'], ['pass', '📜', 'Пропуск', 'violet'], ['home', '⚔️', 'Бой', 'blue'], ['clan', '🛡️', 'Клан', 'green'], ['top', '🏛️', 'Слава', 'gold']];
+// Вкладки: иконка и подпись.
+const TABS = [['shop', '🏺', 'Агора'], ['pass', '📜', 'Пропуск'], ['home', '⚔️', 'Бой'], ['clan', '🛡️', 'Клан'], ['top', '🏛️', 'Слава']];
 
 export default function App() {
   const [settings, updateSettings] = useSettings();
@@ -352,9 +353,9 @@ export default function App() {
           {tab === 'pass' && <Pass profile={profile} onEquip={equip} onBuy={buyPremium} onClaimGift={claimGift} buying={buying} />}
           {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} />}
           <nav className="tabbar">
-            {TABS.map(([id, icon, label, tone]) => (
+            {TABS.map(([id, icon, label]) => (
               <button key={id} className={tab === id ? 'on' : ''} onClick={() => { setTab(id); haptic('select'); }}>
-                <span className={`tile ${tone}`}>{icon}</span>{label}
+                <span className="tile"><Glyph e={icon} size={28} /></span>{label}
               </button>
             ))}
           </nav>

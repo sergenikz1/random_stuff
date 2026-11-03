@@ -1,11 +1,12 @@
 'use client';
-// Пояса чемпионов, турнир недели и почта с наградами.
+// Пояса чемпионов, турниры и почта с наградами.
 import { useEffect, useState } from 'react';
 import { PACKS } from '../lib/economy.js';
 import { stickerById } from '../lib/stickers.js';
 import { api } from '../lib/client/net.js';
 import { Avatar, Card, plural } from './ui.jsx';
 import { PackIcon, fmtLeft } from './Stickers.jsx';
+import { Icon } from './Icon.jsx';
 
 // Чемпионский пояс: кожаный ремень с золотой пластиной и эмблемой арены.
 export function BeltIcon({ arena, size = 64, empty = false }) {
@@ -24,7 +25,7 @@ export function BeltsList({ openPlayer, onChallenge, toast, version }) {
   useEffect(() => { api('belts').then((r) => setBelts(r.belts)).catch((e) => toast(e.message)); }, [version, toast]);
   if (!belts) return <Card><div className="empty">Загрузка…</div></Card>;
   return (
-    <Card title="Пояса чемпионов" icon="🥊" tone="gold" wave={['#ffe27a', '#ff9f43']}>
+    <Card title="Пояса чемпионов" icon="🥊">
       <p className="small" style={{ fontWeight: 600, marginBottom: 10 }}>
         На каждой арене один пояс. Победите чемпиона своей арены в рейтинговом или титульном бою — пояс ваш.
         Кто держит пояс в момент смены недели, получает большую награду.
@@ -56,6 +57,38 @@ function rewardLine(r) {
     .filter(Boolean).join(' · ');
 }
 
+// Картинка турнира — плоская заглушка, пока нет нарисованного арта.
+// Малый: палестра с венком. Большой: стадион с факелами и кубком.
+function TourneyArt({ kind }) {
+  const big = kind === 'big';
+  const col = (x, h = 64) => (
+    <g key={x}>
+      <rect x={x} y={118 - h} width="12" height={h} fill="var(--card)" stroke="var(--accent)" strokeWidth="2" />
+      <rect x={x - 3} y={118 - h - 6} width="18" height="6" fill="var(--accent)" />
+      <path d={`M${x + 6} ${122 - h} V114`} stroke="var(--accent)" strokeWidth="1" opacity=".5" />
+    </g>
+  );
+  const torch = (x) => (
+    <g key={`t${x}`} transform={`translate(${x} 72)`}>
+      <rect x="-3" y="0" width="6" height="46" fill="var(--accent)" /><path d="M-10 0 h20 l-4 -7 h-12 z" fill="var(--accent)" />
+      <path d="M0 -30 C9 -19 7 -12 0 -7 C-7 -12 -9 -19 0 -30 Z" fill="#e2531d" /><path d="M0 -21 C4 -16 4 -12 0 -10 C-4 -12 -4 -16 0 -21 Z" fill="#f2c14e" />
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 360 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <rect width="360" height="150" fill="var(--volc-sky1)" />
+      {big
+        ? [0, 1, 2, 3].map((i) => <path key={i} d={`M${14 + i * 10} ${100 - i * 12} H${346 - i * 10}`} stroke="var(--accent)" strokeWidth="5" opacity={0.85 - i * 0.18} />)
+        : <circle cx="300" cy="34" r="16" fill="var(--card)" stroke="var(--accent)" strokeWidth="2" />}
+      {big ? [torch(40), torch(320)] : [col(30), col(58, 54), col(290, 54), col(318)]}
+      <rect y="118" width="360" height="32" fill="var(--volc-ground)" /><path d="M0 118 H360" stroke="var(--accent)" strokeWidth="2" />
+      <g transform={big ? 'translate(136 22) scale(1.8)' : 'translate(142 26) scale(1.6)'}><Icon name={big ? 'trophy' : 'medal'} size={48} /></g>
+      <g transform="translate(96 72) scale(1.1)"><Icon name="laurel" size={48} /></g>
+      <g transform="translate(212 72) scale(-1.1 1.1) translate(-48 0)"><Icon name="laurel" size={48} /></g>
+    </svg>
+  );
+}
+
 export function TourneysView({ profile, onStart, onPlay, status, version, toast }) {
   const [runs, setRuns] = useState(null);
   useEffect(() => { api('tourney').then((r) => setRuns(r.runs)).catch((e) => toast?.(e.message)); }, [version, profile?.eco?.gems, toast]);
@@ -66,36 +99,44 @@ export function TourneysView({ profile, onStart, onPlay, status, version, toast 
       {runs.map((t) => {
         const run = t.run;
         return (
-          <Card key={t.kind} title={t.name} icon={t.kind === 'big' ? '🏆' : '🏅'} tone={t.kind === 'big' ? 'gold' : 'violet'} wave={t.kind === 'big' ? ['#ffe27a', '#ff9f43'] : ['#b49bff', '#ff9fd5']}>
-            <p className="small" style={{ fontWeight: 600, marginBottom: 10 }}>
-              Вход — <b>{t.entry} 💎</b>. Играйте, пока не наберёте {t.maxLosses} поражения или {t.maxWins} побед. Чем больше побед, тем лучше награда. Ничья не считается.
-            </p>
-            {run ? (
-              <div className="run-box">
-                <div className="run-wins"><span className="greek-title">{run.wins}</span><small>побед из {t.maxWins}</small></div>
-                <div className="run-lives">{Array.from({ length: t.maxLosses }, (_, i) => <span key={i} className={i < t.maxLosses - run.losses ? 'heart on' : 'heart'}>{i < t.maxLosses - run.losses ? '❤️' : '🖤'}</span>)}</div>
-                <div className="run-next small"><b>Сейчас:</b> {rewardLine(t.rewards[run.wins])}</div>
+          <section key={t.kind} className="card tourney-card">
+            <div className="tourney-art"><TourneyArt kind={t.kind} /><span className="t-name">{t.name}</span></div>
+            <div className="tourney-body">
+              <p className="tourney-rules">
+                Играйте, пока не наберёте {t.maxLosses} поражения или {t.maxWins} {plural(t.maxWins, 'победу', 'победы', 'побед')}. Чем больше побед, тем лучше награда. Ничья не считается.
+              </p>
+              {run ? (
+                <>
+                  <div className="run-box">
+                    <div className="run-wins"><span className="greek-title">{run.wins}</span><small>побед из {t.maxWins}</small></div>
+                    <div className="run-lives">{Array.from({ length: t.maxLosses }, (_, i) => <span key={i} className={i < t.maxLosses - run.losses ? 'heart on' : 'heart'} />)}</div>
+                    <div className="run-next small"><b>Сейчас:</b> {rewardLine(t.rewards[run.wins])}</div>
+                  </div>
+                  <button className="gel xl" disabled={status !== 'online'} onClick={() => onPlay(t.kind)}><Icon name="swords" size={26} /> Турнирный бой</button>
+                </>
+              ) : (
+                <>
+                  <div className="small muted center" style={{ fontWeight: 700, marginBottom: 6 }}>
+                    {t.last ? `Прошлый забег: ${t.last.wins} побед` : 'Вы ещё не играли'}{t.best ? ` · рекорд ${t.best}` : ''}
+                  </div>
+                  <div className="entry-label">Войти за</div>
+                  <button className="gel xl entry-btn" disabled={gems < t.entry} onClick={() => onStart(t.kind)}>{t.entry} <Icon name="gem" size={30} /></button>
+                  {gems < t.entry && <div className="entry-short">Не хватает {t.entry - gems} 💎</div>}
+                </>
+              )}
+              <div className="small" style={{ fontWeight: 900, margin: '14px 0 6px', color: 'var(--heading)' }}>Награды за победы</div>
+              <div className="ladder">
+                {t.rewards.map((r, i) => (
+                  <div key={i} className={`ladder-row ${run && run.wins === i ? 'cur' : ''} ${run && run.wins > i ? 'past' : ''}`}>
+                    <span className="ladder-n">{i}</span><span className="grow">{rewardLine(r)}</span>
+                  </div>
+                )).reverse()}
               </div>
-            ) : (
-              <div className="small muted" style={{ fontWeight: 700, marginBottom: 8 }}>
-                {t.last ? `Прошлый забег: ${t.last.wins} побед` : 'Вы ещё не играли'}{t.best ? ` · рекорд ${t.best}` : ''}
-              </div>
-            )}
-            {run
-              ? <button className="gel xl" disabled={status !== 'online'} onClick={() => onPlay(t.kind)}>⚔ Турнирный бой</button>
-              : <button className="gel xl violet" disabled={gems < t.entry} onClick={() => onStart(t.kind)}>Войти за {t.entry} 💎</button>}
-            <div className="small" style={{ fontWeight: 900, margin: '14px 0 6px', color: 'var(--heading)' }}>Награды за победы</div>
-            <div className="ladder">
-              {t.rewards.map((r, i) => (
-                <div key={i} className={`ladder-row ${run && run.wins === i ? 'cur' : ''} ${run && run.wins > i ? 'past' : ''}`}>
-                  <span className="ladder-n">{i}</span><span className="grow">{rewardLine(r)}</span>
-                </div>
-              )).reverse()}
             </div>
-          </Card>
+          </section>
         );
       })}
-      <p className="small center" style={{ color: 'var(--sky-soft)', fontWeight: 700, textShadow: 'var(--sky-shadow)' }}>
+      <p className="small center muted" style={{ fontWeight: 700 }}>
         Кристаллы — за задания дня, дорогу трофеев и наборы. Исход турнира решает только сила.
       </p>
     </>
@@ -105,7 +146,7 @@ export function TourneysView({ profile, onStart, onPlay, status, version, toast 
 export function InboxCard({ eco, onClaim }) {
   if (!eco?.inbox?.length) return null;
   return (
-    <Card title="Награды" icon="📬" tone="gold">
+    <Card title="Награды" icon="📬">
       <div className="rows">
         {eco.inbox.map((it) => (
           <div key={it.id} className="row">

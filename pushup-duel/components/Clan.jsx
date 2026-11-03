@@ -19,7 +19,7 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
   if (w && w.status === 'active') {
     const lead = w.score.mine - w.score.enemy;
     return (
-      <Card title="Война кланов" icon="⚔️" tone="rose" wave={['#ff9fb3', '#ffbe5c']}>
+      <Card title="Война кланов" icon="⚔️">
         <div className="war-board">
           <div><span className="war-emoji">{my.emoji}</span><b>{my.name}</b><span className="war-score mine">{w.score.mine}</span></div>
           <div className="war-vs">VS<small>осталось <WarTimer end={w.end} /></small></div>
@@ -35,7 +35,7 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
   }
   if (w && w.status === 'pending') {
     return (
-      <Card title="Война кланов" icon="📯" tone="rose">
+      <Card title="Война кланов" icon="📯">
         <p style={{ fontWeight: 700 }}>{w.attacker ? `Ждём ответа клана «${w.enemy.name}»…` : `Клан «${w.enemy.emoji} ${w.enemy.name}» вызывает вас на войну на ${w.hours} часа!`}</p>
         {w.canRespond && (
           <div className="row-actions" style={{ marginTop: 10 }}>
@@ -48,7 +48,7 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
     );
   }
   return (
-    <Card title="Война кланов" icon="⚔️" tone="rose">
+    <Card title="Война кланов" icon="⚔️">
       {w?.status === 'done' && (
         <p style={{ fontWeight: 800, marginBottom: 8 }}>
           Прошлая война с «{w.enemy.name}»: {w.score.mine}:{w.score.enemy} — {w.score.mine > w.score.enemy ? 'победа 🏆' : w.score.mine < w.score.enemy ? 'поражение' : 'ничья'}
@@ -94,7 +94,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
     return (
       <div className="page">
         <div className="page-head"><h1>{my.emoji} {my.name}</h1><p>{my.place ? `#${my.place} из ${my.of} кланов на этой неделе` : 'Клан'}</p></div>
-        <Card wave={['#b49bff', '#43a8ff']}>
+        <Card>
           {my.about && <p style={{ fontWeight: 600, marginBottom: 10 }}>{my.about}</p>}
           <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="stat"><b>{my.week}</b><span>за неделю</span></div>
@@ -104,14 +104,14 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
           <button className="gel wide violet" style={{ marginTop: 12 }} onClick={() => onShareClan(my)}>📨 Позвать в клан</button>
         </Card>
         <WarCard my={my} data={data} status={status} onWarDuel={onWarDuel} onDeclareWar={onDeclareWar} onRespondWar={onRespondWar} openClan={openClan} />
-        <Card title="Спарринги" icon="🤼" tone="green">
+        <Card title="Спарринги" icon="🤼">
           <p className="small" style={{ fontWeight: 600, marginBottom: 10 }}>Тренируйтесь с соклановцами: без влияния на рейтинг, но с опытом и очками для клана.</p>
           <button className="gel xl green" disabled={status !== 'online' || my.members < 2} onClick={onSpar}>🤼 Найти спарринг в клане</button>
           <p className="small muted" style={{ marginTop: 6, fontWeight: 600 }}>
             В сети: {my.roster.filter((m) => m.online && m.id !== profile?.id).length} · можно вызвать конкретного участника кнопкой ⚔ в составе
           </p>
         </Card>
-        <Card title="Состав" icon="👥" tone="violet">
+        <Card title="Состав" icon="👥">
           <div className="rows">
             {my.roster.map((m) => (
               <PlayerRow key={m.id} r={{ ...m, me: m.id === profile?.id }} onClick={() => openPlayer(m.id)}
@@ -134,7 +134,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
   return (
     <div className="page">
       <div className="page-head"><h1>Кланы</h1><p>Отжимайтесь командой и поднимайте клан в недельном рейтинге</p></div>
-      <Card title="Создать клан" icon="🛡️" tone="violet" wave={['#b49bff', '#ff9fd5']}>
+      <Card title="Создать клан" icon="🛡️">
         <div className="field" style={{ marginBottom: 10 }}>
           <span>Название</span>
           <input className="input" maxLength={24} value={form.name} placeholder="Например, Железные локти" onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -152,7 +152,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
         <button className="gel wide violet" disabled={busy || form.name.trim().length < 3}
           onClick={() => act(() => api('clans', { method: 'POST', body: form }))}>Основать клан</button>
       </Card>
-      <Card title="Вступить" icon="🔎" tone="blue">
+      <Card title="Вступить" icon="🔎">
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <input className="input" value={q} placeholder="Название или код клана" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} />
           <button className="gel" onClick={load}>Найти</button>

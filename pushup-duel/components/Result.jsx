@@ -49,7 +49,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
         <div className="center" style={{ color: 'var(--sky-soft)', fontWeight: 700, textShadow: 'var(--sky-shadow)' }}>{sub}</div>
       </div>
 
-      <Card wave={outcome === 'loss' ? ['#ff9fb3', '#ffbe5c'] : undefined}>
+      <Card>
         {opp ? (
           <div className="res-sides">
             <div>
@@ -102,7 +102,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
       )}
 
       {progress ? (
-        <Card title={`+${progress.total} опыта`} icon="⭐" tone="gold">
+        <Card title={`+${progress.total} опыта`} icon="⭐">
           <div>
             {progress.items.map((it, i) => (
               <div key={i} className="xp-line" style={{ animationDelay: `${i * 120}ms` }}><span>{it.label}</span><b>+{it.xp}</b></div>

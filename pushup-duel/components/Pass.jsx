@@ -6,6 +6,7 @@ import {
 import { createFx, syntheticPose, celebrate } from '../lib/client/effects.js';
 import { music } from '../lib/client/music.js';
 import { Avatar, Bar, Card, Seg, plural } from './ui.jsx';
+import { roman } from './Greek.jsx';
 
 const CAT_ICON = { skin: '🥷', frame: '💠', trail: '🦴', burst: '💥', victory: '🏆', title: '🏷️', music: '🎵', gift: '🎁' };
 const CAT_TONE = {
@@ -103,7 +104,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
     <div className="page">
       <div className="page-head"><h1>Боевой пропуск</h1><p>{p.season.name} · ещё {daysLeft} {plural(daysLeft, 'день', 'дня', 'дней')} до извержения</p></div>
 
-      <Card title="Задания дня" icon="🎯" tone="rose">
+      <Card title="Задания дня" icon="🎯">
         <div className="rows">
           {p.quests.map((q) => (
             <div key={q.id} className="row">
@@ -118,9 +119,9 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
         </div>
       </Card>
 
-      <Card wave={['#ffe27a', '#ff9f43']}>
+      <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="tile gold" style={{ width: 62, height: 62, borderRadius: 18, fontSize: 28, fontWeight: 900, color: '#fff' }}>{p.level}</div>
+          <div className="lvl-num" style={{ width: 62, height: 62, fontSize: 30, color: 'var(--accent-ink)', background: 'var(--accent)', borderColor: 'var(--accent-edge)' }}>{roman(p.level)}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 900, fontSize: 18, color: 'var(--heading)' }}>Уровень {p.level} из {MAX_LEVEL} {p.premium && <span className="chip gold">🌟 премиум</span>}</div>
             <div className="small muted" style={{ fontWeight: 700, margin: '4px 0 6px' }}>{p.max ? 'Сезон пройден полностью! 👑' : `${p.xpInLevel} / ${p.xpNeed} опыта до следующего`}</div>
@@ -133,7 +134,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
       </Card>
 
       {!p.premium && (
-        <Card className="premium-card" title="Премиум-пропуск" icon="🌟" tone="gold" wave={['#ffe27a', '#b06bff']}>
+        <Card className="premium-card" title="Премиум-пропуск" icon="🌟">
           <div className="rows">
             <div className="row"><span style={{ fontSize: 22 }}>🎁</span><div className="grow"><div className="title">Настоящие подарки Telegram</div><div className="sub">на 8, 16, 24 и 30 уровнях — приходят от бота</div></div></div>
             <div className="row"><span style={{ fontSize: 22 }}>🦸</span><div className="grow"><div className="title">Скины Супергерой, Кибер, Дух огня</div><div className="sub">и сияние, звездопад, корона, аватары 🦸 💎</div></div></div>
@@ -146,7 +147,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
         </Card>
       )}
 
-      <Card title="Примерочная" icon="🪞" tone="violet">
+      <Card title="Примерочная" icon="🪞">
         <Preview skin={p.equipped.skin} trail={p.equipped.trail} burst={p.equipped.burst} victory={victoryPreview ? victoryPreview.split(':')[0] : null}
           frame={p.equipped.frame} avatar={p.avatar} key={victoryPreview || 'pv'} />
         <div style={{ marginTop: 12, overflowX: 'auto' }}>
@@ -174,7 +175,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
         {cat === 'music' && <p className="small muted" style={{ marginTop: 10, fontWeight: 600 }}>Новые треки открываются за приглашения друзей: 1, 3, 5 и 10 друзей.</p>}
       </Card>
 
-      <Card title="Награды сезона" icon="🎁" tone="gold">
+      <Card title="Награды сезона" icon="🎁">
         <div className="small muted" style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', margin: '-4px 0 8px 48px' }}>
           <span>Бесплатно</span><span>🌟 Премиум</span>
         </div>

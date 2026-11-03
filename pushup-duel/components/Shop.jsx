@@ -27,7 +27,7 @@ export default function Shop({ profile, onBuy, onPremium, busy }) {
         <div style={{ marginTop: 8 }}><Currency eco={eco} /></div>
       </div>
 
-      <Card title="Предложения дня" icon="🛍️" tone="rose" wave={['#ff9fb3', '#ffbe5c']}>
+      <Card title="Предложения дня" icon="🛍️">
         <div className="items four">
           {eco.shop.offers.map((o) => {
             const done = o.bought || o.owned;
@@ -47,7 +47,7 @@ export default function Shop({ profile, onBuy, onPremium, busy }) {
         </div>
       </Card>
 
-      <Card title="Наборы наклеек" icon="🎴" tone="orange">
+      <Card title="Наборы наклеек" icon="🎴">
         <div className="items">
           {eco.shop.packs.map((c) => (
             <div key={c.id} className="item">
@@ -60,7 +60,7 @@ export default function Shop({ profile, onBuy, onPremium, busy }) {
         <p className="small muted" style={{ marginTop: 10, fontWeight: 600 }}>Набор из магазина открывается сразу. Кристаллы дают задания дня, дорога трофеев и наборы — за звёзды они не продаются. Ещё ими платят за вход в турниры.</p>
       </Card>
 
-      <Card title="Бусты" icon="⚡" tone="teal">
+      <Card title="Бусты" icon="⚡">
         <div className="rows">
           {eco.shop.boosts.map((b) => (
             <div key={b.id} className="row">
@@ -72,7 +72,7 @@ export default function Shop({ profile, onBuy, onPremium, busy }) {
         </div>
       </Card>
 
-      <Card className="premium-card" title="Звёзды Telegram" icon="🌟" tone="gold" wave={['#ffe27a', '#b06bff']}>
+      <Card className="premium-card" title="Звёзды Telegram" icon="🌟">
         <div className="row">
           <span style={{ fontSize: 26 }}>🎖️</span>
           <div className="grow"><div className="title">Премиум-пропуск</div><div className="sub">{profile.premium ? 'Уже куплен в этом сезоне' : 'Подарки Telegram, скины, +20% опыта'}</div></div>

@@ -3,6 +3,7 @@
 // по центру арена с кнопкой «В бой» и выбором режима, внизу — амфоры (наборы наклеек).
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar } from './ui.jsx';
+import { Icon } from './Icon.jsx';
 import { PackSlots, Currency } from './Economy.jsx';
 import { ARENAS } from '../lib/economy.js';
 import { api } from '../lib/client/net.js';
@@ -60,12 +61,12 @@ export default function Home({ profile, status, settings, theme, onPlay, onMode,
         {view > 1 && <button className="arena-arrow l" onClick={() => setView(view - 1)} aria-label="Предыдущая арена">‹</button>}
         {view < ARENAS.length && <button className="arena-arrow r" onClick={() => setView(view + 1)} aria-label="Следующая арена">›</button>}
         {eco?.inbox?.length > 0 && (
-          <button className="inbox-btn" onClick={onInbox} aria-label="Награды"><span className="tile gold">📬</span><span className="badge-dot">{eco.inbox.length}</span></button>
+          <button className="inbox-btn" onClick={onInbox} aria-label="Награды"><span className="tile"><Icon name="mail" size={38} /></span><span className="badge-dot">{eco.inbox.length}</span></button>
         )}
         <div className="meander-band" />
         <div className="arena-actions">
           <button className="gel battle-btn" disabled={needsOnline && status !== 'online'} onClick={onPlay}>
-            ⚔ В БОЙ
+            <Icon name="swords" size={30} /> В БОЙ
           </button>
           <button className="mode-pick" onClick={onMode}>
             <ExerciseIcon kind={ex.id} size={40} />

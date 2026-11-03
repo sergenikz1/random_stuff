@@ -861,3 +861,25 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .hit-dots i { width: 14px; height: 14px; border-radius: 3px; border: 2px solid var(--accent); transform: rotate(45deg); }
 .hit-dots i.on { background: var(--cta); border-color: var(--cta-edge); }
 :root[data-theme="midnight"] .vase-rays { opacity: calc(0.03 + var(--hits) * 0.03); }
+
+/* Открытие набора — на весь экран, без текста: ваза, ромбики ударов, потом наклейки. */
+.pack-screen { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  padding: calc(20px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)) 18px calc(24px + env(safe-area-inset-bottom));
+  background: var(--bg); overflow: hidden; animation: fadein 250ms ease; cursor: pointer; }
+.pack-screen::before, .pack-screen::after { content: ""; position: absolute; left: 0; right: 0; height: 18px; background-image: var(--meander); background-size: 18px 18px; background-repeat: repeat-x; }
+.pack-screen::before { top: calc(14px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)); }
+.pack-screen::after { bottom: calc(14px + env(safe-area-inset-bottom)); }
+.pack-screen.r-common { --rc: #9fb6cf; } .pack-screen.r-rare { --rc: #43a8ff; } .pack-screen.r-epic { --rc: #b06bff; } .pack-screen.r-legend { --rc: #d9a63a; }
+.pack-screen.summary { cursor: default; justify-content: center; }
+.pack-screen .pack-open { width: 100%; max-width: 420px; min-height: 0; cursor: inherit; }
+.pack-screen .vase-stage { width: 250px; height: 296px; }
+.pack-screen .vase { width: 224px; height: 266px; }
+.pack-screen .shard { left: 13px; top: 15px; width: 224px; height: 266px; }
+.pack-screen .vase-rays { width: 460px; height: 460px; margin: -230px 0 0 -230px; }
+.pack-screen .hit-dots { margin: 26px 0 0; gap: 10px; }
+.pack-screen .hit-dots i { width: 18px; height: 18px; }
+.pack-screen .hit-dots.gone { opacity: 0; transition: opacity 300ms; }
+.pack-screen .hit-dots.small { margin-top: 10px; gap: 7px; }
+.pack-screen .hit-dots.small i { width: 11px; height: 11px; border-width: 1.5px; }
+.pack-screen .pack-summary { padding: 0 4px; }
+.pack-take { max-width: 420px; position: relative; z-index: 2; }

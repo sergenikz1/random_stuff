@@ -4,9 +4,9 @@ import { Glyph, rich } from './Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { STICKERS, STICKER_RARITY, STICKER_RARITY_ORDER, PACKS, CARD_STICKERS_MAX, stickerById } from '../lib/stickers.js';
 import { sfx } from '../lib/client/sound.js';
-import { haptic } from '../lib/client/tg.js';
+import { haptic, bindBackButton } from '../lib/client/tg.js';
 import { askTiltPermission } from '../lib/client/tilt.js';
-import { Card, Sheet, plural } from './ui.jsx';
+import { Card, Sheet } from './ui.jsx';
 import { PlayerCard } from './PlayerCard.jsx';
 
 // Наклейка с белой «вырубкой». У эпических и легендарных — голограмма от наклона телефона.
@@ -147,10 +147,12 @@ export function PackOpenModal({ loot, onClose }) {
     reveal(shown + 1);
   };
   const cur = shown >= 0 && shown < total ? loot.stickers[shown] : null;
+  // «Назад» Telegram: до итога — сразу к итогу (награда уже начислена), на итоге — закрыть.
+  useEffect(() => bindBackButton(done ? onClose : () => { setHits(HITS); setShown(total); }), [done, onClose, total]);
 
   return (
-    <Sheet onClose={done ? onClose : tap} center>
-      <div className={`pack-open r-${loot.type === 'basic' ? 'common' : loot.type}`} onClick={tap} role="button" tabIndex={0}>
+    <div className={`pack-screen r-${loot.type === 'basic' ? 'common' : loot.type} ${done ? 'summary' : ''}`} onClick={done ? undefined : tap} role="button" tabIndex={0}>
+      <div className="pack-open">
         {shown < 0 && (
           <div className={`vase-stage ${broken ? 'broken' : ''}`} style={{ '--hits': hits }}>
             <div className="vase-rays" />
@@ -170,21 +172,18 @@ export function PackOpenModal({ loot, onClose }) {
             {broken && <div className="vase-burst" />}
           </div>
         )}
-        {shown < 0 && !broken && (
-          <>
-            <div className="hit-dots">{Array.from({ length: HITS }, (_, i) => <i key={i} className={i < hits ? 'on' : ''} />)}</div>
-            <p className="center muted" style={{ fontWeight: 800 }}>{hits === 0 ? 'Тапайте по вазе, чтобы разбить' : `Ещё ${HITS - hits} ${plural(HITS - hits, 'удар', 'удара', 'ударов')}`}</p>
-          </>
+        {shown < 0 && (
+          <div className={`hit-dots ${broken ? 'gone' : ''}`}>{Array.from({ length: HITS }, (_, i) => <i key={i} className={i < hits ? 'on' : ''} />)}</div>
         )}
         {cur && (
           <div key={shown} className={`reveal r-${cur.rarity}`}>
             <div className="reveal-glow" />
-            <Sticker id={cur.id} size={140} className="fly" />
+            <Sticker id={cur.id} size={170} className="fly" />
             <div className="reveal-name">{stickerById(cur.id).name}</div>
             <div className="reveal-meta" style={{ color: STICKER_RARITY[cur.rarity].color }}>
               {STICKER_RARITY[cur.rarity].name}{cur.isNew ? ' · новая!' : cur.converted ? ` · лишняя → +${cur.converted} 🪙` : ' · ещё копия'}
             </div>
-            <div className="small muted">{shown + 1} из {total} · нажмите дальше</div>
+            <div className="hit-dots small">{loot.stickers.map((_, i) => <i key={i} className={i <= shown ? 'on' : ''} />)}</div>
           </div>
         )}
         {done && (
@@ -200,9 +199,8 @@ export function PackOpenModal({ loot, onClose }) {
           </div>
         )}
       </div>
-      {done ? <button className="gel xl" onClick={onClose}>Забрать</button>
-        : <button className="glass-btn" onClick={(e) => { e.stopPropagation(); setHits(HITS); setShown(total); }}>Показать все</button>}
-    </Sheet>
+      {done && <button className="gel xl pack-take" onClick={onClose}>Забрать</button>}
+    </div>
   );
 }
 

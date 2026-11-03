@@ -42,7 +42,7 @@ export default function Lobby({ flow, profile, stats, onCancel, onBot, onShareRo
     return (
       <div className="lobby">
         <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" /></div>
-        <h1>{flow.invited ? `Ждём ${flow.invited}…` : 'Комната создана'}</h1>
+        <h1>{flow.title ? `🥊 Титульный бой: ждём ${flow.invited}…` : flow.invited ? `Ждём ${flow.invited}…` : 'Комната создана'}</h1>
         {flow.code ? <div className="code">{flow.code}</div> : <div className="spinner" />}
         <p>{flow.invited ? 'Мы отправили вызов в Telegram. Или скиньте ссылку сами:' : `Дуэль ${fmtTime((flow.durationSec || 60) * 1000)}. Отправьте другу ссылку или код:`}</p>
         <button className="gel xl" style={{ maxWidth: 360 }} disabled={!flow.code} onClick={onShareRoom}>📨 Позвать друга</button>
@@ -55,9 +55,9 @@ export default function Lobby({ flow, profile, stats, onCancel, onBot, onShareRo
   return (
     <div className="lobby">
       <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" /></div>
-      <h1>Ищем соперника…</h1>
+      <h1>{flow.tournament ? '🎟️ Турнир: ищем соперника…' : 'Ищем соперника…'}</h1>
       <p>{fmtTime(elapsed)} · рейтинг {profile?.rating} · онлайн {stats?.online ?? '—'}, в поиске {stats?.queue ?? '—'}</p>
-      {elapsed > 20000 && (
+      {elapsed > 20000 && !flow.tournament && (
         <>
           <p style={{ opacity: 0.85 }}>Пока никого — позовите друзей или сразитесь с ботом</p>
           <button className="gel orange" onClick={onBot}>🤖 Бой с ботом</button>

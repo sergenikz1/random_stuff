@@ -5,6 +5,8 @@ import { badgeById, RARITY, RARITY_ORDER } from '../lib/pass.js';
 import { sfx } from '../lib/client/sound.js';
 import { haptic } from '../lib/client/tg.js';
 import { Avatar } from './ui.jsx';
+import { Sticker } from './Stickers.jsx';
+import { ARENAS } from '../lib/economy.js';
 
 // Редкость карточки — по самому редкому жетону; премиум — всегда легендарная рамка.
 function cardRarity(player) {
@@ -43,12 +45,18 @@ export function PlayerCard({ player, side = '', bot = false, animate = false }) 
           : <span className="pcard-nobadge">жетонов пока нет</span>}
       </div>
       {!bot && player.games > 0 && <div className="pcard-stats">{player.wins} побед · рекорд {player.bestReps}</div>}
+      {player.belt && <div className="pcard-belt">🥊 Чемпион · {ARENAS.find((a) => a.id === player.belt)?.name}</div>}
+      {(player.card || []).map((it, i) => (
+        <span key={i} className="pcard-stk" style={{ left: `${it.x * 100}%`, top: `${it.y * 100}%`, transform: `translate(-50%, -50%) rotate(${it.r}deg) scale(${it.s})`, animationDelay: animate ? `${1700 + i * 140}ms` : undefined }}>
+          <Sticker id={it.id} size={40} />
+        </span>
+      ))}
     </div>
   );
 }
 
 // Интро перед боем: карточки вылетают навстречу, удар «VS», жетоны переворачиваются по очереди.
-export function VersusIntro({ me, opp, bot, mode, onDone }) {
+export function VersusIntro({ me, opp, bot, mode, belt, onDone }) {
   const [out, setOut] = useState(false);
   // Время интро считаем по отрисованным кадрам (шаг не больше 50 мс): если страница
   // подвиснет, интро не «проскочит», а дождётся и доиграет.
@@ -70,7 +78,7 @@ export function VersusIntro({ me, opp, bot, mode, onDone }) {
     <div className={`versus ${out ? 'out' : ''}`} onClick={onDone}>
       <div className="versus-rays" />
       <div className="versus-flash" />
-      <div className="versus-tag">{{ ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ' }[mode]}</div>
+      <div className="versus-tag">{belt ? `🥊 ТИТУЛЬНЫЙ БОЙ · ${ARENAS.find((a) => a.id === belt)?.name?.toUpperCase()}` : { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', tournament: '🎟️ ТУРНИР НЕДЕЛИ', title: '🥊 ТИТУЛЬНЫЙ БОЙ' }[mode]}</div>
       <div className="versus-cards">
         <PlayerCard player={me} side="left" animate />
         <div className="versus-vs">VS</div>

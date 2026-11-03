@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { COSMETICS, cosmeticName, REFERRAL_XP, BADGES, RARITY } from '../lib/pass.js';
 import { PlayerCard, Badge } from './PlayerCard.jsx';
+import { Album } from './Stickers.jsx';
 import { Avatar, Card, Seg, ago, fmtTime } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
 
 const OUT = { win: ['Победа', 'green'], loss: ['Поражение', 'red'], draw: ['Ничья', ''] };
 const MODE = { ranked: '⚔️', friend: '🤝', bot: '🤖', training: '🏋️' };
 
-export default function Profile({ profile, settings, updateSettings, onSave, onInvite, inTg }) {
+export default function Profile({ profile, settings, updateSettings, onSave, onInvite, inTg, onEditCard }) {
   const [name, setName] = useState(profile?.name || '');
   if (!profile) return <div className="page"><div className="page-head"><h1>Профиль</h1></div></div>;
   const p = profile;
@@ -39,8 +40,9 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
       </Card>
 
       <Card title="Моя карточка" icon="🃏" tone="violet" wave={['#b06bff', '#43a8ff']}>
-        <p className="small" style={{ fontWeight: 600, marginBottom: 12 }}>Её видит соперник в интро перед боем. Выберите до трёх жетонов для витрины.</p>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><PlayerCard player={p} /></div>
+        <p className="small" style={{ fontWeight: 600, marginBottom: 12 }}>Её видит соперник в интро перед боем. Украсьте наклейками и выберите до трёх жетонов для витрины.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><PlayerCard player={p} /></div>
+        <button className="gel wide violet" style={{ marginBottom: 14 }} onClick={onEditCard}>✨ Наклейки на карточке</button>
         <div className="rows">
           {BADGES.map((b) => {
             const own = p.earnedBadges.includes(b.id);
@@ -61,6 +63,8 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
           })}
         </div>
       </Card>
+
+      <Album eco={p.eco} />
 
       <Card title="Пригласить друзей" icon="🎁" tone="green" wave={['#6fe08a', '#5ee8d8']}>
         <p style={{ fontWeight: 600 }}>За каждого друга — <b>+{REFERRAL_XP.inviter} опыта</b>, другу — +{REFERRAL_XP.invitee}. И музыка для боя:</p>

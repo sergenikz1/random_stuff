@@ -108,6 +108,20 @@ export class Premium {
     }
   }
 
+  // Подарок Telegram за приз (турнир). Возвращает { status: 'sent' | 'failed', error }.
+  async sendStarsGift(p, stars, text) {
+    if (!p.tgId) return { status: 'failed', error: 'Подарки получают только пользователи Telegram' };
+    if (!this.bot) return this.devPayments ? { status: 'sent', dev: true } : { status: 'failed', error: 'Бот не настроен' };
+    try {
+      const gift = await this.pickGift(stars);
+      await this.bot.sendGift({ user_id: p.tgId, gift_id: gift.id, text });
+      return { status: 'sent' };
+    } catch (e) {
+      console.warn('sendGift:', e.message);
+      return { status: 'failed', error: 'Не удалось отправить подарок — попробуйте позже' };
+    }
+  }
+
   // Подарок нужной цены из каталога Telegram; лимитированные и распроданные пропускаем.
   async pickGift(stars) {
     const { gifts } = await this.bot.getAvailableGifts();

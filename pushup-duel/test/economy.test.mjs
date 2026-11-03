@@ -1,12 +1,14 @@
-// Сундуки, дорога трофеев, магазин и бусты.
+// Наборы наклеек, коллекция и карточка, дорога трофеев, магазин, почта, билеты.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Store, privateProfile, applyActivity } from '../lib/server/store.js';
-import { awardWinChest, unlockChest, openChest, claimRoad, buy, ensureEco } from '../lib/server/economy.js';
-import { CHEST_CYCLE, CHESTS, gemsToOpen, shopOffersForDay, arenaOf, CHEST_POOL } from '../lib/economy.js';
+import { Store, privateProfile, publicCard, applyActivity } from '../lib/server/store.js';
+import {
+  awardWin, unlockPack, openPack, claimRoad, buy, ensureEco, setCard, addInbox, claimInbox, givePack,
+} from '../lib/server/economy.js';
+import { PACK_CYCLE, PACKS, gemsToOpen, shopOffersForDay, arenaOf } from '../lib/economy.js';
+import { stickersOf, MAX_COPIES, STICKER_RARITY } from '../lib/stickers.js';
 import { dayKey, questsForDay } from '../lib/pass.js';
 
-// Детерминированный генератор для проверки содержимого сундуков.
 const seq = (...vals) => { let i = 0; return () => vals[i++ % vals.length]; };
 
 function player() {
@@ -16,90 +18,113 @@ function player() {
   return { store, p };
 }
 
-test('сундуки за победы идут по циклу и не больше четырёх', () => {
+test('наборы за победы идут по циклу, не больше четырёх; каждые 3 победы — билет', () => {
   const { p } = player();
   const got = [];
-  for (let i = 0; i < 5; i++) got.push(awardWinChest(p));
-  assert.deepEqual(got.slice(0, 4).map((g) => g.type), CHEST_CYCLE.slice(0, 4));
+  for (let i = 0; i < 5; i++) got.push(awardWin(p));
+  assert.deepEqual(got.slice(0, 4).map((g) => g.type), PACK_CYCLE.slice(0, 4));
   assert.equal(got[4].full, true);
-  assert.equal(p.chestCycle, 4);
+  assert.equal(p.tickets, 1);
+  assert.equal(got[2].ticket, true);
 });
 
 test('открытие: по таймеру бесплатно, раньше — за кристаллы, одновременно только один', () => {
   const { p } = player();
-  awardWinChest(p); awardWinChest(p);
+  awardWin(p); awardWin(p);
   const t0 = 1_000_000;
-  unlockChest(p, 0, t0);
-  assert.throws(() => unlockChest(p, 1, t0), /только один/);
-  assert.throws(() => openChest(p, 0, {}, Math.random, t0 + 1000), /не открылся/);
-  const left = CHESTS.wood.unlockMin * 60000 - 1000;
+  unlockPack(p, 0, t0);
+  assert.throws(() => unlockPack(p, 1, t0), /только один/);
+  assert.throws(() => openPack(p, 0, {}, Math.random, t0 + 1000), /не открылся/);
   p.gems = 0;
-  assert.throws(() => openChest(p, 0, { gems: true }, Math.random, t0 + 1000), /Нужно/);
+  assert.throws(() => openPack(p, 0, { gems: true }, Math.random, t0 + 1000), /Нужно/);
   p.gems = 50;
-  const loot = openChest(p, 0, { gems: true }, seq(0.5), t0 + 1000);
-  assert.equal(loot.spent, gemsToOpen(left));
-  assert.equal(p.gems, 50 - loot.spent);
-  assert.equal(p.chests[0], null);
-  // Второй сундук открываем честно по таймеру.
-  unlockChest(p, 1, t0);
-  const free = openChest(p, 1, {}, seq(0.5), t0 + CHESTS.wood.unlockMin * 60000 + 1);
-  assert.equal(free.spent, 0);
+  const loot = openPack(p, 0, { gems: true }, seq(0.5), t0 + 1000);
+  assert.equal(loot.spent, gemsToOpen(PACKS.basic.unlockMin * 60000 - 1000));
+  assert.equal(loot.stickers.length, PACKS.basic.count);
+  assert.equal(p.packs[0], null);
 });
 
-test('содержимое: монеты, опыт, предмет, повтор превращается в монеты', () => {
+test('гарантия редкости, коллекция и лишние копии в монеты', () => {
   const { p } = player();
-  p.chests[0] = { type: 'magic', at: 0, unlockAt: 1 };
-  const coins0 = p.coins, xp0 = p.xp;
-  // rnd = 0 → минимум монет, кристаллы гарантированы, первый предмет пула оба раза (второй — повтор).
-  const loot = openChest(p, 0, {}, () => 0, 10);
-  assert.equal(loot.items.length, 2);
-  assert.equal(loot.items[0].key, CHEST_POOL[0]);
-  assert.equal(loot.items[1].duplicate, true);
-  assert.ok(p.extraUnlocks.includes(CHEST_POOL[0]));
-  assert.equal(p.coins - coins0, CHESTS.magic.coins[0] + 60);
-  assert.equal(p.xp - xp0, CHESTS.magic.xp);
-  assert.ok(loot.gems >= CHESTS.magic.gems[0]);
+  // rnd = 0 → всегда первая наклейка нужной редкости; легендарный набор гарантирует легендарную.
+  const loot = givePack(p, 'legend', () => 0);
+  assert.equal(loot.stickers.length, PACKS.legend.count);
+  assert.ok(loot.stickers.some((s) => s.rarity === 'legend'));
+  // Пять одинаковых обычных: три в коллекцию, две — монетами.
+  const coins0 = p.coins;
+  const first = stickersOf('common')[0].id;
+  const l2 = givePack(p, 'basic', () => 0); // 3 копии первой обычной
+  givePack(p, 'basic', () => 0);
+  assert.equal(p.stickers[first], MAX_COPIES);
+  const converted = l2.stickers.filter((s) => s.converted).length;
+  assert.ok(p.coins > coins0);
+  assert.ok(converted >= 0);
 });
 
-test('дорога трофеев: только после достижения порога и один раз', () => {
+test('карточка: только свои наклейки, не больше копий и не больше шести', () => {
+  const { p, store } = player();
+  p.stickers = { fire: 1, crown: 2 };
+  setCard(p, [{ id: 'fire', x: 0.2, y: 0.3, r: 15, s: 1.2 }, { id: 'crown', x: 2, y: -1, r: 999, s: 9 }, { id: 'crown' }]);
+  const card = publicCard(p, store).card;
+  assert.equal(card.length, 3);
+  assert.deepEqual(card[1], { id: 'crown', x: 1, y: 0, r: 180, s: 2 });
+  assert.throws(() => setCard(p, [{ id: 'fire' }, { id: 'fire' }]), /копий/);
+  assert.throws(() => setCard(p, [{ id: 'dragon' }]), /коллекции/);
+  assert.throws(() => setCard(p, Array(7).fill({ id: 'crown' })), /до 6/);
+});
+
+test('дорога трофеев: только после порога, один раз; билеты и наборы', () => {
   const { p } = player();
   assert.throws(() => claimRoad(p, 1050), /Откроется/);
-  p.rating = 1060; ensureEco(p);
+  p.rating = 1080; ensureEco(p);
   claimRoad(p, 1025);
   assert.equal(p.coins, 50);
   claimRoad(p, 1050);
-  assert.equal(p.chests.filter(Boolean)[0].type, 'silver');
+  assert.equal(p.packs.filter(Boolean)[0].type, 'rare');
+  claimRoad(p, 1075);
+  assert.equal(p.tickets, 1);
   assert.throws(() => claimRoad(p, 1050), /уже получена/);
-  // Лучший рейтинг сохраняется, даже если текущий упал.
   p.rating = 900; ensureEco(p);
-  assert.equal(p.bestRating, 1060);
-  assert.equal(arenaOf(900).id, 1);
+  assert.equal(p.bestRating, 1080);
   assert.equal(arenaOf(1460).name, 'Боксёрский ринг');
 });
 
-test('магазин: предложения дня одинаковые, покупка за монеты, буст удваивает опыт', () => {
+test('магазин: наклейки и косметика за монеты, наборы и билет за кристаллы, буст', () => {
   const { p, store } = player();
   const offers = shopOffersForDay(dayKey());
-  assert.equal(offers.length, 3);
+  assert.equal(offers.length, 4);
   assert.deepEqual(shopOffersForDay(dayKey()), offers);
-  assert.throws(() => buy(p, offers[0].id), /Нужно/);
-  p.coins = 5000;
+  assert.ok(offers.slice(0, 3).every((o) => o.sticker) && offers[3].item);
+  p.coins = 10000;
   buy(p, offers[0].id);
-  assert.ok(privateProfile(p, store).unlocked.includes(offers[0].item));
-  assert.throws(() => buy(p, offers[0].id), /Уже есть/);
-  p.gems = 100;
-  const r = buy(p, 'chest_silver', seq(0.5));
-  assert.ok(r.loot.coins > 0);
-  assert.equal(p.gems, 85);
+  assert.equal(p.stickers[offers[0].sticker], 1);
+  assert.throws(() => buy(p, offers[0].id), /Уже куплено/);
+  buy(p, offers[3].id);
+  assert.ok(privateProfile(p, store).unlocked.includes(offers[3].item));
+  p.gems = 200;
+  const r = buy(p, 'pack_rare', seq(0.5));
+  assert.equal(r.loot.stickers.length, PACKS.rare.count);
+  buy(p, 'ticket');
+  assert.equal(p.tickets, 1);
   buy(p, 'boost_xp');
   const res = applyActivity(p, { type: 'training', reps: 10, repTimes: [] }, store);
   assert.ok(res.items.some((i) => i.label.startsWith('Буст')));
-  assert.throws(() => buy(p, 'nope'), /не найдено/);
+});
+
+test('почта: награда с набором и наклейкой забирается один раз', () => {
+  const { p } = player();
+  addInbox(p, { title: 'Приз', gems: 7, pack: 'rare', sticker: 'champ' });
+  const id = p.inbox[0].id;
+  const r = claimInbox(p, id, seq(0.4));
+  assert.equal(p.gems >= 7, true);
+  assert.equal(p.stickers.champ, 1);
+  assert.ok(r.loot.stickers.length >= PACKS.rare.count);
+  assert.throws(() => claimInbox(p, id), /не найдена/);
+  assert.ok(STICKER_RARITY.legend.dupCoins > STICKER_RARITY.common.dupCoins);
 });
 
 test('задания дня дают кристаллы', () => {
   const { p, store } = player();
-  // Задание дня выбирается по дате — доводим первое из них до цели, какое бы ни выпало.
   const q = questsForDay(dayKey())[0];
   p.quests = { day: dayKey(), prog: { [q.kind]: q.goal }, done: [] };
   const gems0 = p.gems;

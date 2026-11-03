@@ -2,7 +2,9 @@
 import { Avatar, Bar, Card, ago, plural } from './ui.jsx';
 import { PASS_REWARDS, cosmeticName } from '../lib/pass.js';
 import { RewardIcon } from './Pass.jsx';
-import { ArenaCard, ChestSlots, Currency } from './Economy.jsx';
+import { ArenaCard, PackSlots, Currency } from './Economy.jsx';
+import { InboxCard, TourneyCard } from './Compete.jsx';
+import { ARENAS } from '../lib/economy.js';
 
 function greeting() {
   const h = new Date().getHours();
@@ -12,7 +14,7 @@ function greeting() {
   return 'Добрый вечер';
 }
 
-export default function Home({ profile, stats, community, feed, status, onRanked, onFriend, onJoinCode, onTraining, onBot, goTab, onUnlockChest, onOpenChest, onRoad, onProfile }) {
+export default function Home({ profile, stats, community, feed, status, onRanked, onFriend, onJoinCode, onTraining, onBot, goTab, onUnlockPack, onOpenPack, onRoad, onProfile, onClaimInbox, onTourneyRegister, onTourneyPlay, version, toast }) {
   const p = profile;
   const nextReward = p && !p.max ? Object.keys(PASS_REWARDS).map(Number).find((l) => l > p.level) : null;
   return (
@@ -36,6 +38,17 @@ export default function Home({ profile, stats, community, feed, status, onRanked
       </div>
 
       {p?.eco && <ArenaCard eco={p.eco} onRoad={onRoad} />}
+      {p?.belt && (
+        <button className="arena-card champ-card" onClick={() => goTab('top')}>
+          <span className="arena-emoji">🥊</span>
+          <div className="grow" style={{ textAlign: 'left' }}>
+            <div className="arena-name">Вы — чемпион арены «{ARENAS.find((a) => a.id === p.belt)?.name}»</div>
+            <div className="arena-sub">Удержите пояс до понедельника, чтобы получить награду</div>
+          </div>
+          <span className="arena-go">›</span>
+        </button>
+      )}
+      <InboxCard eco={p?.eco} onClaim={onClaimInbox} />
 
       <Card className="hero" wave={['#4fdcc8', '#6fd36a']}>
         <div className="online">
@@ -54,11 +67,15 @@ export default function Home({ profile, stats, community, feed, status, onRanked
       </Card>
 
       {p?.eco && (
-        <Card title="Сундуки" icon="🧰" tone="orange">
-          <ChestSlots eco={p.eco} profileAt={p._at || Date.now()} onUnlock={onUnlockChest} onOpen={onOpenChest} />
-          <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Сундук — за каждую победу в рейтинговой дуэли. Открывается по таймеру, по одному.</p>
+        <Card title="Наборы наклеек" icon="🎴" tone="orange" link="Альбом" onLink={onProfile}>
+          <PackSlots eco={p.eco} profileAt={p._at || Date.now()} onUnlock={onUnlockPack} onOpen={onOpenPack} />
+          <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>
+            Набор — за каждую победу в рейтинге. Каждые 3 победы — билет на турнир ({p.eco.winsTowardTicket}/3).
+          </p>
         </Card>
       )}
+
+      {p && <TourneyCard profile={p} onRegister={onTourneyRegister} onPlay={onTourneyPlay} status={status} version={version} toast={toast} compact />}
 
       {p && (
         <Card title="Боевой пропуск" icon="🎖️" tone="gold" link="Награды" onLink={() => goTab('pass')}>

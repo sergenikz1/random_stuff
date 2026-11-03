@@ -7,6 +7,7 @@ import android.os.Looper
 import android.widget.TextView
 import androidx.leanback.widget.ListRow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
 import org.intergalactictv.client.R
 import org.junit.After
 import org.junit.Assert.*
@@ -37,7 +38,8 @@ class NativeSearchInterfaceTest {
         val rutube = VideoItem("rutube-fixture", "Фильм на Rutube")
         val page = WebVideoSearch.page("https://example.org/movie", "Фильм")
         val extracted = page.copy(streamUrl = "https://cdn.example.org/movie.m3u8", streamMimeType = "application/x-mpegURL")
-        StreamSearchFragment.rutubeSearch = { _, _ -> delay(200); Page(listOf(rutube), false, 1) }
+        val rutubeReady = CompletableDeferred<Unit>()
+        StreamSearchFragment.rutubeSearch = { _, _ -> rutubeReady.await(); Page(listOf(rutube), false, 1) }
         StreamSearchFragment.siteSearch = { object : SiteVideoSearch {
             override suspend fun search(query: String, found: (VideoItem) -> Unit, progress: (Int, Int) -> Unit) {
                 assertEquals("Игра престолов", query)
@@ -56,7 +58,8 @@ class NativeSearchInterfaceTest {
             assertEquals(2, rows.size())
             assertEquals(0, (rows[0] as ListRow).adapter.size())
             assertEquals(extracted, (rows[1] as ListRow).adapter[0])
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250))
+            rutubeReady.complete(Unit)
+            shadowOf(Looper.getMainLooper()).idle()
             val top = rows[0] as ListRow
             val bottom = rows[1] as ListRow
             assertTrue(top.headerItem.name.startsWith("Rutube"))

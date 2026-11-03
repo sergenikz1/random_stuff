@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { celebrate } from '../lib/client/effects.js';
 import { sfx } from '../lib/client/sound.js';
@@ -53,7 +54,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
         {opp ? (
           <div className="res-sides">
             <div>
-              <Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" />
+              <Avatar emoji={profile?.avatar} look={profile?.look} frame={profile?.frame} size="lg" side="me" />
               <div style={{ fontWeight: 800, marginTop: 6 }}>{profile?.name}</div>
               <div className="num me">{me.reps}</div>
               {mode === 'ranked' && (
@@ -64,7 +65,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
             </div>
             <div style={{ fontWeight: 900, fontSize: 22, fontStyle: 'italic', color: 'var(--soft)' }}>VS</div>
             <div>
-              <Avatar emoji={opp.avatar} frame={opp.frame} size="lg" side="opp" />
+              <Avatar emoji={opp.avatar} look={opp.look} frame={opp.frame} size="lg" side="opp" />
               <div style={{ fontWeight: 800, marginTop: 6 }}>{opp.name}</div>
               <div className="num opp">{opp.reps}</div>
               {mode === 'ranked' && <div className="chip" style={{ marginTop: 6 }}>{opp.ratingBefore + opp.delta} Эло</div>}
@@ -83,20 +84,20 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
         <Card>
           <div className="rows">
             {data.belt?.won && <div className="row new-reward" style={{ border: 0 }}><BeltIcon arena={ARENAS.find((a) => a.id === data.belt.won)} size={56} /><div className="grow"><div className="title">Пояс чемпиона ваш!</div><div className="sub">Арена «{ARENAS.find((a) => a.id === data.belt.won).name}» — удержите его до понедельника</div></div></div>}
-            {data.belt?.defended && <div className="row"><span style={{ fontSize: 26 }}>🛡️</span><div className="grow"><div className="title">Пояс защищён</div><div className="sub">Ещё одна защита титула</div></div></div>}
-            {data.belt?.lost && <div className="row"><span style={{ fontSize: 26 }}>💔</span><div className="grow"><div className="title">Пояс потерян</div><div className="sub">Отберите его обратно в рейтинге или вызовом</div></div></div>}
+            {data.belt?.defended && <div className="row"><Glyph e="🛡️" size={32} /><div className="grow"><div className="title">Пояс защищён</div><div className="sub">Ещё одна защита титула</div></div></div>}
+            {data.belt?.lost && <div className="row"><Glyph e="💔" size={32} /><div className="grow"><div className="title">Пояс потерян</div><div className="sub">Отберите его обратно в рейтинге или вызовом</div></div></div>}
             {data.reward?.type && <div className="row new-reward" style={{ border: 0 }}><PackIcon type={data.reward.type} size={48} className="bounce" /><div className="grow"><div className="title">{PACKS[data.reward.type].name}!</div><div className="sub">Ждёт на главной в слоте {data.reward.slot + 1}</div></div></div>}
-            {data.reward?.full && <div className="row"><span style={{ fontSize: 26 }}>🎴</span><div className="grow"><div className="title">Все слоты наборов заняты</div><div className="sub">Откройте набор, чтобы получать новые за победы</div></div></div>}
+            {data.reward?.full && <div className="row"><Glyph e="🎴" size={32} /><div className="grow"><div className="title">Все слоты наборов заняты</div><div className="sub">Откройте набор, чтобы получать новые за победы</div></div></div>}
             {data.run && (
               <div className="row">
-                <span style={{ fontSize: 26 }}>{data.run.done ? '🏁' : '🏅'}</span>
+                <Glyph e={data.run.done ? '🏁' : '🏅'} size={32} />
                 <div className="grow">
-                  <div className="title">{data.run.kind === 'big' ? 'Большой' : 'Малый'} турнир: {data.run.wins} {plural(data.run.wins, 'победа', 'победы', 'побед')} {'❤️'.repeat(Math.max(0, data.run.maxLosses - data.run.losses))}{'🖤'.repeat(Math.min(data.run.maxLosses, data.run.losses))}</div>
-                  <div className="sub">{data.run.done ? 'Забег окончен — награда в почте на главной 📬' : `Ещё ${data.run.maxLosses - data.run.losses} ${plural(data.run.maxLosses - data.run.losses, 'поражение', 'поражения', 'поражений')} до конца забега`}</div>
+                  <div className="title">{data.run.kind === 'big' ? 'Большой' : 'Малый'} турнир: {data.run.wins} {plural(data.run.wins, 'победа', 'победы', 'побед')} <span className="run-lives inline">{Array.from({ length: data.run.maxLosses }, (_, i) => <span key={i} className={i < data.run.maxLosses - data.run.losses ? 'heart on' : 'heart'} />)}</span></div>
+                  <div className="sub">{rich(data.run.done ? 'Забег окончен — награда в почте на главной 📬' : `Ещё ${data.run.maxLosses - data.run.losses} ${plural(data.run.maxLosses - data.run.losses, 'поражение', 'поражения', 'поражений')} до конца забега`)}</div>
                 </div>
               </div>
             )}
-            {data.war && <div className="row"><span style={{ fontSize: 26 }}>⚔️</span><div className="grow"><div className="title">+{data.war.points} очков вашему клану</div><div className="sub">Победа в бою войны</div></div></div>}
+            {data.war && <div className="row"><Glyph e="⚔️" size={32} /><div className="grow"><div className="title">+{data.war.points} очков вашему клану</div><div className="sub">Победа в бою войны</div></div></div>}
           </div>
         </Card>
       )}
@@ -134,8 +135,8 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
           {mode === 'ranked' ? '⚔️ Новый соперник' : mode === 'tournament' ? (data.run && !data.run.done ? '🏅 Следующий бой турнира' : '🏆 К турнирам') : mode === 'spar' ? '🤼 Ещё спарринг' : mode === 'war' ? '⚔️ Ещё бой войны' : mode === 'friend' || mode === 'title' ? '🔁 Реванш' : mode === 'bot' ? '🤖 Ещё бой' : '🏋️ Ещё подход'}
         </button>
         <div className="row-actions">
-          <button className="glass-btn" onClick={onShare}>📤 Поделиться</button>
-          <button className="glass-btn" onClick={onHome}>🏠 На главную</button>
+          <button className="glass-btn" onClick={onShare}><Glyph e="📤" size="1.25em" /> Поделиться</button>
+          <button className="glass-btn" onClick={onHome}><Glyph e="🏠" size="1.25em" /> На главную</button>
         </div>
       </div>
     </div>

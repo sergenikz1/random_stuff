@@ -7,7 +7,8 @@ const SEGMENTS = [['ls', 'rs'], ['ls', 'le'], ['le', 'lw'], ['rs', 're'], ['re',
 const JOINTS = ['ls', 'rs', 'le', 're', 'lw', 'rw'];
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const CONFETTI = ['#ff4d6d', '#ffd23f', '#43a8ff', '#6fe08a', '#b49bff', '#ff9f43', '#5ff6ff'];
+// Конфетти в цветах темы: синий, белый, охра, красный.
+const CONFETTI = ['#1f4fa8', '#ffffff', '#d9a63a', '#c23b22', '#10213f', '#f3e6cf'];
 
 export function createFx(canvas) {
   const ctx = canvas.getContext('2d');

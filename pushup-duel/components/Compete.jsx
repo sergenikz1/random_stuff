@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Пояса чемпионов, турниры и почта с наградами.
 import { useEffect, useState } from 'react';
 import { PACKS } from '../lib/economy.js';
@@ -38,10 +39,10 @@ export function BeltsList({ openPlayer, onChallenge, toast, version }) {
               <div className="title">Арена {b.arena.id} · {b.arena.name}</div>
               {b.holder ? (
                 <button className="sub belt-holder" onClick={() => openPlayer(b.holder.id)}>
-                  <Avatar emoji={b.holder.avatar} frame={b.holder.frame} size="sm" /> {b.holder.name}{b.mine ? ' (вы)' : ''} · {days(b.since)} {plural(days(b.since), 'день', 'дня', 'дней')} · защит: {b.defenses}
+                  <Avatar emoji={b.holder.avatar} look={b.holder.look} frame={b.holder.frame} size="sm" /> {b.holder.name}{b.mine ? ' (вы)' : ''} · {days(b.since)} {plural(days(b.since), 'день', 'дня', 'дней')} · защит: {b.defenses}
                 </button>
               ) : <div className="sub">Свободен — выиграйте рейтинговый бой на этой арене</div>}
-              <div className="sub">За неделю: 💎 {b.weekly.gems} + {PACKS[b.weekly.pack].name.toLowerCase()}</div>
+              <div className="sub">За неделю: <Glyph e="💎" size="1.25em" /> {b.weekly.gems} + {PACKS[b.weekly.pack].name.toLowerCase()}</div>
             </div>
             {b.canChallenge && <button className="gel orange" style={{ padding: '7px 12px', fontSize: 13 }} onClick={() => onChallenge(b.holder)}>Вызов</button>}
           </div>
@@ -110,7 +111,7 @@ export function TourneysView({ profile, onStart, onPlay, status, version, toast 
                   <div className="run-box">
                     <div className="run-wins"><span className="greek-title">{run.wins}</span><small>побед из {t.maxWins}</small></div>
                     <div className="run-lives">{Array.from({ length: t.maxLosses }, (_, i) => <span key={i} className={i < t.maxLosses - run.losses ? 'heart on' : 'heart'} />)}</div>
-                    <div className="run-next small"><b>Сейчас:</b> {rewardLine(t.rewards[run.wins])}</div>
+                    <div className="run-next small"><b>Сейчас:</b> {rich(rewardLine(t.rewards[run.wins]))}</div>
                   </div>
                   <button className="gel xl" disabled={status !== 'online'} onClick={() => onPlay(t.kind)}><Icon name="swords" size={26} /> Турнирный бой</button>
                 </>
@@ -128,7 +129,7 @@ export function TourneysView({ profile, onStart, onPlay, status, version, toast 
               <div className="ladder">
                 {t.rewards.map((r, i) => (
                   <div key={i} className={`ladder-row ${run && run.wins === i ? 'cur' : ''} ${run && run.wins > i ? 'past' : ''}`}>
-                    <span className="ladder-n">{i}</span><span className="grow">{rewardLine(r)}</span>
+                    <span className="ladder-n">{i}</span><span className="grow">{rich(rewardLine(r))}</span>
                   </div>
                 )).reverse()}
               </div>
@@ -150,10 +151,10 @@ export function InboxCard({ eco, onClaim }) {
       <div className="rows">
         {eco.inbox.map((it) => (
           <div key={it.id} className="row">
-            {it.pack ? <PackIcon type={it.pack} size={34} /> : <span style={{ fontSize: 24 }}>{it.gift ? '🎁' : '🏅'}</span>}
+            {it.pack ? <PackIcon type={it.pack} size={34} /> : <Glyph e={it.gift ? '🎁' : '🏅'} size={30} />}
             <div className="grow">
               <div className="title">{it.title}</div>
-              <div className="sub">{[it.gift && `подарок Telegram ${it.gift} ★`, it.pack && PACKS[it.pack].name.toLowerCase(), it.gems && `💎 ${it.gems}`, it.sticker && `наклейка «${stickerById(it.sticker)?.name}»`].filter(Boolean).join(' · ')}</div>
+              <div className="sub">{rich([it.gift && `подарок Telegram ${it.gift} ★`, it.pack && PACKS[it.pack].name.toLowerCase(), it.gems && `💎 ${it.gems}`, it.sticker && `наклейка «${stickerById(it.sticker)?.name}»`].filter(Boolean).join(' · '))}</div>
             </div>
             <button className="gel green" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => onClaim(it.id)}>{it.gift ? 'Отправить' : 'Забрать'}</button>
           </div>

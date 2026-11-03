@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Экран боя: камера + MediaPipe Pose + счётчик. Режимы: ranked и friend (онлайн, судья — сервер),
 // bot (соперник-бот на клиенте) и training (без соперника).
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -338,17 +339,17 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
       <div className="vignette" />
 
       <div className="hud">
-        <div className="hud-tag">{belt ? `🥊 ${TAGS.title}` : TAGS[mode]}</div>
+        <div className="hud-tag">{rich(belt ? `🥊 ${TAGS.title}` : TAGS[mode])}</div>
         <div className="hud-row">
           <div className="hud-p">
-            <Avatar emoji={profile?.avatar} frame={profile?.frame || profile?.equipped?.frame} size="sm" side="me" />
+            <Avatar emoji={profile?.avatar} look={profile?.look} frame={profile?.frame || profile?.equipped?.frame} size="sm" side="me" />
             <div style={{ minWidth: 0 }}><div className="n">{profile?.name}</div><div className="r">{profile?.rating}</div></div>
           </div>
           <div className={`hud-timer ${phase === 'live' && timeLeft < 10000 ? 'hot' : ''}`}>{fmtTime(phase === 'live' ? timeLeft : durationMs)}</div>
           {opponent ? (
             <div className="hud-p right">
               <div style={{ minWidth: 0 }}><div className="n">{opponent.name}</div><div className="r">{opponent.bot ? `бот · ${opponent.rating}` : opponent.rating}</div></div>
-              <Avatar emoji={opponent.avatar} frame={opponent.frame} size="sm" side="opp" />
+              <Avatar emoji={opponent.avatar} look={opponent.look} frame={opponent.frame} size="sm" side="opp" />
             </div>
           ) : <div className="hud-p right"><div className="r">темп {pace}/мин</div></div>}
         </div>
@@ -364,8 +365,8 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
       {!opponent && <div className="train-count">{count.my}<small>{phase === 'live' ? `отжиманий · ${pace} в минуту` : 'отжиманий'}</small></div>}
 
       <div className="game-tools">
-        <button className="icon-btn" onClick={flip} aria-label="Сменить камеру">🔄</button>
-        <button className="icon-btn" onClick={() => updateSettings({ sound: !settings.sound })} aria-label="Звук">{settings.sound ? '🔊' : '🔇'}</button>
+        <button className="icon-btn" onClick={flip} aria-label="Сменить камеру"><Glyph e="🔄" size="1.25em" /></button>
+        <button className="icon-btn" onClick={() => updateSettings({ sound: !settings.sound })} aria-label="Звук">{rich(settings.sound ? '🔊' : '🔇')}</button>
       </div>
 
       {seen && (
@@ -389,7 +390,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
         )}
         {phase === 'judging' && <div className="panel"><div className="spinner" style={{ margin: '0 auto 10px' }} /><div className="mid">Подводим итоги…</div></div>}
         {phase === 'camera_error' && (
-          <div className="panel"><div className="mid">😕</div><div className="hint">{err}</div>
+          <div className="panel"><div className="mid"><Glyph e="😕" size="1.25em" /></div><div className="hint">{err}</div>
             <button className="gel" style={{ marginTop: 12 }} onClick={() => location.reload()}>Повторить</button></div>
         )}
         {err && phase !== 'camera_error' && <div className="hint" style={{ marginTop: 80 }}>{err}</div>}

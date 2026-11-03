@@ -1,7 +1,8 @@
 'use client';
 // Базовые элементы интерфейса: плоский греческий стиль.
 import { useEffect } from 'react';
-import { Glyph } from './Icon.jsx';
+import { Glyph, rich } from './Icon.jsx';
+import { AvatarArt } from './Emblem.jsx';
 import { bindBackButton } from '../lib/client/tg.js';
 
 // Фон: сплошной цвет темы, без пузырей и бликов.
@@ -24,13 +25,9 @@ export function Card({ title, icon, link, onLink, className = '', children, styl
   );
 }
 
-export function Avatar({ emoji, frame = 'none', size = '', side = '' }) {
-  const f = frame && frame !== 'none' ? `f-${frame}` : side;
-  return (
-    <span className={`ava ${size} ${f}`}>
-      <i><b>{emoji || '🙂'}</b></i>
-    </span>
-  );
+// Аватар-конструктор: фигура (emoji = id фигуры) и облик look (форма, окантовка, цвета).
+export function Avatar({ emoji, look, frame = 'none', size = '', side = '' }) {
+  return <AvatarArt fig={emoji} look={look} frame={frame} size={size} side={side} />;
 }
 
 export function Bar({ value, max = 1, tone = '' }) {
@@ -62,7 +59,7 @@ export function Sheet({ onClose, children, center = false }) {
 
 export function Toast({ text }) {
   if (!text) return null;
-  return <div className="toast" role="status">{text}</div>;
+  return <div className="toast" role="status">{rich(text)}</div>;
 }
 
 export const fmtTime = (ms) => {
@@ -87,8 +84,8 @@ export const plural = (n, one, few, many) => {
 };
 
 export function Medal({ place }) {
-  if (place === 1) return <span className="place">🥇</span>;
-  if (place === 2) return <span className="place">🥈</span>;
-  if (place === 3) return <span className="place">🥉</span>;
+  if (place === 1) return <span className="place"><Glyph e="🥇" size="1.25em" /></span>;
+  if (place === 2) return <span className="place"><Glyph e="🥈" size="1.25em" /></span>;
+  if (place === 3) return <span className="place"><Glyph e="🥉" size="1.25em" /></span>;
   return <span className="place">{place}</span>;
 }

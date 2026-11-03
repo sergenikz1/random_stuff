@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar } from './ui.jsx';
 import { Icon } from './Icon.jsx';
+import { Crest } from './Emblem.jsx';
 import { PackSlots, Currency } from './Economy.jsx';
 import { ARENAS } from '../lib/economy.js';
 import { api } from '../lib/client/net.js';
@@ -35,7 +36,7 @@ export default function Home({ profile, status, settings, theme, onPlay, onMode,
     <div className="page home">
       <div className="topbar">
         <button className="topbar-me" onClick={onProfile} aria-label="Профиль">
-          <Avatar emoji={p.avatar} frame={p.equipped?.frame} size="sm" />
+          <Avatar emoji={p.avatar} look={p.look} frame={p.equipped?.frame} size="sm" />
           <span className="topbar-lvl">{roman(p.level)}</span>
           <span className="topbar-col">
             <span className="topbar-name">{p.name}</span>
@@ -85,10 +86,10 @@ export function PlayerRow({ r, onClick, right }) {
   return (
     <button className={`row ${r.me ? 'me' : ''}`} onClick={onClick} style={{ textAlign: 'left', width: '100%' }}>
       {r.place !== undefined && <span className="place">{r.place <= 3 ? ['🥇', '🥈', '🥉'][r.place - 1] : r.place}</span>}
-      <Avatar emoji={r.avatar} frame={r.frame} size="sm" />
+      <Avatar emoji={r.avatar} look={r.look} frame={r.frame} size="sm" />
       <div className="grow">
         <div className="title">{r.name}{r.me ? ' (вы)' : ''}</div>
-        <div className="sub">{[r.clan && `${r.clan.emoji} ${r.clan.name}`, r.title, `ур. ${r.level}`].filter(Boolean).join(' · ')}</div>
+        <div className="sub">{r.clan && <><Crest crest={r.clan.crest} size={13} /> </>}{[r.clan?.name, r.title, `ур. ${r.level}`].filter(Boolean).join(' · ')}</div>
       </div>
       {right}
     </button>

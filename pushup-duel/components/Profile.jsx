@@ -1,33 +1,33 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 import { useState } from 'react';
-import { COSMETICS, cosmeticName, REFERRAL_XP, BADGES, RARITY } from '../lib/pass.js';
+import { cosmeticName, REFERRAL_XP, BADGES, RARITY } from '../lib/pass.js';
 import { PlayerCard, Badge } from './PlayerCard.jsx';
 import { Album } from './Stickers.jsx';
 import { Avatar, Card, Seg, ago, fmtTime } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
+import { Crest } from './Emblem.jsx';
 
 const OUT = { win: ['Победа', 'green'], loss: ['Поражение', 'red'], draw: ['Ничья', ''] };
 const MODE = { ranked: '⚔️', friend: '🤝', bot: '🤖', training: '🏋️' };
 
-export default function Profile({ profile, settings, updateSettings, onSave, onInvite, inTg, onEditCard }) {
+export default function Profile({ profile, settings, updateSettings, onSave, onInvite, inTg, onEditCard, onEditAvatar }) {
   const [name, setName] = useState(profile?.name || '');
   if (!profile) return <div className="page"><div className="page-head"><h1>Профиль</h1></div></div>;
   const p = profile;
-  const unlocked = new Set(p.unlocked);
-  const avatars = Object.keys(COSMETICS.avatar);
 
   return (
     <div className="page">
       <Card>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <Avatar emoji={p.avatar} frame={p.equipped.frame} size="lg" />
+          <button style={{ border: 0, background: 'none', padding: 0 }} onClick={onEditAvatar} aria-label="Изменить аватар"><Avatar emoji={p.avatar} look={p.look} frame={p.equipped.frame} size="lg" /></button>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--heading)' }}>{p.name}</div>
             <div className="small" style={{ fontWeight: 700 }}>{p.title}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
               <span className="chip gold">{p.rank} · {p.rating}</span>
               <span className="chip">ур. {p.level}</span>
-              {p.clan && <span className="chip">{p.clan.emoji} {p.clan.name}</span>}
+              {p.clan && <span className="chip"><Crest crest={p.clan.crest} size={16} /> {p.clan.name}</span>}
             </div>
           </div>
         </div>
@@ -42,7 +42,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
       <Card title="Моя карточка" icon="🃏">
         <p className="small" style={{ fontWeight: 600, marginBottom: 12 }}>Её видит соперник в интро перед боем. Украсьте наклейками и выберите до трёх жетонов для витрины.</p>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><PlayerCard player={p} /></div>
-        <button className="gel wide violet" style={{ marginBottom: 14 }} onClick={onEditCard}>✨ Наклейки на карточке</button>
+        <button className="gel wide violet" style={{ marginBottom: 14 }} onClick={onEditCard}><Glyph e="✨" size="1.25em" /> Наклейки на карточке</button>
         <div className="rows">
           {BADGES.map((b) => {
             const own = p.earnedBadges.includes(b.id);
@@ -54,10 +54,10 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
               onSave({ badges: next });
             };
             return (
-              <button key={b.id} className={`row ${chosen ? 'me' : ''}`} style={{ textAlign: 'left', width: '100%', opacity: own ? 1 : 0.45 }} onClick={toggle}>
+              <button key={b.id} className={`row ${chosen ? 'me' : ''}`} style={{ textAlign: 'left', width: '100%', opacity: own ? 1 : 0.7, filter: own ? 'none' : 'grayscale(1)' }} onClick={toggle}>
                 <Badge id={b.id} />
                 <div className="grow"><div className="title">{b.name}</div><div className="sub">{b.need}</div></div>
-                <span className="chip" style={{ color: RARITY[b.rarity].color, borderColor: RARITY[b.rarity].color }}>{own ? (chosen ? '✓ в витрине' : RARITY[b.rarity].name) : '🔒'}</span>
+                <span className="chip" style={{ color: RARITY[b.rarity].color, borderColor: RARITY[b.rarity].color }}>{rich(own ? (chosen ? '✓ в витрине' : RARITY[b.rarity].name) : '🔒')}</span>
               </button>
             );
           })}
@@ -73,15 +73,15 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
             <div key={n} className="row" style={{ opacity: p.invites >= n ? 1 : 0.7 }}>
               <span className="chip">{n} {n === 1 ? 'друг' : n < 5 ? 'друга' : 'друзей'}</span>
               <div className="grow"><div className="title">{text}</div></div>
-              <span>{p.invites >= n ? '✅' : '🔒'}</span>
+              <span>{rich(p.invites >= n ? '✅' : '🔒')}</span>
             </div>
           ))}
         </div>
         <div className="row" style={{ margin: '10px 0' }}>
-          <span style={{ fontSize: 22 }}>👥</span>
+          <Glyph e="👥" size={28} />
           <div className="grow"><div className="title">Приглашено: {p.invites}</div><div className="sub">Друзей в PushDuel: {p.friends}</div></div>
         </div>
-        <button className="gel wide green" onClick={onInvite}>📨 Позвать друга</button>
+        <button className="gel wide green" onClick={onInvite}><Glyph e="📨" size="1.25em" /> Позвать друга</button>
       </Card>
 
       <Card title="Достижения" icon="🏅">
@@ -90,7 +90,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
             <div key={a.id} className="row" style={a.done ? undefined : { opacity: 0.6 }}>
               <RewardIcon k={a.items[0]} />
               <div className="grow"><div className="title">{a.need}</div><div className="sub">{a.items.map(cosmeticName).join(', ')}</div></div>
-              <span>{a.done ? '✅' : '🔒'}</span>
+              <span>{rich(a.done ? '✅' : '🔒')}</span>
             </div>
           ))}
         </div>
@@ -101,12 +101,11 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
           <input className="input" maxLength={16} value={name} onChange={(e) => setName(e.target.value)} />
           <button className="gel" disabled={name.trim() === p.name || name.trim().length < 2} onClick={() => onSave({ name: name.trim() })}>OK</button>
         </div>
-        <div className="emoji-grid">
-          {avatars.map((a) => (
-            <button key={a} className={p.avatar === a ? 'on' : ''} disabled={!unlocked.has(`avatar:${a}`)} onClick={() => onSave({ avatar: a })}>{a}</button>
-          ))}
-        </div>
-        <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Редкие аватары открываются в боевом пропуске и за приглашения.</p>
+        <button className="row" style={{ width: '100%', textAlign: 'left' }} onClick={onEditAvatar}>
+          <Avatar emoji={p.avatar} look={p.look} frame={p.equipped.frame} size="md" />
+          <div className="grow"><div className="title">Конструктор аватара</div><div className="sub">Фигура, форма, окантовка и цвета</div></div>
+          <span className="chip">Изменить</span>
+        </button>
       </Card>
 
       <Card title="История" icon="📜">

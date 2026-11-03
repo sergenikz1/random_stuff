@@ -245,7 +245,7 @@ export class Compete {
     const mine = this.store.clans.get(clanId);
     return {
       id: w.id, status: w.status, attacker: side === 'a',
-      enemy: enemy ? this.store.clanCard(enemy) : { name: 'Распущенный клан', emoji: '🏳️' },
+      enemy: enemy ? this.store.clanCard(enemy) : { name: 'Распущенный клан', emoji: '🛡️' },
       score: { mine: w.score[side], enemy: w.score[side === 'a' ? 'b' : 'a'] },
       duels: { mine: w.duels[side], enemy: w.duels[side === 'a' ? 'b' : 'a'] },
       end: w.end || null, proposedAt: w.proposedAt, myContrib: w.contrib[me.id] || 0,

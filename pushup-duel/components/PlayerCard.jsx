@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Карточка игрока с жетонами и интро «VS» перед матчем.
 import { useEffect, useState } from 'react';
 import { badgeById, RARITY, RARITY_ORDER } from '../lib/pass.js';
@@ -6,7 +7,9 @@ import { sfx } from '../lib/client/sound.js';
 import { haptic } from '../lib/client/tg.js';
 import { Avatar } from './ui.jsx';
 import { Sticker } from './Stickers.jsx';
-import { ARENAS } from '../lib/economy.js';
+import { ARENAS, arenaOf } from '../lib/economy.js';
+import { roman } from './Greek.jsx';
+import { Crest } from './Emblem.jsx';
 
 // Редкость карточки — по самому редкому жетону; премиум — всегда легендарная рамка.
 function cardRarity(player) {
@@ -33,16 +36,16 @@ export function PlayerCard({ player, side = '', bot = false, animate = false }) 
     <div className={`pcard h r-${rarity} ${side} ${animate ? 'enter' : ''}`} style={{ '--rc': RARITY[rarity].color }}>
       <div className="pcard-holo" />
       <div className="pcard-left">
-        <div className="pcard-ava"><Avatar emoji={player.avatar} frame={player.frame} size="lg" /></div>
-        <div className="pcard-lvl">{player.premium ? '🌟 ' : ''}ур. {player.level ?? 1}</div>
+        <div className="pcard-ava"><Avatar emoji={player.avatar} look={player.look} frame={player.frame} size="lg" /></div>
+        <div className="pcard-lvl">{player.premium && <Glyph e="🌟" size="1.2em" />} ур. {player.level ?? 1}</div>
       </div>
       <div className="pcard-right">
-        <div className="pcard-top"><span>{bot ? 'БОТ' : (player.rank || '').toUpperCase()}</span>{player.belt && <span className="pcard-belt">🥊 {ARENAS.find((a) => a.id === player.belt)?.name}</span>}</div>
+        <div className="pcard-top"><span>{bot ? 'БОТ' : (player.rank || '').toUpperCase()}</span>{player.belt && <span className="pcard-belt"><Glyph e="🥊" size="1.25em" /> {ARENAS.find((a) => a.id === player.belt)?.name}</span>}</div>
         <div className="pcard-name">{player.name}</div>
         <div className="pcard-title">{bot ? 'Тренировочный соперник' : player.title || 'Новобранец'}</div>
         <div className="pcard-line">
           <span className="pcard-elo"><b>{player.rating}</b> Эло</span>
-          {player.clan && <span className="pcard-clan">{player.clan.emoji} {player.clan.name}</span>}
+          {player.clan && <span className="pcard-clan"><Crest crest={player.clan.crest} size={16} /> {player.clan.name}</span>}
         </div>
         <div className="pcard-badges">
           {(player.badges || []).length
@@ -85,12 +88,13 @@ export function VersusIntro({ me, opp, bot, mode, belt, onDone }) {
       <div className="versus-rays" />
       <div className="versus-flash" />
       <div className="versus-streaks"><i /><i /><i /><i /><i /><i /></div>
-      <div className="versus-tag">{belt ? `🥊 ТИТУЛЬНЫЙ БОЙ · ${ARENAS.find((a) => a.id === belt)?.name?.toUpperCase()}` : { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', tournament: '🏆 ТУРНИР', title: '🥊 ТИТУЛЬНЫЙ БОЙ', spar: '🤼 СПАРРИНГ В КЛАНЕ', war: '⚔️ ВОЙНА КЛАНОВ' }[mode]}</div>
+      <div className="versus-tag">{rich(belt ? `🥊 ТИТУЛЬНЫЙ БОЙ · ${ARENAS.find((a) => a.id === belt)?.name?.toUpperCase()}` : { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', tournament: '🏆 ТУРНИР', title: '🥊 ТИТУЛЬНЫЙ БОЙ', spar: '🤼 СПАРРИНГ В КЛАНЕ', war: '⚔️ ВОЙНА КЛАНОВ' }[mode])}</div>
       <div className="versus-stack">
         <PlayerCard player={me} side="from-left" animate />
         <div className="versus-vs">VS</div>
         <PlayerCard player={opp} side="from-right" bot={bot} animate />
       </div>
+      <div className="versus-meta">{(() => { const a = arenaOf(Math.max(me.rating || 0, opp.rating || 0)); return `Арена ${roman(a.id)} · ${a.name}`; })()}<small>Больше отжиманий — победа</small></div>
       <div className="versus-hint">Нажмите, чтобы пропустить</div>
     </div>
   );

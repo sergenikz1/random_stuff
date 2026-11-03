@@ -21,6 +21,7 @@ import Shop from './Shop.jsx';
 import { PackOpenModal } from './Economy.jsx';
 import TrophyMap from './TrophyMap.jsx';
 import { Glyph } from './Icon.jsx';
+import { AvatarEditor } from './Emblem.jsx';
 import { CardEditor } from './Stickers.jsx';
 import { startTilt } from '../lib/client/tilt.js';
 import { Sheet } from './ui.jsx';
@@ -351,7 +352,7 @@ export default function App() {
             onDeclareWar={(clanId) => clanCall('clans/war/declare', { clanId }, 'Вызов отправлен капитану ⚔️')}
             onRespondWar={(id, action) => clanCall(`clans/war/${id}`, { action }, action === 'accept' ? 'Война началась! ⚔️' : 'Вызов отклонён')} />}
           {tab === 'pass' && <Pass profile={profile} onEquip={equip} onBuy={buyPremium} onClaimGift={claimGift} buying={buying} />}
-          {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} />}
+          {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} onEditAvatar={() => setSheet({ kind: 'avatar' })} />}
           <nav className="tabbar">
             {TABS.map(([id, icon, label]) => (
               <button key={id} className={tab === id ? 'on' : ''} onClick={() => { setTab(id); haptic('select'); }}>
@@ -371,12 +372,13 @@ export default function App() {
       )}
       {sheet?.kind === 'road' && <TrophyMap eco={profile?.eco} profile={profile} theme={theme} onClose={closeSheet} onClaim={claimRoad} />}
       {sheet?.kind === 'card' && profile && <CardEditor profile={profile} onSave={saveCard} onClose={closeSheet} />}
+      {sheet?.kind === 'avatar' && profile && <AvatarEditor profile={profile} onSave={(b) => { setSheet(null); saveProfile(b); }} onClose={closeSheet} />}
       {sheet?.kind === 'packGems' && (
         <Sheet onClose={closeSheet} center>
           <h2 className="center">Открыть сейчас?</h2>
           <p className="center muted" style={{ fontWeight: 700 }}>Набор откроется мгновенно за {sheet.gems} 💎 (у вас {profile?.eco?.gems ?? 0})</p>
           <button className="gel xl violet" disabled={ecoBusy || (profile?.eco?.gems ?? 0) < sheet.gems}
-            onClick={() => { const slot = sheet.slot; setSheet(null); ecoCall(`packs/${slot}/open`, { gems: true }, (r) => setLoot(r.loot)); }}>💎 {sheet.gems} — открыть</button>
+            onClick={() => { const slot = sheet.slot; setSheet(null); ecoCall(`packs/${slot}/open`, { gems: true }, (r) => setLoot(r.loot)); }}><Glyph e="💎" size="1.25em" /> {sheet.gems} — открыть</button>
           <button className="glass-btn" onClick={closeSheet}>Подождать</button>
         </Sheet>
       )}

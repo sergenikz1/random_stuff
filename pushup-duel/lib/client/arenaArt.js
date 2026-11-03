@@ -3,8 +3,8 @@
 // компонент арены просто покажет <img> вместо этой SVG.
 
 const PAL = {
-  light: { sky: ['#d6e6fb', '#d6e6fb'], far: '#7c8fb0', ground: '#f3e6cf', stone: '#1f4fa8', fill: '#ffffff', smoke: 'rgba(90,100,120,0.35)', lava: '#ff6a1a', sun: '#ffffff', sea: ['#9db4d6', '#9db4d6'], colA: '#e8f0ff', colB: '#c9d8f2', volc: '#7b8aa3', leaf: '#6f9a5a' },
-  dark: { sky: ['#1a0c06', '#1a0c06'], far: '#3a170a', ground: '#1f120b', stone: '#d4772f', fill: '#140e0a', smoke: 'rgba(255,190,140,0.22)', lava: '#ff6a1a', sun: '#ffcf7a', sea: ['#4a2311', '#4a2311'], colA: '#3a1d0e', colB: '#1a0d06', volc: '#3a1a0b', leaf: '#7a5a2a' },
+  light: { sky: ['#d6e6fb', '#d6e6fb'], far: '#7c8fb0', ground: '#f3e6cf', stone: '#1f4fa8', fill: '#ffffff', smoke: '#c9d5e8', lava: '#ff6a1a', sun: '#ffffff', sea: ['#9db4d6', '#9db4d6'], colA: '#e8f0ff', colB: '#c9d8f2', volc: '#7b8aa3', leaf: '#6f9a5a' },
+  dark: { sky: ['#1a0b08', '#1a0b08'], far: '#3a1510', ground: '#22120d', stone: '#d9a63a', fill: '#150d0b', smoke: '#3a1a12', lava: '#ff6a1a', sun: '#ffcf7a', sea: ['#5a1d14', '#5a1d14'], colA: '#3a1d0e', colB: '#1a0d06', volc: '#3a1510', leaf: '#7a5a2a' },
 };
 
 function columns(a, x, y, n, gap, h, w = 10) {
@@ -45,14 +45,14 @@ export function arenaSvg(n, dark) {
   const a = dark ? PAL.dark : PAL.light;
   const vx = n === 7 ? 70 : 282;
   const volcano = `<g transform='translate(${vx} 150) scale(1.15)'>
-    ${Array.from({ length: 3 + Math.min(4, n) }, (_, i) => `<circle cx='${(i % 2 ? 8 : -6) + i * 3}' cy='${-58 - i * 13}' r='${8 + i * 3}' fill='${a.smoke}'/>`).join('')}
-    <ellipse cx='0' cy='-50' rx='24' ry='10' fill='${a.lava}' opacity='.4'/>
+    ${Array.from({ length: 3 + Math.min(4, n) }, (_, i) => `<circle cx='${(i % 2 ? 8 : -6) + i * 3}' cy='${-58 - i * 13}' r='${8 + i * 3}' fill='${a.smoke}' stroke='${a.stone}' stroke-width='1.2'/>`).join('')}
+    
     <path d='M-80 2 L-20 -50 Q0 -56 20 -50 L80 2 Z' fill='${a.volc}' stroke='${a.stone}' stroke-width='1.4'/>
     <path d='M-15 -51 Q0 -43 15 -51' stroke='${a.lava}' stroke-width='3' fill='none'/>
     <path d='M2 -46 C-4 -34 6 -26 0 -14' stroke='${a.lava}' stroke-width='2.4' fill='none'/></g>`;
   const sky = dark
     ? Array.from({ length: 22 }, (_, i) => `<circle cx='${(i * 53) % 360}' cy='${-100 + ((i * 29) % 170)}' r='1.2' fill='#ffd2a0' opacity='.8'/>`).join('')
-    : `<circle cx='60' cy='-30' r='20' fill='${a.sun}' opacity='.95'/><circle cx='60' cy='-30' r='34' fill='${a.sun}' opacity='.25'/>`;
+    : `<circle cx='60' cy='-30' r='20' fill='${a.sun}' stroke='${a.stone}' stroke-width='1.5'/>`;
   return `<svg viewBox='0 0 360 330' width='100%' height='100%' preserveAspectRatio='xMidYMax slice' xmlns='http://www.w3.org/2000/svg'>
     <rect width='360' height='330' fill='${a.sky[0]}'/>
     <g transform='translate(0 120)'>

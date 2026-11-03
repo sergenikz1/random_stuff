@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Поиск соперника и комната с другом.
 import { useEffect, useState } from 'react';
 import { bindBackButton } from '../lib/client/tg.js';
@@ -41,11 +42,11 @@ export default function Lobby({ flow, profile, stats, onCancel, onBot, onShareRo
   if (flow.kind === 'room') {
     return (
       <div className="lobby">
-        <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" /></div>
-        <h1>{flow.title ? `🥊 Титульный бой: ждём ${flow.invited}…` : flow.invited ? `Ждём ${flow.invited}…` : 'Комната создана'}</h1>
+        <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} look={profile?.look} frame={profile?.frame} size="lg" side="me" /></div>
+        <h1>{rich(flow.title ? `🥊 Титульный бой: ждём ${flow.invited}…` : flow.invited ? `Ждём ${flow.invited}…` : 'Комната создана')}</h1>
         {flow.code ? <div className="code">{flow.code}</div> : <div className="spinner" />}
         <p>{flow.invited ? 'Мы отправили вызов в Telegram. Или скиньте ссылку сами:' : `Дуэль ${fmtTime((flow.durationSec || 60) * 1000)}. Отправьте другу ссылку или код:`}</p>
-        <button className="gel xl" style={{ maxWidth: 360 }} disabled={!flow.code} onClick={onShareRoom}>📨 Позвать друга</button>
+        <button className="gel xl" style={{ maxWidth: 360 }} disabled={!flow.code} onClick={onShareRoom}><Glyph e="📨" size="1.25em" /> Позвать друга</button>
         <button className="glass-btn" onClick={onCancel}>Закрыть комнату</button>
       </div>
     );
@@ -54,14 +55,14 @@ export default function Lobby({ flow, profile, stats, onCancel, onBot, onShareRo
   // Рейтинговая очередь.
   return (
     <div className="lobby">
-      <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" /></div>
-      <h1>{{ small: '🏅 Малый турнир', big: '🏆 Большой турнир', clan: '🤼 Спарринг в клане', war: '⚔️ Бой войны' }[flow.queue] || 'Ищем соперника…'}</h1>
+      <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} look={profile?.look} frame={profile?.frame} size="lg" side="me" /></div>
+      <h1>{rich({ small: '🏅 Малый турнир', big: '🏆 Большой турнир', clan: '🤼 Спарринг в клане', war: '⚔️ Бой войны' }[flow.queue] || 'Ищем соперника…')}</h1>
       {flow.queue && <p style={{ marginTop: -8 }}>{flow.queue === 'clan' ? 'Ждём соклановца, который тоже ищет спарринг' : flow.queue === 'war' ? 'Ищем бойца вражеского клана' : 'Ищем соперника'}</p>}
       <p>{fmtTime(elapsed)} · рейтинг {profile?.rating} · онлайн {stats?.online ?? '—'}, в поиске {stats?.queue ?? '—'}</p>
       {elapsed > 20000 && !flow.queue && (
         <>
           <p style={{ opacity: 0.85 }}>Пока никого — позовите друзей или сразитесь с ботом</p>
-          <button className="gel orange" onClick={onBot}>🤖 Бой с ботом</button>
+          <button className="gel orange" onClick={onBot}><Glyph e="🤖" size="1.25em" /> Бой с ботом</button>
         </>
       )}
       <button className="glass-btn" onClick={onCancel}>Отмена</button>

@@ -225,6 +225,40 @@ const ICONS = {
     <path className="k" d="M14 20 H22 V26 H14 Z M26 20 H34 V26 H26 Z" />
     <path className="s" d="M24 4 C20 1 14 2 12 6" />
   </>),
+  check: () => (<>
+    <rect className="p" x="6" y="6" width="36" height="36" rx="4" />
+    <path className="s thick" d="M14 24 L21 31 L35 15" />
+  </>),
+  box: () => (<>
+    <rect className="p" x="6" y="6" width="36" height="36" rx="4" />{meander(10, 39, 6, 4.6)}
+  </>),
+  flag: () => (<>
+    <path className="s thick" d="M12 44 V5" />
+    <path className="p" d="M12 7 H38 L32 15 L38 23 H12 Z" />{meander(15, 18, 3, 4)}
+  </>),
+  refresh: () => (<>
+    <path className="s thick" d="M38 18 A15 15 0 1 0 39 30" />
+    <path className="k" d="M42 9 L41 22 L29 18 Z" />
+  </>),
+  sound: () => (<>
+    <path className="p" d="M6 18 H14 L26 8 V40 L14 30 H6 Z" />
+    <path className="s" d="M32 17 C36 21 36 27 32 31 M37 12 C44 19 44 29 37 36" />
+  </>),
+  mute: () => (<>
+    <path className="p" d="M6 18 H14 L26 8 V40 L14 30 H6 Z" />
+    <path className="s thick" d="M32 18 L42 30 M42 18 L32 30" />
+  </>),
+  home: () => (<>
+    <path className="p" d="M5 22 L24 6 L43 22 Z" /><rect className="p" x="10" y="22" width="28" height="20" />
+    <rect className="k" x="20" y="29" width="8" height="13" />
+  </>),
+  close: () => (<>
+    <circle className="p" cx="24" cy="24" r="19" /><path className="s thick" d="M17 17 L31 31 M31 17 L17 31" />
+  </>),
+  heart: () => (<>
+    <path className="p" d="M24 42 C10 32 5 24 5 16 C5 9 10 5 16 5 C20 5 23 8 24 11 C25 8 28 5 32 5 C38 5 43 9 43 16 C43 24 38 32 24 42 Z" />
+  </>),
+
 };
 
 // Эмодзи, которые в интерфейсе заменяются иконками.
@@ -236,6 +270,7 @@ export const EMOJI_ICON = {
   '🏺': 'amphora', '🎴': 'amphora', '🛍️': 'amphora', '⚔️': 'swords', '⚔': 'swords', '🛡️': 'shield', '🏆': 'trophy',
   '🏅': 'medal', '🎖️': 'medal', '🔥': 'flame', '🌋': 'volcano', '⭐': 'star', '🌟': 'star', '🎁': 'gift', '🔒': 'lock',
   '🎭': 'mask', '⚡': 'bolt', '🪞': 'picture', '🥊': 'belt', '👑': 'laurel', '🫒': 'laurel',
+  '✅': 'check', '⬜': 'box', '🏳️': 'flag', '🔄': 'refresh', '🔊': 'sound', '🔇': 'mute', '🏠': 'home', '❤️': 'heart',
 };
 
 export function Icon({ name, size = 28, className = '' }) {
@@ -256,3 +291,13 @@ export function Glyph({ e, size = 26, className = '' }) {
 }
 
 export const ICON_NAMES = Object.keys(ICONS);
+
+// Строка с эмодзи → текст, где нарисованные значки заменены иконками (остальные эмодзи CSS рисует силуэтом).
+const EMOJI_RE = /(\p{Extended_Pictographic}\uFE0F?)/u;
+export function rich(text, size = '1.2em') {
+  if (typeof text !== 'string' || !EMOJI_RE.test(text)) return text;
+  return text.split(EMOJI_RE).map((part, i) => {
+    const name = EMOJI_ICON[part] || EMOJI_ICON[part.replace('\uFE0F', '')];
+    return name ? <Icon key={i} name={name} size={size} className="ico-inline" /> : part;
+  });
+}

@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Наклейки: отрисовка с голограммой, наборы, открытие, редактор карточки, альбом.
 import { useEffect, useRef, useState } from 'react';
 import { STICKERS, STICKER_RARITY, STICKER_RARITY_ORDER, PACKS, CARD_STICKERS_MAX, stickerById } from '../lib/stickers.js';
@@ -68,7 +69,7 @@ export function PackSlots({ eco, profileAt, onUnlock, onOpen }) {
             onClick={() => (ready ? onOpen(c.slot, false) : unlocking || anyUnlocking ? onOpen(c.slot, true, gems) : onUnlock(c.slot))}>
             <PackIcon type={c.type} size={46} className={ready ? 'bounce' : ''} />
             <span className="chest-name">{PACKS[c.type].name}</span>
-            <span className="chest-state">{ready ? 'Открыть!' : unlocking ? fmtLeft(left) : anyUnlocking ? `💎 ${gems}` : 'Начать'}</span>
+            <span className="chest-state">{rich(ready ? 'Открыть!' : unlocking ? fmtLeft(left) : anyUnlocking ? `💎 ${gems}` : 'Начать')}</span>
           </button>
         );
       })}
@@ -112,10 +113,10 @@ export function PackOpenModal({ loot, onClose }) {
             <h2 className="center">{PACKS[loot.type].name}</h2>
             <div className="sum-grid">{loot.stickers.map((s, i) => <Sticker key={i} id={s.id} size={58} />)}</div>
             <div className="rows" style={{ marginTop: 10 }}>
-              <div className="row"><span style={{ fontSize: 22 }}>🪙</span><div className="grow"><div className="title">{loot.coins} монет</div></div></div>
-              {loot.gems > 0 && <div className="row"><span style={{ fontSize: 22 }}>💎</span><div className="grow"><div className="title">{loot.gems} кристаллов</div></div></div>}
-              {loot.xp > 0 && <div className="row"><span style={{ fontSize: 22 }}>⭐</span><div className="grow"><div className="title">{loot.xp} опыта пропуска</div></div></div>}
-              {loot.levelAfter > loot.levelBefore && <div className="new-reward">🎉 Новый уровень пропуска: {loot.levelAfter}</div>}
+              <div className="row"><Glyph e="🪙" size={28} /><div className="grow"><div className="title">{loot.coins} монет</div></div></div>
+              {loot.gems > 0 && <div className="row"><Glyph e="💎" size={28} /><div className="grow"><div className="title">{loot.gems} кристаллов</div></div></div>}
+              {loot.xp > 0 && <div className="row"><Glyph e="⭐" size={28} /><div className="grow"><div className="title">{loot.xp} опыта пропуска</div></div></div>}
+              {loot.levelAfter > loot.levelBefore && <div className="new-reward"><Glyph e="🎉" size="1.25em" /> Новый уровень пропуска: {loot.levelAfter}</div>}
             </div>
           </div>
         )}
@@ -184,7 +185,7 @@ export function CardEditor({ profile, onSave, onClose }) {
           <button className="glass-btn" onClick={() => patch(cur.k, { r: Math.min(180, cur.r + 15) })}>⟳</button>
           <button className="glass-btn" onClick={() => patch(cur.k, { s: Math.max(0.5, +(cur.s - 0.15).toFixed(2)) })}>−</button>
           <button className="glass-btn" onClick={() => patch(cur.k, { s: Math.min(2, +(cur.s + 0.15).toFixed(2)) })}>＋</button>
-          <button className="glass-btn danger" onClick={() => { setItems((arr) => arr.filter((x) => x.k !== cur.k)); setSel(null); }}>🗑</button>
+          <button className="glass-btn danger" onClick={() => { setItems((arr) => arr.filter((x) => x.k !== cur.k)); setSel(null); }}><Glyph e="🗑" size="1.25em" /></button>
         </div>
       )}
       <div className="sticker-tray">

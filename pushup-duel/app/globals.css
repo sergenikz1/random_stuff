@@ -75,7 +75,7 @@
 
   --ink: #f1e3c8;
   --soft: #b39577;
-  --heading: #e0b25a;
+  --heading: #e2502f;
   --accent: #c23b22;
   --accent-ink: #fff3e0;
   --accent-edge: #8a2614;
@@ -94,8 +94,8 @@
   --terra-edge: #9e4f1a;
   --navy: #8a2614;
 
-  --ip: #d9a63a;
-  --ii: #0b0706;
+  --ip: #150d0b;
+  --ii: #e2502f;
   --tab: #110a08;
   --scrim: rgba(0, 0, 0, 0.7);
   --stage: #0d0806;
@@ -174,7 +174,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .gel.xl { padding: 14px 24px; font-size: 17px; width: 100%; }
 .gel.wide { width: 100%; }
 .gel.green  { --b1: var(--cta); --b2: var(--cta-edge); --bi: var(--cta-ink); }
-.gel.orange { --b1: var(--terra); --b2: var(--terra-edge); --bi: #fff; }
+.gel.orange { --b1: var(--cta); --b2: var(--cta-edge); --bi: var(--cta-ink); }
 .gel.rose   { --b1: var(--red); --b2: var(--red-edge); --bi: #fff; }
 .gel.violet, .gel.blue { --b1: var(--accent); --b2: var(--accent-edge); --bi: var(--accent-ink); }
 .gel .ico { --ip: var(--b1, var(--cta)); --ii: var(--bi, var(--cta-ink)); }
@@ -244,7 +244,6 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .tabbar button .tile { width: 30px; height: 30px; }
 .tabbar button.on { color: var(--accent-ink); background: var(--accent); }
 .tabbar button.on .ico { --ip: var(--accent-ink); --ii: var(--accent); }
-:root[data-theme="midnight"] .tabbar button.on .ico { --ip: var(--accent); --ii: #140d09; }
 
 /* ---------- Аватар-конструктор ---------- */
 /* Слои: внешняя линия → полоса окантовки (фон) → узор окантовки → внутренняя линия → лицо с фигурой. */
@@ -447,7 +446,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 @keyframes spin { to { transform: rotate(360deg); } }
 .splash { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--heading); }
 .splash .logo { font-family: var(--font-display-stack); font-size: 40px; letter-spacing: 0.12em; text-align: center; }
-.splash .logo span { color: var(--terra); }
+.splash .logo span { color: var(--cta); }
 .hidden { display: none !important; }
 @media (min-width: 640px) { .page { max-width: 560px; margin: 0 auto; width: 100%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
@@ -478,7 +477,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .pcard-title { font-size: 11.5px; font-weight: 800; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pcard-line { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .pcard-elo { font-size: 12px; font-weight: 700; color: var(--soft); }
-.pcard-elo b { font-family: var(--font-display-stack); font-weight: 400; font-size: 20px; color: var(--terra); }
+.pcard-elo b { font-family: var(--font-display-stack); font-weight: 400; font-size: 20px; color: var(--cta-edge); }
 .pcard-clan { font-size: 11.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pcard-badges { display: flex; gap: 5px; margin-top: 6px; min-height: 30px; align-items: center; flex-wrap: wrap; }
 .pcard-badges .badge { --s: 30px; }
@@ -648,9 +647,6 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
   padding: 6px 16px 7px; border-radius: 4px; white-space: nowrap; color: var(--soft); font-weight: 800; background: var(--card); border: 1.5px solid var(--accent); }
 .arena-plate .greek-title { font-size: 18px; color: var(--heading); overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .arena-plate .small { font-size: 12px; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.arena-arrow { position: absolute; top: 40%; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; font-weight: 900;
-  color: var(--accent); background: var(--card); border: 2px solid var(--accent); }
-.arena-arrow.l { left: 8px; } .arena-arrow.r { right: 8px; }
 .inbox-btn { position: absolute; left: 10px; top: 12px; border: 0; background: none; padding: 0; }
 .inbox-btn .tile { width: 40px; height: 40px; }
 .arena-actions { display: flex; gap: 8px; padding: 10px 12px 12px; }
@@ -663,7 +659,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 /* ---------- Вулкан и стрик ---------- */
 .volc-art { height: 150px; border-radius: 6px; overflow: hidden; border: 1.5px solid var(--card-border); }
 .volc-art .smoke { fill: #c9d5e8; stroke: var(--accent); stroke-width: 1.2; animation: smoke 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-:root[data-theme="midnight"] .volc-art .smoke { fill: #3a1a12; stroke: #d9a63a; }
+:root[data-theme="midnight"] .volc-art .smoke { fill: #3a1a12; stroke: var(--accent); }
 @keyframes smoke { 50% { transform: translateY(-6px) scale(1.06); } }
 .volc-art .lavaflow { stroke-dasharray: 12 8; animation: lava 1.6s linear infinite; }
 @keyframes lava { to { stroke-dashoffset: -40; } }
@@ -766,7 +762,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .gate-lock { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 900; color: #fff; background: var(--olive); }
 .tmap-gate:not(.on) .gate-lock { background: none; }
 .tmap-link { position: absolute; height: 0; border-top: 2px dashed var(--accent); }
-.tmap.dark .tmap-link { border-color: #d9a63a; }
+.tmap.dark .tmap-link { border-color: #c23b22; }
 .tmap-node { position: absolute; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; z-index: 2; font-size: 10.5px; font-weight: 900;
   color: var(--accent); background: var(--card); border: 2.5px solid var(--accent); }
 .tmap-node.ready { color: #2a1a00; background: var(--ochre); border-color: var(--ochre-edge); animation: nodePulse 1.4s ease-in-out infinite; }
@@ -784,7 +780,7 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .tmap-reward.ready { border: 2px solid var(--ochre); }
 .tmap-me { position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; animation: meBob 2s ease-in-out infinite; }
 @keyframes meBob { 50% { transform: translateY(-5px); } }
-.me-tag { white-space: nowrap; padding: 2px 9px; border-radius: 4px; font-size: 11px; font-weight: 900; color: #fff; background: var(--terra); border: 1.5px solid var(--terra-edge); }
+.me-tag { white-space: nowrap; padding: 2px 9px; border-radius: 4px; font-size: 11px; font-weight: 900; color: var(--cta-ink); background: var(--cta); border: 1.5px solid var(--cta-edge); }
 .tmap-head { position: fixed; z-index: 47; left: 0; right: 0; top: 0; pointer-events: none;
   padding: calc(8px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)) 16px 8px;
   display: flex; flex-direction: column; align-items: center; background: var(--card); border-bottom: 2px solid var(--accent); }
@@ -823,3 +819,70 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .versus-meta { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #fff; font-family: var(--font-display-stack); font-weight: 700; font-size: 20px; letter-spacing: 0.08em; animation: fadein 600ms 1.2s both; }
 .versus-meta small { font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0; opacity: 0.7; }
 .versus.leaving .versus-meta { transition: opacity 300ms; opacity: 0; }
+
+/* ---------- Открытие набора: ваза трескается и разбивается ---------- */
+.pack-open.r-common { --rc: #9fb6cf; } .pack-open.r-rare { --rc: #43a8ff; } .pack-open.r-epic { --rc: #b06bff; } .pack-open.r-legend { --rc: #d9a63a; }
+.vase-stage { position: relative; width: 170px; height: 200px; display: grid; place-items: center; }
+.vase-rays { position: absolute; width: 300px; height: 300px; left: 50%; top: 50%; margin: -150px 0 0 -150px; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, var(--rc) 0deg 7deg, transparent 7deg 20deg); opacity: calc(0.06 + var(--hits) * 0.05);
+  animation: spin 16s linear infinite; transition: opacity 200ms; }
+.vase { position: relative; width: 150px; height: 178px; }
+.vase.idle { animation: vaseIdle 2.4s ease-in-out infinite; }
+@keyframes vaseIdle { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-2deg) translateY(-3px); } }
+/* Удар: толчок, сила растёт с номером удара. */
+.vase.hit { animation: vaseHit 340ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes vaseHit {
+  0% { transform: scale(calc(0.9 - var(--hits) * 0.01)) rotate(0); }
+  30% { transform: scale(1.04) rotate(calc(var(--hits) * -1.2deg)) translateX(calc(var(--hits) * -1px)); }
+  60% { transform: scale(0.99) rotate(calc(var(--hits) * 1deg)) translateX(calc(var(--hits) * 1px)); }
+  100% { transform: scale(1) rotate(0); } }
+/* Новая трещина «прорисовывается». */
+.vase .crack { stroke-dasharray: 40; stroke-dashoffset: 0; }
+.vase .crack:last-child { animation: crackDraw 260ms ease-out both; }
+@keyframes crackDraw { from { stroke-dashoffset: 40; } }
+/* Отколотые кусочки на каждом ударе. */
+.vase .chip { position: absolute; left: 50%; top: 48%; width: 7px; height: 6px; background: var(--ink); clip-path: polygon(0 0, 100% 30%, 60% 100%);
+  animation: chipFall 650ms cubic-bezier(0.2, 0.6, 0.4, 1) forwards; }
+@keyframes chipFall { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; } }
+/* Осколки разлетаются из точки удара и падают. */
+.shard { position: absolute; left: 10px; top: 11px; width: 150px; height: 178px; animation: shardFly 900ms cubic-bezier(0.15, 0.7, 0.4, 1) forwards; }
+@keyframes shardFly {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  15% { transform: translate(calc(var(--dx) * 0.08), calc(var(--dy) * 0.02)) rotate(calc(var(--rot) * 0.1)); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+.vase-burst { position: absolute; width: 40px; height: 40px; left: 50%; top: 52%; margin: -20px 0 0 -20px; border-radius: 50%; border: 4px solid var(--rc);
+  animation: burst 600ms ease-out forwards; }
+@keyframes burst { from { transform: scale(0.3); opacity: 1; } to { transform: scale(7); opacity: 0; border-width: 1px; } }
+.hit-dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0 6px; }
+.hit-dots i { width: 14px; height: 14px; border-radius: 3px; border: 2px solid var(--accent); transform: rotate(45deg); }
+.hit-dots i.on { background: var(--cta); border-color: var(--cta-edge); }
+:root[data-theme="midnight"] .vase-rays { opacity: calc(0.03 + var(--hits) * 0.03); }
+
+/* Открытие набора — на весь экран, без текста: ваза, ромбики ударов, потом наклейки. */
+.pack-screen { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  padding: calc(20px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)) 18px calc(24px + env(safe-area-inset-bottom));
+  background: var(--bg); overflow: hidden; animation: fadein 250ms ease; cursor: pointer; }
+.pack-screen::before, .pack-screen::after { content: ""; position: absolute; left: 0; right: 0; height: 18px; background-image: var(--meander); background-size: 18px 18px; background-repeat: repeat-x; }
+.pack-screen::before { top: calc(14px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)); }
+.pack-screen::after { bottom: calc(14px + env(safe-area-inset-bottom)); }
+.pack-screen.r-common { --rc: #9fb6cf; } .pack-screen.r-rare { --rc: #43a8ff; } .pack-screen.r-epic { --rc: #b06bff; } .pack-screen.r-legend { --rc: #d9a63a; }
+.pack-screen.summary { cursor: default; justify-content: center; }
+.pack-screen .pack-open { width: 100%; max-width: 420px; min-height: 0; cursor: inherit; }
+.pack-screen .vase-stage { width: 250px; height: 296px; }
+.pack-screen .vase { width: 224px; height: 266px; }
+.pack-screen .shard { left: 13px; top: 15px; width: 224px; height: 266px; }
+.pack-screen .vase-rays { width: 460px; height: 460px; margin: -230px 0 0 -230px; }
+.pack-screen .hit-dots { margin: 26px 0 0; gap: 10px; }
+.pack-screen .hit-dots i { width: 18px; height: 18px; }
+.pack-screen .hit-dots.gone { opacity: 0; transition: opacity 300ms; }
+.pack-screen .hit-dots.small { margin-top: 10px; gap: 7px; }
+.pack-screen .hit-dots.small i { width: 11px; height: 11px; border-width: 1.5px; }
+.pack-screen .pack-summary { padding: 0 4px; }
+.pack-take { max-width: 420px; position: relative; z-index: 2; }
+:root[data-theme="midnight"] .pcard-elo b { color: var(--cta); }
+
+/* Фото Telegram в аватаре: окантовка и форма из конструктора сохраняются. */
+.ava .face.photo { overflow: hidden; }
+.ava .face.photo img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.fig-grid .tg-pick { padding: 0; overflow: hidden; display: grid; place-items: center; font-weight: 900; font-size: 13px; color: var(--accent); }
+.fig-grid .tg-pick img { width: 100%; height: 100%; object-fit: cover; }

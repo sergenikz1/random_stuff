@@ -13,11 +13,16 @@ import { Sheet } from './ui.jsx';
 export function AvatarArt({ fig, look, frame = 'none', size = '', side = '' }) {
   const l = cleanLook(look || DEFAULT_LOOK);
   const fx = frame && frame !== 'none' ? `f-${frame}` : side;
+  // Фото Telegram — по умолчанию; если его нет или не загрузилось, показываем фигуру.
+  const [broken, setBroken] = useState(false);
+  const photo = l.src === 'tg' && look?.photo && !broken ? look.photo : null;
   return (
     <span className={`ava ${size} shape-${l.shape} rim-${l.rim} ${fx}`}
       style={{ '--rim': paint(l.rimColor), '--bg': paint(l.bg), '--fc': paint(l.figColor) }}>
       <i className="l-out" /><i className="l-band" /><i className="l-pat" /><i className="l-in" />
-      <b className="face"><em className="sil">{fig || '🦊'}</em></b>
+      <b className={`face ${photo ? 'photo' : ''}`}>
+        {photo ? <img src={photo} alt="" loading="lazy" draggable="false" onError={() => setBroken(true)} /> : <em className="sil">{fig || '🦊'}</em>}
+      </b>
     </span>
   );
 }
@@ -87,6 +92,8 @@ function Chips({ map, value, onChange }) {
 export function AvatarEditor({ profile, onSave, onClose }) {
   const [fig, setFig] = useState(profile.avatar);
   const [look, setLook] = useState(cleanLook(profile.look));
+  const photo = profile.look?.photo; // ссылка на фото Telegram, если оно есть
+  const shown = { ...look, photo };
   const [tab, setTab] = useState('fig');
   const unlocked = new Set(profile.unlocked);
   const set = (k) => (v) => setLook({ ...look, [k]: v });
@@ -95,9 +102,9 @@ export function AvatarEditor({ profile, onSave, onClose }) {
     <Sheet onClose={onClose}>
       <h2>Мой аватар</h2>
       <div className="emblem-preview">
-        <AvatarArt fig={fig} look={look} frame={profile.equipped?.frame} size="xl" />
-        <AvatarArt fig={fig} look={look} size="md" />
-        <AvatarArt fig={fig} look={look} size="sm" />
+        <AvatarArt fig={fig} look={shown} frame={profile.equipped?.frame} size="xl" />
+        <AvatarArt fig={fig} look={shown} size="md" />
+        <AvatarArt fig={fig} look={shown} size="sm" />
       </div>
       <div className="seg">
         {[['fig', 'Фигура'], ['shape', 'Форма'], ['rim', 'Окантовка'], ['color', 'Цвета']].map(([k, n]) => (
@@ -107,13 +114,16 @@ export function AvatarEditor({ profile, onSave, onClose }) {
       {tab === 'fig' && (
         <>
           <div className="fig-grid">
+            <button className={`tg-pick ${look.src === 'tg' ? 'on' : ''}`} disabled={!photo} onClick={() => setLook({ ...look, src: 'tg' })} title="Фото из Telegram">
+              {photo ? <img src={photo} alt="" /> : <span>TG</span>}
+            </button>
             {figs.map((a) => (
-              <button key={a} className={fig === a ? 'on' : ''} disabled={!unlocked.has(`avatar:${a}`)} onClick={() => setFig(a)}>
+              <button key={a} className={(look.src === 'fig' || !photo) && fig === a ? 'on' : ''} disabled={!unlocked.has(`avatar:${a}`)} onClick={() => { setFig(a); setLook({ ...look, src: 'fig' }); }}>
                 <em className="sil">{a}</em>
               </button>
             ))}
           </div>
-          <p className="small muted">Редкие фигуры открываются в боевом пропуске, в магазине и за приглашения.</p>
+          <p className="small muted">{photo ? 'Первая клетка — ваше фото из Telegram. ' : ''}Редкие фигуры открываются в боевом пропуске, в магазине и за приглашения.</p>
         </>
       )}
       {tab === 'shape' && <Chips map={AVATAR_SHAPES} value={look.shape} onChange={set('shape')} />}

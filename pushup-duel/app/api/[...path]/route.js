@@ -9,6 +9,13 @@ async function handle(req, { params }) {
   }
   const { path } = await params;
   const url = new URL(req.url);
+  // Фото профиля Telegram: открытая ссылка для <img>, без авторизации.
+  if (req.method === 'GET' && path?.[0] === 'photo' && path[1] && ctx.photos) {
+    const ph = await ctx.photos.get(path[1]);
+    if (!ph) return new Response(null, { status: 404 });
+    if (ph.redirect) return Response.redirect(ph.redirect, 302);
+    return new Response(ph.buf, { headers: { 'content-type': ph.type, 'cache-control': 'public, max-age=3600' } });
+  }
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : null;
   const r = await ctx.api.handle({
     method: req.method,

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.IntergalacticTV" parent="@style/Theme.Leanback">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.IntergalacticTV.Browse" parent="@style/Theme.Leanback.Browse">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.IntergalacticTV.Details" parent="@style/Theme.Leanback.Details">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.IntergalacticTV.VerticalGrid" parent="@style/Theme.Leanback.VerticalGrid">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+
+    <style name="Theme.IntergalacticTV.GuidedStep" parent="@style/Theme.Leanback.GuidedStep">
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+    </style>
+</resources>

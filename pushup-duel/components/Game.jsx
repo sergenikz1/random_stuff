@@ -79,7 +79,6 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
     setRecOn(true);
     haptic('light');
   }, [belt, mode, durationMs, profile, opponent, facing, inviteLabel, stopRec]);
-  const toggleRec = () => (recRef.current ? stopRec() : startRec());
   // Ролик для итога: останавливаем запись, если она ещё идёт.
   const takeClip = useCallback(async () => { const c = await stopRec(); clipRef.current = null; return c; }, [stopRec]);
   useEffect(() => {
@@ -257,7 +256,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
             if (now - s.visibleSince > 700) {
               if (online) {
                 if (!s.readySent) { s.readySent = true; socket.send({ t: 'ready' }); setPhase('opp_wait'); }
-              } else startCountdown(3000);
+              } else startCountdown(5000);
             }
           } else s.visibleSince = 0;
         }
@@ -297,7 +296,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
           if (settings.haptics) haptic('heavy');
           setTimeout(() => setCountdown(null), 700);
         } else {
-          const n = Math.min(3, Math.ceil(left / 1000));
+          const n = Math.min(5, Math.ceil(left / 1000));
           if (s.cd !== n) {
             s.cd = n;
             setCountdown(n);
@@ -366,7 +365,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
   const manualReady = () => {
     const s = st.current;
     if (online) { if (!s.readySent) { s.readySent = true; socket.send({ t: 'ready' }); setPhase('opp_wait'); } }
-    else startCountdown(3000);
+    else startCountdown(5000);
   };
 
   const flip = () => {
@@ -381,7 +380,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
   const pace = elapsed > 3000 ? Math.round((count.my / elapsed) * 60000) : 0;
 
   return (
-    <div className="game">
+    <div className="game" data-phase={phase}>
       <video ref={videoRef} className={facing === 'user' ? 'mirror' : ''} playsInline muted autoPlay />
       <canvas ref={canvasRef} />
       <div className="vignette" />
@@ -414,9 +413,7 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
 
       {recOn && <div className="rec-badge"><i /> REC {fmtTime(recMs)}</div>}
       <div className="game-tools">
-        {recordable && phase !== 'camera_error' && (
-          <button className={`icon-btn rec-btn ${recOn ? 'on' : ''}`} onClick={toggleRec} aria-label={recOn ? 'Остановить запись' : 'Записать видео'}><i /></button>
-        )}
+        {recOn && <button className="icon-btn rec-btn on" onClick={stopRec} aria-label="Остановить запись"><i /></button>}
         <button className="icon-btn" onClick={flip} aria-label="Сменить камеру"><Glyph e="🔄" size="1.25em" /></button>
         <button className="icon-btn" onClick={() => updateSettings({ sound: !settings.sound })} aria-label="Звук">{rich(settings.sound ? '🔊' : '🔇')}</button>
       </div>
@@ -452,6 +449,11 @@ export default function Game({ mode, durationMs, opponent, belt = null, socket, 
       {floaters.map((f) => <div key={f.id} className={`plus ${f.opp ? 'opp' : ''}`} style={{ left: `${f.x}%`, top: `${f.y}%` }}>{f.text}</div>)}
 
       {showIntro && phase !== 'loading' && phase !== 'camera_error' && <VersusIntro me={profile} opp={opponent} bot={!!opponent?.bot} mode={mode} belt={belt} onDone={endIntro} />}
+
+      {/* Записать бой можно только до старта: пока ждём соперника и идёт отсчёт 5…0. По умолчанию не пишем. */}
+      {recordable && !recOn && ['waiting', 'opp_wait', 'countdown'].includes(phase) && (
+        <button className="rec-cta" onClick={startRec}><i /> Записать бой</button>
+      )}
 
       <div className="game-bottom">
         {(phase === 'waiting' || phase === 'loading') && <button className="gel green" onClick={manualReady} disabled={phase === 'loading'}>Я готов</button>}

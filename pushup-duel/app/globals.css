@@ -895,3 +895,8 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
   display: flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 4px; background: rgba(13, 26, 51, 0.82); color: #fff; font-weight: 800; font-size: 12px; }
 .rec-badge i { width: 9px; height: 9px; border-radius: 50%; background: #e04a3a; animation: pulse 1s infinite; }
 .clip-preview { display: block; width: 100%; max-height: 360px; border-radius: 6px; background: #000; object-fit: contain; }
+.rec-cta { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(196px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 6px; border: 2px solid #fff;
+  background: rgba(192, 57, 43, 0.92); color: #fff; font-weight: 800; font-size: 16px; white-space: nowrap; }
+.rec-cta i { width: 16px; height: 16px; border-radius: 50%; background: #fff; animation: pulse 1.2s infinite; }
+.rec-cta:active { transform: translateX(-50%) translateY(1px); }

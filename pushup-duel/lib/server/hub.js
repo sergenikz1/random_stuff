@@ -21,7 +21,7 @@ export class Hub {
     this.tourneyMs = opts.tourneyMs ?? TOURNEYS.small.durationSec * 1000;
     this.sparMs = opts.sparMs ?? 60000;
     this.warMs = opts.warMs ?? WAR.duelSec * 1000;
-    this.countdownMs = opts.countdownMs ?? 3500;
+    this.countdownMs = opts.countdownMs ?? 5500; // 5 секунд отсчёта (+запас на связь): можно успеть включить запись
     this.rankedMs = opts.rankedMs ?? 60000;
     this.readyTimeoutMs = opts.readyTimeoutMs ?? 60000;
     this.minRepGapMs = opts.minRepGapMs ?? 280;

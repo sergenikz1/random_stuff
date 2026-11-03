@@ -27,12 +27,12 @@ import kotlin.coroutines.resumeWithException
 class WebVideoSearch(
     private val http: OkHttpClient = client,
     private val searchEndpoint: String = SEARCH_URL,
-    private val fallbackEndpoint: String? = "https://www.bing.com/search"
+    private val fallbackEndpoint: String? = "https://www.bing.com/search?mkt=ru-RU&setlang=ru"
 ) {
     data class Result(val items: List<VideoItem>, val inspected: Int, val unavailable: Int)
     private data class Html(val text: String, val url: String)
 
-    suspend fun search(query: String): Result = coroutineScope {
+    suspend fun findPages(query: String): List<VideoItem> {
         var pages = emptyList<VideoItem>()
         for (endpoint in listOfNotNull(searchEndpoint, fallbackEndpoint).distinct()) {
             try {
@@ -44,7 +44,12 @@ class WebVideoSearch(
             } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (_: Exception) { /* Try the next search provider. */ }
         }
-        if (pages.isEmpty()) throw IOException("Поисковик не вернул страницы. Откройте поиск в браузере.")
+        if (pages.isEmpty()) throw IOException("Поисковик не вернул ссылки. Попробуйте повторить поиск.")
+        return pages
+    }
+
+    suspend fun search(query: String): Result = coroutineScope {
+        val pages = findPages(query)
         val checked = pages.map { page -> async(Dispatchers.IO) {
             try {
                 val body = fetch(page.pageUrl)
@@ -116,12 +121,6 @@ class WebVideoSearch(
             val path = value.toHttpUrlOrNull()?.encodedPath?.lowercase() ?: return false
             return listOf(".m3u8", ".mpd", ".mp4", ".webm", ".m4v").any(path::endsWith)
         }
-
-        fun browserSearch(query: String): VideoItem = page(
-            "https://duckduckgo.com/".toHttpUrlOrNull()!!.newBuilder()
-                .addQueryParameter("q", "$query смотреть онлайн").build().toString(),
-            "Поиск в браузере · $query"
-        )
 
         fun page(url: String, title: String, description: String = ""): VideoItem {
             val normalized = webUrl(url) ?: throw IllegalArgumentException("Введите HTTP/HTTPS-ссылку")

@@ -84,8 +84,6 @@
             android:screenOrientation="landscape" />
         <activity android:name=".streaming.StreamPlayerActivity" android:exported="false"
             android:screenOrientation="landscape" />
-        <activity android:name="org.intergalactictv.client.streaming.WebPlayerActivity" android:exported="false"
-            android:screenOrientation="landscape" />
         <activity android:name=".streaming.SourcesActivity" android:exported="false"
             android:screenOrientation="landscape" android:theme="@style/Theme.IntergalacticTV.GuidedStep" />
         <activity android:name=".update.UpdateActivity" android:exported="false"

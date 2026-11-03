@@ -112,12 +112,6 @@ class WebVideoSearchTest {
         } finally { server.shutdown() }
     }
 
-    @Test fun `browser search keeps title unchanged while appending suffix to actual query`() {
-        val result = WebVideoSearch.browserSearch("Солярис")
-        assertEquals("Поиск в браузере · Солярис", result.title)
-        assertEquals("Солярис смотреть онлайн", result.pageUrl.toHttpUrl().queryParameter("q"))
-    }
-
     @Test fun `legacy history still identifies Rutube and direct streams`() {
         val old = VideoItem("rutube-id", "Видео")
         assertTrue(VideoItem.fromJson(old.toJson()).isRutube)

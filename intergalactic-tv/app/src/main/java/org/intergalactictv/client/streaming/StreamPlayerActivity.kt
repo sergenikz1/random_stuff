@@ -107,7 +107,7 @@ class StreamPlayerActivity : FragmentActivity() {
         progress.visibility = View.VISIBLE; errorPanel.visibility = View.GONE
         loadJob = lifecycleScope.launch {
             try {
-                val resolved = info ?: services.resolve(video)
+                val resolved = info ?: if (video.isWeb) services.resolveWeb(this@StreamPlayerActivity, video) else services.resolve(video)
                 if (!foreground || request != generation) return@launch
                 recovering = false
                 startPlayer(resolved)
@@ -259,7 +259,7 @@ class StreamPlayerActivity : FragmentActivity() {
             if (cause is HttpDataSource.InvalidResponseCodeException) status = (cause as HttpDataSource.InvalidResponseCodeException).responseCode
             cause = cause?.cause
         }
-        val wait = recovery.nextDelayMs(playbackError?.errorCode, status)
+        val wait = if (error is NoWebVideoException) null else recovery.nextDelayMs(playbackError?.errorCode, status)
         if (playbackError?.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ||
             playbackError?.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) {
             decoderMode = (decoderMode + 1).coerceAtMost(2)

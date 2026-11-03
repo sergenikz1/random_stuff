@@ -13,7 +13,10 @@ object StreamRepository {
     }
 
     suspend fun resolve(video: VideoItem): PlaybackInfo = withContext(Dispatchers.IO) {
-        video.streamUrl?.let { directInfo(it, video.isLive, video.title, video.requestHeaders) }
+        if (video.isWeb && video.streamUrl == null) throw IOException("Не удалось получить прямую ссылку на видео")
+        video.streamUrl?.let { directInfo(it, video.isLive, video.title, video.requestHeaders).let { info ->
+            info.copy(mimeType = video.streamMimeType ?: info.mimeType)
+        } }
             ?: if (video.isAddon) SourceRepository.resolve(video) else RutubeApi.playback(video.id)
     }
 
@@ -57,7 +60,7 @@ object StreamRepository {
         if (listOf(".mp4", ".mkv", ".webm", ".mpd").any(path::endsWith)) {
             return@withContext listOf(direct(url.toString(), url.pathSegments.last().ifBlank { "Онлайн-видео" }))
         }
-        // Dynamic players are opened in the TV browser even if static inspection fails.
+        // The native player resolves dynamic website sources in an invisible browser session.
         val video = try { WebVideoSearch().inspect(url.toString()) }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (_: Exception) { WebVideoSearch.page(url.toString(), url.host) }

@@ -1,0 +1,6 @@
+{
+  "name": "intergalactic-tv-browser-tests",
+  "private": true,
+  "scripts": { "test": "node test-background.cjs" },
+  "devDependencies": { "playwright-core": "1.56.1" }
+}

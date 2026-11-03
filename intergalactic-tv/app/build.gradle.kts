@@ -12,8 +12,8 @@ android {
         applicationId = "org.scryertv.client"
         minSdk = 21
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.4.0"
+        versionCode = 7
+        versionName = "1.5.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -97,6 +97,7 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     implementation("org.jsoup:jsoup:1.18.3")
+    implementation("androidx.webkit:webkit:1.12.1")
     implementation(libs.okhttp)
     implementation(libs.glide)
     implementation(libs.kotlinx.coroutines.android)

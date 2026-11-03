@@ -39,6 +39,14 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test background video extraction in Chromium
+        working-directory: intergalactic-tv/browser-tests
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
       - name: Decode permanent release keystore
         if: env.SCRYERTV_KEYSTORE_BASE64 != ''
         run: |

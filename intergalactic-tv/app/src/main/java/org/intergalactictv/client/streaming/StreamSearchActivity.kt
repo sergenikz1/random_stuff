@@ -33,6 +33,7 @@ class StreamSearchActivity : FragmentActivity() {
 class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.SearchResultProvider {
     private val rows = ArrayObjectAdapter(ListRowPresenter())
     private val results = ArrayObjectAdapter(StreamCardPresenter())
+    private val webResults = ArrayObjectAdapter(StreamCardPresenter())
     private var query = ""
     private var page = 0
     private var more = false
@@ -49,7 +50,7 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         setOnItemViewClickedListener(OnItemViewClickedListener { _, item, _, row ->
             val video = item as? VideoItem ?: return@OnItemViewClickedListener
             // У видео из плейлиста очередь автоперехода — его полка в выдаче.
-            val shelf = (row as? ListRow)?.adapter?.takeIf { it !== results && video.streamUrl != null }
+            val shelf = (row as? ListRow)?.adapter?.takeIf { it !== results && it !== webResults && video.streamUrl != null }
             val playlist = shelf?.let { a -> (0 until a.size()).mapNotNull { a.get(it) as? VideoItem } }.orEmpty()
             StreamActions.show(this, video, playlist)
         })
@@ -72,13 +73,14 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
         job?.cancel(); pageJob?.cancel(); sourcesJob?.cancel(); webJob?.cancel()
         val request = ++generation
         query = text.trim(); page = 0; more = false; webVideos = 0
-        rows.clear(); results.clear()
+        rows.clear(); results.clear(); webResults.clear()
         status("")
         if (query.length < 2) return
         job = lifecycleScope.launch {
             delay(delayMs)
             if (request != generation) return@launch
-            rows.add(ListRow(HeaderItem(0, "Видео · $query"), results))
+            rows.add(ListRow(HeaderItem(0, "Rutube · $query"), results))
+            rows.add(ListRow(HeaderItem(1, "Интернет · $query"), webResults))
             more = true; loadPage()
             searchSources(query, request)
             searchWeb(query, request)
@@ -91,8 +93,8 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
             try {
                 siteSearch(requireActivity()).search(text, found = { video ->
                     if (generation == request && video.streamUrl != null) {
-                        val known = (0 until results.size()).any { (results[it] as VideoItem).id == video.id }
-                        if (!known) { results.add(video); webVideos++ }
+                        val known = (0 until webResults.size()).any { (webResults[it] as VideoItem).id == video.id }
+                        if (!known) { webResults.add(video); webVideos++ }
                         updateResultsRow()
                     }
                 }, progress = { checked, total ->
@@ -162,8 +164,12 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     }
 
     private fun updateResultsRow() {
-        val index = (0 until rows.size()).firstOrNull { (rows[it] as? ListRow)?.adapter === results } ?: return
-        rows.replace(index, ListRow(HeaderItem(0, "Видео · $query · ${results.size()}"), results))
+        fun update(adapter: ArrayObjectAdapter, id: Long, name: String) {
+            val index = (0 until rows.size()).firstOrNull { (rows[it] as? ListRow)?.adapter === adapter } ?: return
+            rows.replace(index, ListRow(HeaderItem(id, "$name · $query · ${adapter.size()}"), adapter))
+        }
+        update(results, 0, "Rutube")
+        update(webResults, 1, "Интернет")
     }
 
     companion object {

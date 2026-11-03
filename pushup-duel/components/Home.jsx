@@ -15,9 +15,8 @@ export default function Home({ profile, status, settings, theme, onPlay, onMode,
   const p = profile;
   const eco = p?.eco;
   const myArena = eco?.arena?.id || 1;
-  const [view, setView] = useState(myArena);
+  const view = myArena; // остальные арены — на дороге славы
   const [belts, setBelts] = useState([]);
-  useEffect(() => { setView(myArena); }, [myArena]);
   useEffect(() => { api('belts').then((r) => setBelts(r.belts)).catch(() => {}); }, [version]);
   const dark = theme === 'midnight';
   const art = useMemo(() => arenaSvg(view, dark), [view, dark]);
@@ -59,8 +58,6 @@ export default function Home({ profile, status, settings, theme, onPlay, onMode,
           </span>
           {roadReady > 0 && <span className="badge-dot">{roadReady}</span>}
         </button>
-        {view > 1 && <button className="arena-arrow l" onClick={() => setView(view - 1)} aria-label="Предыдущая арена">‹</button>}
-        {view < ARENAS.length && <button className="arena-arrow r" onClick={() => setView(view + 1)} aria-label="Следующая арена">›</button>}
         {eco?.inbox?.length > 0 && (
           <button className="inbox-btn" onClick={onInbox} aria-label="Награды"><span className="tile"><Icon name="mail" size={38} /></span><span className="badge-dot">{eco.inbox.length}</span></button>
         )}

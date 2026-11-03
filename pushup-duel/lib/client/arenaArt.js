@@ -4,7 +4,7 @@
 
 const PAL = {
   light: { sky: ['#d6e6fb', '#d6e6fb'], far: '#7c8fb0', ground: '#f3e6cf', stone: '#1f4fa8', fill: '#ffffff', smoke: '#c9d5e8', lava: '#ff6a1a', sun: '#ffffff', sea: ['#9db4d6', '#9db4d6'], colA: '#e8f0ff', colB: '#c9d8f2', volc: '#7b8aa3', leaf: '#6f9a5a' },
-  dark: { sky: ['#1a0b08', '#1a0b08'], far: '#3a1510', ground: '#22120d', stone: '#d9a63a', fill: '#150d0b', smoke: '#3a1a12', lava: '#ff6a1a', sun: '#ffcf7a', sea: ['#5a1d14', '#5a1d14'], colA: '#3a1d0e', colB: '#1a0d06', volc: '#3a1510', leaf: '#7a5a2a' },
+  dark: { sky: ['#1a0b08', '#1a0b08'], far: '#3a1510', ground: '#22120d', stone: '#d2452c', fill: '#150d0b', smoke: '#3a1a12', lava: '#ff6a1a', sun: '#ffcf7a', sea: ['#5a1d14', '#5a1d14'], colA: '#3a1d0e', colB: '#1a0d06', volc: '#3a1510', leaf: '#7a5a2a' },
 };
 
 function columns(a, x, y, n, gap, h, w = 10) {

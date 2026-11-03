@@ -17,6 +17,22 @@ export class Api {
     this.compete = null;
   }
 
+  // Загрузка ролика боя (тело — сам видеофайл, не JSON). Возвращает { status, body }.
+  async uploadClip({ auth, startParam, buf, type, meta }) {
+    const who = authenticate(auth, this.config, startParam);
+    if (!who) return { status: 401, body: { error: 'Нужен вход через Telegram' } };
+    if (!this.clips) return { status: 503, body: { error: 'Ролики недоступны' } };
+    const { player: p } = this.store.getOrCreate(who.id, who, refFrom(who.startParam));
+    if (who.tgId) p.tgId = who.tgId;
+    try {
+      return { status: 200, body: await this.clips.create(p, buf, type, meta) };
+    } catch (e) {
+      if (e instanceof UserError) return { status: 400, body: { error: e.message } };
+      console.error('clips:', e);
+      return { status: 500, body: { error: 'Ошибка сервера' } };
+    }
+  }
+
   // Возвращает { status, body }.
   async handle({ method, path, query, body, auth, startParam }) {
     const who = authenticate(auth, this.config, startParam);

@@ -10,6 +10,7 @@ import { startBot } from './lib/server/telegram.js';
 import { Premium } from './lib/server/premium.js';
 import { Compete } from './lib/server/compete.js';
 import { Photos } from './lib/server/photos.js';
+import { Clips } from './lib/server/clips.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT) || 3000;
@@ -61,6 +62,8 @@ compete.settle().catch((e) => console.error('settle:', e));
 // Фото Telegram для аватаров: через Bot API, если есть токен.
 const photos = new Photos(store, { botToken });
 store.photoBot = !!botToken;
+// Ролики боёв лежат рядом с данными сутки; бот отправляет их в чат и готовит для пересылки.
+api.clips = new Clips({ dir: path.join(path.dirname(dataFile), 'clips'), botToken, config });
 globalThis.__pushduel = { api, hub, store, config, photos };
 
 const app = next({ dev, hostname: '0.0.0.0', port });

@@ -18,14 +18,12 @@ function player() {
   return { store, p };
 }
 
-test('наборы за победы идут по циклу, не больше четырёх; каждые 3 победы — билет', () => {
+test('наборы за победы идут по циклу, не больше четырёх', () => {
   const { p } = player();
   const got = [];
   for (let i = 0; i < 5; i++) got.push(awardWin(p));
   assert.deepEqual(got.slice(0, 4).map((g) => g.type), PACK_CYCLE.slice(0, 4));
   assert.equal(got[4].full, true);
-  assert.equal(p.tickets, 1);
-  assert.equal(got[2].ticket, true);
 });
 
 test('открытие: по таймеру бесплатно, раньше — за кристаллы, одновременно только один', () => {
@@ -73,7 +71,7 @@ test('карточка: только свои наклейки, не больш�
   assert.throws(() => setCard(p, Array(7).fill({ id: 'crown' })), /до 6/);
 });
 
-test('дорога трофеев: только после порога, один раз; билеты и наборы', () => {
+test('дорога трофеев: только после порога, один раз; кристаллы и наборы', () => {
   const { p } = player();
   assert.throws(() => claimRoad(p, 1050), /Откроется/);
   p.rating = 1080; ensureEco(p);
@@ -82,14 +80,14 @@ test('дорога трофеев: только после порога, оди�
   claimRoad(p, 1050);
   assert.equal(p.packs.filter(Boolean)[0].type, 'rare');
   claimRoad(p, 1075);
-  assert.equal(p.tickets, 1);
+  assert.equal(p.gems, 15);
   assert.throws(() => claimRoad(p, 1050), /уже получена/);
   p.rating = 900; ensureEco(p);
   assert.equal(p.bestRating, 1080);
   assert.equal(arenaOf(1460).name, 'Театр Диониса');
 });
 
-test('магазин: наклейки и косметика за монеты, наборы и билет за кристаллы, буст', () => {
+test('магазин: наклейки и косметика за монеты, наборы за кристаллы, буст', () => {
   const { p, store } = player();
   const offers = shopOffersForDay(dayKey());
   assert.equal(offers.length, 4);
@@ -104,8 +102,7 @@ test('магазин: наклейки и косметика за монеты, 
   p.gems = 200;
   const r = buy(p, 'pack_rare', seq(0.5));
   assert.equal(r.loot.stickers.length, PACKS.rare.count);
-  buy(p, 'ticket');
-  assert.equal(p.tickets, 1);
+  assert.throws(() => buy(p, 'ticket'), /не найдено/);
   buy(p, 'boost_xp');
   const res = applyActivity(p, { type: 'training', reps: 10, repTimes: [] }, store);
   assert.ok(res.items.some((i) => i.label.startsWith('Буст')));

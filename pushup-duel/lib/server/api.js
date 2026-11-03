@@ -60,14 +60,13 @@ export class Api {
           const q = String(query.q || '').toLowerCase().trim();
           return {
             clans: (q ? all.filter((x) => x.name.toLowerCase().includes(q) || x.id.toLowerCase() === q) : all).slice(0, 50),
-            myClan: p.clanId && s.clans.get(p.clanId) ? s.clanFull(s.clans.get(p.clanId)) : null,
+            myClan: p.clanId && s.clans.get(p.clanId) ? this.withWar(s.clanFull(s.clans.get(p.clanId)), p) : null,
           };
         }
         case 'belts': return { belts: this.compete ? this.compete.beltsView(p) : [] };
         case 'tourney': {
-          if (!this.compete) return { tourney: null };
-          await this.compete.settle();
-          return { tourney: this.compete.tourneyView(p) };
+          if (!this.compete) return { runs: [] };
+          return { runs: this.compete.runsView(p), gems: p.gems };
         }
         case 'players': {
           const t = s.get(String(b || ''));
@@ -118,9 +117,10 @@ export class Api {
           s.save();
           return { ...r, profile: privateProfile(p, s) };
         }
+        // Турниры: POST tourney/<small|big>/start — оплатить вход кристаллами.
         case 'tourney': {
-          if (!this.compete) throw new UserError('Турнир недоступен');
-          if (b === 'register') { this.compete.register(p); s.save(); return { tourney: this.compete.tourneyView(p), profile: privateProfile(p, s) }; }
+          if (!this.compete) throw new UserError('Турниры недоступны');
+          if (c === 'start') { this.compete.startRun(p, b); s.save(); return { runs: this.compete.runsView(p), profile: privateProfile(p, s) }; }
           return undefined;
         }
         case 'road': {
@@ -147,6 +147,13 @@ export class Api {
         case 'clans': {
           if (!b) { s.createClan(p, body); s.save(); return this.myClan(p); }
           if (b === 'leave') { s.leaveClan(p); s.save(); return { ok: true }; }
+          // Война: POST clans/war/declare { clanId } · clans/war/<id>/accept · clans/war/<id>/decline
+          if (b === 'war') {
+            if (!this.compete) throw new UserError('Войны недоступны');
+            if (c === 'declare') { await this.compete.declareWar(p, body.clanId); s.save(); return this.myClan(p); }
+            if (body.action === 'accept' || body.action === 'decline') { this.compete.respondWar(p, c, body.action === 'accept'); s.save(); return this.myClan(p); }
+            return undefined;
+          }
           if (c === 'join') { s.joinClan(p, b); s.save(); return this.myClan(p); }
           return undefined;
         }
@@ -158,7 +165,18 @@ export class Api {
 
   myClan(p) {
     const clan = this.store.clans.get(p.clanId);
-    return { clan: clan ? this.store.clanFull(clan) : null, profile: privateProfile(p, this.store) };
+    return { clan: clan ? this.withWar(this.store.clanFull(clan), p) : null, profile: privateProfile(p, this.store) };
+  }
+
+  // К клану — его война и кто из участников в сети (для спаррингов).
+  withWar(full, p) {
+    const online = new Set(this.hub.conns.keys());
+    return {
+      ...full,
+      roster: full.roster.map((m) => ({ ...m, online: online.has(m.id) })),
+      war: this.compete ? this.compete.warView(full.id, p) : null,
+      captain: this.store.clans.get(full.id)?.ownerId === p.id,
+    };
   }
 
   // Тренировка или бой с ботом: проверяем правдоподобие и начисляем опыт.

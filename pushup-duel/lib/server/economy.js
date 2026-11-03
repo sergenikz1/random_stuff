@@ -1,8 +1,8 @@
 // Сервер: монеты, кристаллы, билеты, наборы наклеек, коллекция и карточка, дорога трофеев,
 // магазин и «почта» с наградами (турнир, пояса).
 import {
-  PACKS, PACK_SLOTS, PACK_CYCLE, gemsToOpen, ROAD, ARENAS, arenaOf, WINS_PER_TICKET,
-  shopOffersForDay, SHOP_PACKS, SHOP_TICKET, BOOSTS, randIn,
+  PACKS, PACK_SLOTS, PACK_CYCLE, gemsToOpen, ROAD, ARENAS, arenaOf,
+  shopOffersForDay, SHOP_PACKS, BOOSTS, randIn,
 } from '../economy.js';
 import {
   STICKERS, STICKER_RARITY, MAX_COPIES, CARD_STICKERS_MAX, stickerById, stickersOf, rollRarity,
@@ -29,16 +29,10 @@ export function ensureEco(p) {
 
 const packState = (c, now) => (!c ? 'empty' : !c.unlockAt ? 'locked' : c.unlockAt > now ? 'unlocking' : 'ready');
 
-// Набор и прогресс к билету за победу в рейтинге.
+// Набор наклеек за победу в рейтинге.
 export function awardWin(p) {
   ensureEco(p);
   const out = {};
-  p.winsTowardTicket += 1;
-  if (p.winsTowardTicket >= WINS_PER_TICKET) {
-    p.winsTowardTicket = 0;
-    p.tickets += 1;
-    out.ticket = true;
-  }
   const slot = p.packs.findIndex((c) => !c);
   if (slot < 0) return { ...out, full: true };
   const type = PACK_CYCLE[p.packCycle % PACK_CYCLE.length];
@@ -197,12 +191,6 @@ export function buy(p, id, rnd = Math.random, now = Date.now()) {
     p.gems -= pack.gems;
     return { loot: givePack(p, pack.pack, rnd) }; // набор из магазина открывается сразу
   }
-  if (id === SHOP_TICKET.id) {
-    if (p.gems < SHOP_TICKET.gems) throw new UserError(`Нужно ${SHOP_TICKET.gems} 💎`);
-    p.gems -= SHOP_TICKET.gems;
-    p.tickets += 1;
-    return { tickets: p.tickets };
-  }
   const boost = BOOSTS.find((b) => b.id === id);
   if (boost) {
     if (p.gems < boost.gems) throw new UserError(`Нужно ${boost.gems} 💎`);
@@ -224,8 +212,6 @@ export function ecoView(p, now = Date.now()) {
   return {
     coins: p.coins,
     gems: p.gems,
-    tickets: p.tickets,
-    winsTowardTicket: p.winsTowardTicket,
     packs: p.packs.map((c, slot) => {
       if (!c) return { slot, state: 'empty' };
       const state = packState(c, now);
@@ -251,7 +237,6 @@ export function ecoView(p, now = Date.now()) {
         bought: p.shopBought.ids.includes(o.id),
       })),
       packs: SHOP_PACKS,
-      ticket: SHOP_TICKET,
       boosts: BOOSTS,
     },
   };

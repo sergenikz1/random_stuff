@@ -50,7 +50,7 @@ const api = new Api(store, hub, config);
 premium = new Premium(store, { bot, hub, price: store.premiumPrice, devPayments: !botToken && config.allowGuests });
 api.premium = premium;
 // Пояса и турнир: итоги недели подводятся раз в минуту (и при запросах турнира).
-const compete = new Compete(store, { premium });
+const compete = new Compete(store, { premium, notify: bot ? bot.notify : null });
 hub.compete = compete;
 api.compete = compete;
 setInterval(() => compete.settle().catch((e) => console.error('settle:', e)), 60000);

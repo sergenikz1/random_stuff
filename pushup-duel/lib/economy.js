@@ -1,8 +1,8 @@
 // Экономика: монеты, кристаллы и билеты, наборы наклеек, арены и дорога трофеев, магазин.
 // Общий модуль: описания читает клиент, а случайности и начисления считает только сервер.
 //
-// Кристаллы и билеты только зарабатываются и за Telegram Stars не продаются: иначе наборы
-// со случайными наклейками стали бы платными лутбоксами.
+// Кристаллы только зарабатываются и за Telegram Stars не продаются: иначе наборы со случайными
+// наклейками стали бы платными лутбоксами. Кристаллы же — вход в турниры.
 import { PACKS, STICKERS, STICKER_RARITY } from './stickers.js';
 
 export { PACKS };
@@ -15,9 +15,6 @@ export const PACK_CYCLE = ['basic', 'basic', 'rare', 'basic', 'rare', 'basic', '
 
 // Мгновенное открытие: 1 кристалл за каждые начатые 6 минут таймера.
 export const gemsToOpen = (msLeft) => Math.max(1, Math.ceil(msLeft / 360000));
-
-// Билет на турнир — за каждые 3 победы в рейтинге.
-export const WINS_PER_TICKET = 3;
 
 // Косметика, которая продаётся в магазине за монеты и встречается на дороге трофеев.
 export const SHOP_POOL = [
@@ -47,17 +44,17 @@ export function arenaOf(trophies) {
 export const ROAD = [
   { at: 1025, reward: { coins: 50 } },
   { at: 1050, reward: { pack: 'rare' } },
-  { at: 1075, reward: { tickets: 1 } },
+  { at: 1075, reward: { gems: 15 } },
   { at: 1100, reward: { gems: 10 } },
   { at: 1150, reward: { pack: 'epic' } },
   { at: 1200, reward: { coins: 150 } },
   { at: 1250, reward: { item: 'frame:ruby' } },
-  { at: 1300, reward: { tickets: 2 } },
+  { at: 1300, reward: { gems: 25 } },
   { at: 1350, reward: { gems: 30 } },
   { at: 1400, reward: { pack: 'epic' } },
   { at: 1450, reward: { pack: 'legend' } },
   { at: 1500, reward: { item: 'title:collector' } },
-  { at: 1550, reward: { tickets: 3 } },
+  { at: 1550, reward: { gems: 40 } },
   { at: 1600, reward: { pack: 'legend' } },
   { at: 1700, reward: { gems: 60 } },
   { at: 1800, reward: { item: 'frame:obsidian' } },
@@ -73,7 +70,6 @@ export const SHOP_PACKS = [
   { id: 'pack_epic',   pack: 'epic',   gems: 40 },
   { id: 'pack_legend', pack: 'legend', gems: 110 },
 ];
-export const SHOP_TICKET = { id: 'ticket', gems: 25 };
 export const BOOSTS = [
   { id: 'boost_xp', name: 'Двойной опыт на 3 часа', hours: 3, gems: 30 },
 ];

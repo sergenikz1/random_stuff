@@ -8,7 +8,7 @@ import { eloDelta } from '../duel.js';
 import { winStreakElo } from '../pass.js';
 import { awardWin } from './economy.js';
 import { arenaOf, ARENAS } from '../economy.js';
-import { TOURNEY } from '../compete.js';
+import { TOURNEYS, WAR } from '../compete.js';
 
 const DURATIONS = [30, 60, 90, 120];
 
@@ -18,7 +18,9 @@ export class Hub {
     this.config = config;
     this.notify = opts.notify || null;           // (tgId, text, button, startParam) => Promise
     this.compete = opts.compete || null;         // пояса и турнир (lib/server/compete.js)
-    this.tourneyMs = opts.tourneyMs ?? TOURNEY.durationSec * 1000;
+    this.tourneyMs = opts.tourneyMs ?? TOURNEYS.small.durationSec * 1000;
+    this.sparMs = opts.sparMs ?? 60000;
+    this.warMs = opts.warMs ?? WAR.duelSec * 1000;
     this.countdownMs = opts.countdownMs ?? 3500;
     this.rankedMs = opts.rankedMs ?? 60000;
     this.readyTimeoutMs = opts.readyTimeoutMs ?? 60000;
@@ -108,7 +110,7 @@ export class Hub {
   handle(conn, msg) {
     switch (msg.t) {
       case 'ping': return send(conn, { t: 'pong', at: msg.at });
-      case 'queue': return this.joinQueue(conn, msg.kind === 'tournament' ? 'tournament' : 'ranked');
+      case 'queue': return this.joinQueue(conn, ['small', 'big', 'clan', 'war'].includes(msg.kind) ? msg.kind : 'ranked');
       case 'unqueue': return this.leaveQueue(conn, true);
       case 'room_create': return this.createRoom(conn, msg.durationSec);
       case 'room_join': return this.joinRoom(conn, msg.code);
@@ -133,16 +135,20 @@ export class Hub {
   }
 
   // ---- Рейтинговая очередь ----
-  // kind: ranked — рейтинговая очередь, tournament — только участники турнира недели.
+  // kind: ranked — рейтинг; small/big — турнирный забег; clan — спарринг с соклановцем;
+  // war — бой войны против игрока вражеского клана.
   joinQueue(conn, kind = 'ranked') {
     this.ensureIdle(conn);
-    if (kind === 'tournament') {
-      if (!this.compete) throw new UserError('Турнир недоступен');
-      this.compete.canPlay(conn.player);
+    const p = conn.player;
+    if (kind === 'small' || kind === 'big') {
+      if (!this.compete) throw new UserError('Турниры недоступны');
+      this.compete.canPlayRun(p, kind);
     }
+    if (kind === 'clan' && !p.clanId) throw new UserError('Спарринги — для участников клана');
+    if (kind === 'war' && !(p.clanId && this.compete?.warOf(p.clanId, ['active']))) throw new UserError('Ваш клан сейчас не воюет');
     this.queue.push({ conn, since: Date.now(), kind });
     conn.state = 'queue';
-    send(conn, { t: 'queued', ...this.stats() });
+    send(conn, { t: 'queued', kind, ...this.stats() });
     this.matchmake();
   }
 
@@ -155,7 +161,16 @@ export class Hub {
     }
   }
 
+  // Кого с кем можно свести в одной очереди.
+  compatible(a, b) {
+    if (a.kind !== b.kind) return false;
+    if (a.kind === 'clan') return a.conn.player.clanId === b.conn.player.clanId;
+    if (a.kind === 'war') return !!this.compete?.warOpponents(a.conn.player, b.conn.player);
+    return true;
+  }
+
   // Окно по рейтингу расширяется, пока человек ждёт: 100 Эло сразу, +40 за каждую секунду.
+  // В спаррингах и боях войны рейтинг не важен — сводим первых подходящих.
   matchmake() {
     const now = Date.now();
     const q = this.queue;
@@ -164,9 +179,9 @@ export class Hub {
       let best = -1, bestDiff = Infinity;
       for (let j = i + 1; j < q.length; j++) {
         const b = q[j];
-        if ((a.kind || 'ranked') !== (b.kind || 'ranked')) continue;
+        if (!this.compatible(a, b)) continue;
         const waited = (now - Math.min(a.since, b.since)) / 1000;
-        const window = Math.min(1500, 100 + 40 * waited);
+        const window = a.kind === 'clan' || a.kind === 'war' ? Infinity : Math.min(1500, 100 + 40 * waited);
         const diff = Math.abs(a.conn.player.rating - b.conn.player.rating);
         if (diff <= window && diff < bestDiff) { best = j; bestDiff = diff; }
       }
@@ -175,7 +190,9 @@ export class Hub {
         q.splice(best, 1);
         q.splice(i, 1);
         i -= 1;
-        if (a.kind === 'tournament') this.startMatch('tournament', a.conn, b.conn, this.tourneyMs);
+        if (a.kind === 'small' || a.kind === 'big') this.startMatch('tournament', a.conn, b.conn, this.tourneyMs, { tkind: a.kind });
+        else if (a.kind === 'clan') this.startMatch('spar', a.conn, b.conn, this.sparMs);
+        else if (a.kind === 'war') this.startMatch('war', a.conn, b.conn, this.warMs);
         else this.startMatch('ranked', a.conn, b.conn, this.rankedMs);
       }
     }
@@ -249,7 +266,7 @@ export class Hub {
   startMatch(mode, a, b, durationMs, extra = {}) {
     const m = {
       id: Math.random().toString(36).slice(2, 10),
-      mode, durationMs, phase: 'prep', ready: new Set(), title: extra.title || null,
+      mode, durationMs, phase: 'prep', ready: new Set(), title: extra.title || null, tkind: extra.tkind || null,
       sides: [a, b].map((conn) => ({ conn, player: conn.player, reps: [], left: false })),
       liveAt: 0, endAt: 0, timer: null,
     };
@@ -263,7 +280,7 @@ export class Hub {
       const beltAtStake = m.title || (mode === 'ranked' && oppBelt && oppBelt === arenaOf(s.player.rating).id ? oppBelt : null)
         || (mode === 'ranked' && this.compete?.beltOf(s.player.id) === arenaOf(opp.player.rating).id ? this.compete.beltOf(s.player.id) : null);
       send(s.conn, {
-        t: 'matched', matchId: m.id, mode, durationMs,
+        t: 'matched', matchId: m.id, mode, durationMs, tkind: m.tkind,
         opponent: publicCard(opp.player, this.store),
         belt: beltAtStake || null,
       });
@@ -365,8 +382,8 @@ export class Hub {
         // Набор наклеек и прогресс к билету за победу в рейтинге.
         if (res === 'win') s.reward = awardWin(p);
       }
-      if (m.mode === 'tournament' && this.compete) s.tourney = this.compete.record(p, res, s.reps.length);
-      if (m.mode === 'friend') addFriend(p, o.player);
+      if (m.mode === 'tournament' && this.compete) s.run = this.compete.recordRun(p, m.tkind, res);
+      if (m.mode === 'friend' || m.mode === 'spar') addFriend(p, o.player);
       pushHistory(p, {
         mode: m.mode, outcome: res, reps: s.reps.length, oppReps: o.reps.length,
         opp: o.player.name, oppAvatar: o.player.avatar, delta: deltas[i] + streakBonus[i], durationMs: m.durationMs,
@@ -383,12 +400,14 @@ export class Hub {
       const wi = winner === A ? 0 : 1;
       if (m.mode === 'ranked') belts = this.compete.onRanked(winner.player, loser.player, arenasBefore[wi], arenasBefore[1 - wi]);
       if (m.mode === 'title' && m.title) belts = this.compete.onTitle(m.title, winner.player, loser.player);
+      if (m.mode === 'war') m.warNote = { [winner.player.id]: this.compete.warDuel(winner.player, loser.player) };
     }
     if (winner) {
       const loser = winner === A ? B : A;
       const how = reason === 'time' ? `${winner.reps.length}:${loser.reps.length}` : 'соперник сдался';
       if (m.mode === 'ranked') this.store.addFeed('🏆', `${winner.player.name} побеждает ${loser.player.name} — ${how}`);
-      else if (m.mode === 'tournament') this.store.addFeed('🎟️', `Турнир: ${winner.player.name} обыгрывает ${loser.player.name} — ${how}`);
+      else if (m.mode === 'tournament' || m.mode === 'spar') { /* турнир и спарринги — без ленты, итоги пишет compete */ }
+      else if (m.mode === 'war') this.store.addFeed('⚔️', `Бой войны: ${winner.player.name} (${this.store.clans.get(winner.player.clanId)?.name}) побеждает ${loser.player.name}`);
       else if (m.mode === 'title') { /* о поясе пишет compete */ }
       else this.store.addFeed('🤝', `Дружеская дуэль: ${winner.player.name} обыгрывает ${loser.player.name} — ${how}`);
       if (winner.reps.length >= 50) this.store.addFeed('💥', `${winner.player.name}: ${winner.reps.length} отжиманий за одну дуэль!`);
@@ -408,7 +427,8 @@ export class Hub {
         opp: { ...publicCard(o.player, this.store), reps: o.reps.length, ratingBefore: ratingsBefore[1 - i], delta: deltas[1 - i] + streakBonus[1 - i] },
         progress: s.progress,
         reward: s.reward || null,
-        tourney: s.tourney || null,
+        run: s.run || null,
+        war: m.warNote?.[s.player.id] || null,
         belt: belts[s.player.id] || null,
         profile: privateProfile(s.player, this.store),
       });

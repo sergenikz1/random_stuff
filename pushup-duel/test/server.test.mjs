@@ -242,3 +242,33 @@ test('титульный бой: вызов чемпиону своей арен
     a.ws.close(); b.ws.close();
   } finally { await s.close(); }
 });
+
+test('спарринг в клане: сводит только соклановцев, без Эло', async () => {
+  const s = await setup({ rankedMs: 5000 });
+  try {
+    const a = client(s.url, tgAuth(41, 'Ахилл'));
+    const b = client(s.url, tgAuth(42, 'Патрокл'));
+    const c = client(s.url, tgAuth(43, 'Гектор'));
+    await Promise.all([a.opened, b.opened, c.opened, a.next('welcome'), b.next('welcome'), c.next('welcome')]);
+    const clan = s.store.createClan(s.store.get('tg41'), { name: 'Мирмидоняне' });
+    s.store.joinClan(s.store.get('tg42'), clan.id);
+    c.send({ t: 'queue', kind: 'clan' });
+    assert.match((await c.next('error')).msg, /участников клана/);
+    a.send({ t: 'queue', kind: 'clan' });
+    b.send({ t: 'queue', kind: 'clan' });
+    const m = await a.next('matched');
+    assert.equal(m.mode, 'spar');
+    assert.equal(m.opponent.name, 'Патрокл');
+    await b.next('matched');
+    a.send({ t: 'ready' }); b.send({ t: 'ready' });
+    await a.next('start');
+    a.send({ t: 'forfeit' });
+    const rb = await b.next('match_over');
+    assert.equal(rb.outcome, 'win');
+    assert.equal(rb.me.delta, 0);
+    // Бой войны без войны недоступен.
+    b.send({ t: 'queue', kind: 'war' });
+    assert.match((await b.next('error')).msg, /не воюет/);
+    a.ws.close(); b.ws.close(); c.ws.close();
+  } finally { await s.close(); }
+});

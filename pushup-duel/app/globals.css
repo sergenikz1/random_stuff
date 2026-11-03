@@ -312,7 +312,7 @@ h1, h2, h3, p { margin: 0; }
 .tabbar .dot { position: absolute; }
 
 /* ---------- Аватар-шестиугольник с рамкой ---------- */
-.ava { --s: 46px; position: relative; width: var(--s); height: var(--s); flex: none; }
+.ava { --s: 46px; display: inline-block; vertical-align: middle; position: relative; width: var(--s); height: var(--s); flex: none; }
 .ava > i, .ava > i > b {
   position: absolute; inset: 0; display: grid; place-items: center;
   clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
@@ -856,3 +856,170 @@ h1, h2, h3, p { margin: 0; }
 .fmt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px; border-radius: 14px; border: 1px solid var(--row-border); background: var(--gloss), var(--row); font-weight: 800; font-size: 11.5px; color: var(--ink); }
 .fmt b { font-size: 19px; }
 .fmt.on { color: #fff; background: var(--gloss), linear-gradient(180deg, var(--g1), var(--g2)); box-shadow: var(--gel-glow); }
+
+/* ---------- Горизонтальная карточка игрока ---------- */
+.pcard.h { width: 330px; max-width: calc(100vw - 32px); display: grid; grid-template-columns: 96px 1fr; gap: 10px; padding: 12px 12px 12px 10px; text-align: left; }
+.pcard.h .pcard-left { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.pcard.h .pcard-ava { margin: 0; }
+.pcard-lvl { font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.14); border: 1px solid color-mix(in srgb, var(--rc) 60%, #fff); }
+.pcard.h .pcard-right { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pcard.h .pcard-top { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+.pcard.h .pcard-belt { margin: 0; font-size: 10px; padding: 2px 6px; }
+.pcard.h .pcard-name { font-family: var(--font-display-stack); font-weight: 400; font-size: 22px; letter-spacing: .03em; }
+.pcard.h .pcard-line { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.pcard.h .pcard-elo { margin: 0; }
+.pcard.h .pcard-clan { margin: 0; }
+.pcard.h .pcard-badges { justify-content: flex-start; margin-top: 6px; gap: 5px; flex-wrap: wrap; }
+.pcard.h .pcard-badges .badge { --s: 30px; }
+.pcard.h .pcard-stats { margin: 0 0 0 4px; align-self: center; font-size: 10.5px; }
+.editor-card .pcard { width: 330px; }
+
+/* ---------- Интро: карточки пролетают навстречу ---------- */
+.versus-stack { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.versus-stack .versus-vs { margin: -6px 0; }
+.pcard.h.from-left.enter { animation: cardInL 700ms cubic-bezier(0.2, 1.25, 0.4, 1) both; }
+.pcard.h.from-right.enter { animation: cardInR 700ms 120ms cubic-bezier(0.2, 1.25, 0.4, 1) both; }
+@keyframes cardInL { from { transform: translateX(-130vw) skewX(-14deg); } 70% { transform: translateX(10px) skewX(3deg); } to { transform: translateX(0) rotate(-2deg); } }
+@keyframes cardInR { from { transform: translateX(130vw) skewX(14deg); } 70% { transform: translateX(-10px) skewX(-3deg); } to { transform: translateX(0) rotate(2deg); } }
+.versus.leaving .pcard.h.from-left { animation: cardOutR 600ms cubic-bezier(0.6, 0, 0.8, 0.4) forwards; }
+.versus.leaving .pcard.h.from-right { animation: cardOutL 600ms 80ms cubic-bezier(0.6, 0, 0.8, 0.4) forwards; }
+@keyframes cardOutR { from { transform: translateX(0) rotate(-2deg); } to { transform: translateX(130vw) skewX(14deg); } }
+@keyframes cardOutL { from { transform: translateX(0) rotate(2deg); } to { transform: translateX(-130vw) skewX(-14deg); } }
+.versus.leaving .versus-vs { animation: vsOut 450ms ease-in forwards; }
+@keyframes vsOut { to { transform: scale(2.6) rotate(-6deg); opacity: 0; } }
+.versus.leaving .versus-tag, .versus.leaving .versus-hint { transition: opacity 300ms; opacity: 0; }
+.versus.out { opacity: 1; }
+.versus-streaks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.versus-streaks i { position: absolute; height: 3px; width: 45%; border-radius: 3px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent); opacity: 0; animation: streak 700ms ease-out both; }
+.versus-streaks i:nth-child(odd) { left: -50%; animation-name: streakR; }
+.versus-streaks i:nth-child(even) { right: -50%; animation-name: streakL; }
+.versus-streaks i:nth-child(1) { top: 30%; } .versus-streaks i:nth-child(2) { top: 60%; animation-delay: 120ms; }
+.versus-streaks i:nth-child(3) { top: 36%; animation-delay: 80ms; } .versus-streaks i:nth-child(4) { top: 66%; animation-delay: 200ms; }
+.versus-streaks i:nth-child(5) { top: 42%; animation-delay: 160ms; } .versus-streaks i:nth-child(6) { top: 56%; animation-delay: 260ms; }
+@keyframes streakR { 0% { transform: translateX(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateX(260%); opacity: 0; } }
+@keyframes streakL { 0% { transform: translateX(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateX(-260%); opacity: 0; } }
+.versus.leaving .versus-streaks i { animation-duration: 600ms; }
+
+/* ---------- Турниры, война, спарринг ---------- */
+.run-box { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; padding: 10px 12px; margin-bottom: 10px; border-radius: 16px; background: var(--gloss), var(--row); border: 1px solid var(--row-border); }
+.run-wins { grid-row: span 2; text-align: center; }
+.run-wins .greek-title { display: block; font-size: 40px; line-height: 1; color: var(--heading); }
+.run-wins small { font-size: 11px; font-weight: 800; color: var(--soft); }
+.run-lives { font-size: 22px; letter-spacing: 2px; }
+.ladder { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.ladder-row { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 12px; font-size: 12.5px; font-weight: 700; background: var(--row); border: 1px solid var(--row-border); }
+.ladder-row.past { opacity: .55; }
+.ladder-row.cur { border-color: var(--g1); box-shadow: 0 0 0 2px rgba(67,168,255,0.3); }
+.ladder-n { min-width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display-stack); font-size: 15px; color: #fff; background: var(--gloss), linear-gradient(180deg, var(--g1), var(--g2)); }
+.war-board { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; text-align: center; }
+.war-board > div, .war-board > button { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: none; color: var(--ink); font-weight: 800; }
+.war-board > div, .war-board > button { min-width: 0; }
+.war-board b { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.war-emoji { font-size: 30px; }
+.war-score { font-family: var(--font-display-stack); font-size: 34px; line-height: 1; }
+.war-score.mine { color: #1fa64a; } .war-score.enemy { color: #e0294f; }
+:root[data-theme="midnight"] .war-score.mine { color: #7ff2a0; } :root[data-theme="midnight"] .war-score.enemy { color: #ff8fa5; }
+.war-vs { font-family: var(--font-display-stack); font-size: 26px; color: var(--soft); display: flex; flex-direction: column; align-items: center; }
+.war-vs small { font-family: var(--font-ui); font-size: 10.5px; font-weight: 800; }
+.spar-btn { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; color: #fff; background: var(--gloss), linear-gradient(180deg, var(--fresh1), var(--fresh2)); box-shadow: 0 2px 6px rgba(31,166,74,0.4); cursor: pointer; }
+
+/* ---- Дорога славы: полноэкранная карта арен ---- */
+.tmap { position: fixed; inset: 0; z-index: 46; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  background: #d8f2ff; animation: tmapIn .35s var(--ease); }
+@keyframes tmapIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.tmap-canvas { position: relative; width: 100%; overflow: hidden; }
+.tmap-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  /* общее небо: снизу светлое утро у Агоры, к Олимпу — глубокая лазурь и золото */
+  background: linear-gradient(0deg, #e6f7ff 0%, #bfe6ff 18%, #8fd0ff 40%, #5cb4ff 62%, #2f86e6 82%, #1f5fd0 93%, #ffe9a8 100%); }
+.tmap.dark { background: #2a1209; }
+.tmap.dark .tmap-inner { background: linear-gradient(0deg, #7a3212 0%, #5a240d 22%, #3a170a 50%, #241008 75%, #120805 92%, #3a1a06 100%); }
+.tmap-art { position: absolute; left: 0; right: 0; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.55) 22%, #000 46%, #000 88%, transparent 100%);
+          mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.55) 22%, #000 46%, #000 88%, transparent 100%); }
+.tmap-art svg { display: block; }
+.tmap-olymp { position: absolute; left: 0; right: 0; top: 0; pointer-events: none;
+  background: radial-gradient(120% 70% at 50% 0%, rgba(255,240,190,.95), rgba(255,226,122,.35) 45%, transparent 75%); }
+.tmap.dark .tmap-olymp { background: radial-gradient(120% 70% at 50% 0%, rgba(255,177,92,.55), rgba(255,106,26,.18) 45%, transparent 75%); }
+
+.tmap-road { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.tmap-road path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.road-edge { stroke: rgba(13, 63, 120, .35); stroke-width: 34; }
+.road-body { stroke: #f6ead2; stroke-width: 28; }
+.road-done { stroke: #ffd06a; stroke-width: 28; filter: drop-shadow(0 0 6px rgba(255, 190, 60, .8)); }
+.road-dash { stroke: rgba(255,255,255,.9); stroke-width: 3; stroke-dasharray: 2 14; }
+.tmap.dark .road-edge { stroke: rgba(0,0,0,.55); }
+.tmap.dark .road-body { stroke: #4a2814; }
+.tmap.dark .road-done { stroke: #ff8a2a; filter: drop-shadow(0 0 8px rgba(255, 106, 26, .9)); }
+.tmap.dark .road-dash { stroke: rgba(255, 210, 160, .55); }
+
+.tmap-gate { position: absolute; left: 14px; right: 14px; display: flex; justify-content: center; }
+.gate-plate { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px 12px 12px; border-radius: 20px;
+  background: var(--card-strong); border: 1.5px solid var(--card-border); box-shadow: var(--card-shadow), var(--card-inset);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); filter: grayscale(.55) brightness(.96); }
+.gate-plate::before, .gate-plate::after { content: ""; position: absolute; top: -10px; bottom: -10px; width: 12px; border-radius: 4px;
+  background: linear-gradient(90deg, #c9d8f2, #fff 45%, #c9d8f2); border: 1.4px solid var(--accent); }
+.gate-plate::before { left: -8px; } .gate-plate::after { right: -8px; }
+.tmap.dark .gate-plate::before, .tmap.dark .gate-plate::after { background: linear-gradient(90deg, #1a0d06, #4a2814 45%, #1a0d06); }
+.tmap-gate.on .gate-plate { filter: none; }
+.gate-plate .tile { width: 54px; height: 54px; font-size: 28px; border-radius: 16px; flex-shrink: 0; }
+.gate-num { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.gate-plate .greek-title { font-size: 21px; line-height: 1.1; color: var(--heading); }
+.gate-plate .small { font-size: 12px; font-weight: 700; color: var(--soft); }
+.gate-lock { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 900; color: #fff;
+  background: var(--gloss), linear-gradient(180deg, var(--fresh1), var(--fresh2)); border: 1px solid rgba(255,255,255,.7); }
+.tmap-gate:not(.on) .gate-lock { background: rgba(0,0,0,.18); }
+
+.tmap-link { position: absolute; height: 3px; border-radius: 2px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.95) 0 6px, transparent 6px 10px);
+  box-shadow: 0 0 4px rgba(13,63,120,.3); }
+.tmap.dark .tmap-link { background: repeating-linear-gradient(90deg, rgba(255,177,92,.8) 0 6px, transparent 6px 10px); }
+.tmap-node { position: absolute; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; z-index: 2;
+  font-size: 10.5px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  background: var(--gloss), linear-gradient(180deg, #9aa9c0, #5d6b85); border: 2px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.tmap-node.ready { background: var(--gloss), linear-gradient(180deg, #ffe27a, #d99a0b); animation: nodePulse 1.4s ease-in-out infinite; }
+.tmap-node.claimed { font-size: 17px; background: var(--gloss), linear-gradient(180deg, var(--fresh1), var(--fresh2)); }
+@keyframes nodePulse { 50% { box-shadow: 0 0 0 7px rgba(255, 210, 80, .35), 0 3px 10px rgba(0,0,0,.25); } }
+
+.tmap-reward { position: absolute; left: 51%; right: 8px; min-height: 64px; display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: 16px; z-index: 2;
+  background: var(--card-strong); border: 1px solid var(--card-border); box-shadow: var(--card-shadow), var(--card-inset); }
+.tmap-reward .title { font-weight: 900; font-size: 13px; line-height: 1.15; color: var(--ink); }
+.tmap-reward .sub { font-size: 11px; font-weight: 800; color: var(--soft); }
+.tmap-reward .rw-ico { font-size: 28px; width: 36px; text-align: center; flex-shrink: 0; }
+.tmap-reward .rw-st { font-size: 16px; }
+.tmap-reward .gel { padding: 6px 9px; font-size: 12px; }
+.tmap-reward.locked { opacity: .8; }
+.tmap-reward.ready { border-color: #ffd06a; box-shadow: 0 0 0 2px rgba(255, 208, 106, .55), var(--card-shadow); }
+.tmap-reward .grow { min-width: 0; }
+
+.tmap-me { position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none;
+  animation: meBob 2s ease-in-out infinite; }
+@keyframes meBob { 50% { transform: translateY(-5px); } }
+.me-tag { white-space: nowrap; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; color: #fff;
+  background: var(--gloss), linear-gradient(180deg, var(--warm1), var(--warm2)); border: 1px solid rgba(255,255,255,.7); box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+
+.tmap-head { position: fixed; z-index: 47; left: 50%; transform: translateX(-50%); pointer-events: none;
+  top: calc(10px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px));
+  display: flex; flex-direction: column; align-items: center; padding: 7px 18px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--card-shadow);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.tmap-head .greek-title { font-size: 17px; color: var(--heading); }
+.tmap-head .small { font-size: 11px; font-weight: 800; color: var(--soft); }
+.tmap-back { position: fixed; z-index: 47; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); min-width: 180px; }
+.gate-plate .grow { flex: 1; min-width: 0; }
+.tmap-reward .grow .gel { display: block; margin-top: 5px; padding: 5px 12px; font-size: 12px; }
+.tmap-summit { position: absolute; width: 170px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px 9px; border-radius: 22px; z-index: 2;
+  background: var(--gloss), linear-gradient(180deg, #fff4c2, #ffd36a); border: 1.5px solid #fff; box-shadow: 0 0 0 3px rgba(217,154,11,.35), 0 10px 30px rgba(217,154,11,.45); text-align: center; color: #5a3a00; }
+.tmap-summit .summit-ico { font-size: 34px; filter: drop-shadow(0 3px 6px rgba(120,80,0,.35)); }
+.tmap-summit .greek-title { font-size: 16px; }
+.tmap-summit .small { font-size: 11px; font-weight: 800; opacity: .8; }
+.tmap.dark .tmap-summit { background: var(--gloss), linear-gradient(180deg, #ffb15c, #c9600f); color: #2a1209; box-shadow: 0 0 0 3px rgba(255,106,26,.35), 0 10px 30px rgba(255,106,26,.5); border-color: #ffd2a0; }
+.tmap-cloud { position: absolute; height: auto; pointer-events: none; opacity: .9; animation: cloudDrift 14s ease-in-out infinite alternate;
+  filter: drop-shadow(0 6px 10px rgba(13, 63, 120, .18)); }
+.tmap-cloud path { fill: rgba(255,255,255,.92); stroke: rgba(255,255,255,1); stroke-width: 2; }
+.tmap-cloud path.shine { fill: none; stroke: rgba(170, 215, 255, .9); stroke-width: 3; stroke-linecap: round; }
+.tmap.dark .tmap-cloud { opacity: .55; filter: none; }
+.tmap.dark .tmap-cloud path { fill: rgba(90, 50, 30, .7); stroke: rgba(255, 170, 100, .25); }
+.tmap.dark .tmap-cloud path.shine { stroke: rgba(255, 140, 60, .35); }
+@keyframes cloudDrift { to { transform: translateX(24px); } }
+.tmap-reward .title { hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; }
+.tmap-reward { gap: 7px; padding: 8px 8px 8px 7px; }
+.tmap-reward .rw-st { font-size: 14px; }

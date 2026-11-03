@@ -18,7 +18,8 @@ import Game from './Game.jsx';
 import Result from './Result.jsx';
 import { PlayerSheet, ClanSheet, ChallengedSheet } from './Sheets.jsx';
 import Shop from './Shop.jsx';
-import { PackOpenModal, TrophyRoad } from './Economy.jsx';
+import { PackOpenModal } from './Economy.jsx';
+import TrophyMap from './TrophyMap.jsx';
 import { CardEditor } from './Stickers.jsx';
 import { startTilt } from '../lib/client/tilt.js';
 import { Sheet } from './ui.jsx';
@@ -174,8 +175,11 @@ export default function App() {
     send({ t: 'challenge', playerId: player.id, durationSec: settings.friendSec, title });
   };
   const titleChallenge = (holder) => challenge(holder, true);
-  const tourneyRegister = () => ecoCall('tourney/register', null, () => { haptic('success'); sfx.level(); toast('Вы в турнире! Играйте с пятницы по воскресенье 🎟️'); setVersion((v) => v + 1); });
-  const tourneyPlay = () => { preload(); unlockAudio(); setFlow({ kind: 'queue', tournament: true }); send({ t: 'queue', kind: 'tournament' }); };
+  // Очереди: турнирный забег (small/big), спарринг в клане (clan), бой клановой войны (war).
+  const queueKind = (kind) => { preload(); unlockAudio(); setSheet(null); setFlow({ kind: 'queue', queue: kind }); send({ t: 'queue', kind }); };
+  const tourneyStart = (kind) => ecoCall(`tourney/${kind}/start`, null, () => { haptic('success'); sfx.level(); toast('Вход оплачен — удачи в турнире! ⚔️'); setVersion((v) => v + 1); });
+  const tourneyPlay = (kind) => queueKind(kind);
+  const clanCall = (path, body, msg) => ecoCall(path, body, () => { haptic('success'); if (msg) toast(msg); setVersion((v) => v + 1); });
   const cancelLobby = useCallback(() => {
     const f = flowRef.current;
     if (f?.kind === 'queue') socketRef.current?.send({ t: 'unqueue' });
@@ -256,7 +260,6 @@ export default function App() {
     haptic('success');
     if (r.loot) setLoot(r.loot);
     else if (r.name) toast(`Куплено: ${r.name}`);
-    else if (r.tickets) toast(`Билет куплен — теперь их ${r.tickets} 🎟️`);
     else if (r.boostUntil) toast('Буст ×2 активирован ⚡');
   });
 
@@ -277,7 +280,10 @@ export default function App() {
   };
   const again = (data) => {
     if (data.mode === 'ranked') startRanked();
-    else if (data.mode === 'tournament') tourneyPlay();
+    else if (data.mode === 'tournament' && data.run && !data.run.done) tourneyPlay(data.run.kind);
+    else if (data.mode === 'tournament') setTab('top');
+    else if (data.mode === 'spar') queueKind('clan');
+    else if (data.mode === 'war') queueKind('war');
     else if (data.mode === 'title' && data.opp?.id) challenge(data.opp, !!data.opp.belt);
     else if (data.mode === 'friend' && data.opp?.id) challenge(data.opp);
     else if (data.mode === 'bot') startBot();
@@ -338,8 +344,11 @@ export default function App() {
               onInbox={() => setSheet({ kind: 'inbox' })} />
           )}
           {tab === 'top' && <Top openPlayer={openPlayer} openClan={openClan} toast={toast} version={version} onTitleChallenge={titleChallenge}
-            profile={profile} onTourneyRegister={tourneyRegister} onTourneyPlay={tourneyPlay} status={status} feed={feed} community={community} />}
-          {tab === 'clan' && <Clan profile={profile} config={config} openPlayer={openPlayer} openClan={openClan} toast={toast} onShareClan={shareClan} onChanged={() => { setVersion((v) => v + 1); api('me').then((r) => setProfile(r.profile)).catch(() => {}); }} version={version} />}
+            profile={profile} onTourneyStart={tourneyStart} onTourneyPlay={tourneyPlay} status={status} feed={feed} community={community} />}
+          {tab === 'clan' && <Clan profile={profile} config={config} openPlayer={openPlayer} openClan={openClan} toast={toast} onShareClan={shareClan} onChanged={() => { setVersion((v) => v + 1); api('me').then((r) => setProfile(r.profile)).catch(() => {}); }} version={version}
+            status={status} onSpar={() => queueKind('clan')} onWarDuel={() => queueKind('war')} onChallenge={challenge}
+            onDeclareWar={(clanId) => clanCall('clans/war/declare', { clanId }, 'Вызов отправлен капитану ⚔️')}
+            onRespondWar={(id, action) => clanCall(`clans/war/${id}`, { action }, action === 'accept' ? 'Война началась! ⚔️' : 'Вызов отклонён')} />}
           {tab === 'pass' && <Pass profile={profile} onEquip={equip} onBuy={buyPremium} onClaimGift={claimGift} buying={buying} />}
           {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} />}
           <nav className="tabbar">
@@ -359,7 +368,7 @@ export default function App() {
           {profile?.eco?.inbox?.length ? <InboxCard eco={profile.eco} onClaim={(id) => { setSheet(null); claimInbox(id); }} /> : <div className="empty">Наград нет</div>}
         </Sheet>
       )}
-      {sheet?.kind === 'road' && <TrophyRoad eco={profile?.eco} onClose={closeSheet} onClaim={claimRoad} />}
+      {sheet?.kind === 'road' && <TrophyMap eco={profile?.eco} profile={profile} theme={theme} onClose={closeSheet} onClaim={claimRoad} />}
       {sheet?.kind === 'card' && profile && <CardEditor profile={profile} onSave={saveCard} onClose={closeSheet} />}
       {sheet?.kind === 'packGems' && (
         <Sheet onClose={closeSheet} center>

@@ -57,16 +57,11 @@ export default function Shop({ profile, onBuy, onPremium, busy }) {
             </div>
           ))}
         </div>
-        <p className="small muted" style={{ marginTop: 10, fontWeight: 600 }}>Набор из магазина открывается сразу. Кристаллы дают задания дня, дорога трофеев и наборы — за звёзды они не продаются.</p>
+        <p className="small muted" style={{ marginTop: 10, fontWeight: 600 }}>Набор из магазина открывается сразу. Кристаллы дают задания дня, дорога трофеев и наборы — за звёзды они не продаются. Ещё ими платят за вход в турниры.</p>
       </Card>
 
-      <Card title="Турнир и бусты" icon="⚡" tone="teal">
+      <Card title="Бусты" icon="⚡" tone="teal">
         <div className="rows">
-          <div className="row">
-            <span style={{ fontSize: 24 }}>🎟️</span>
-            <div className="grow"><div className="title">Билет на турнир недели</div><div className="sub">У вас {eco.tickets}. Ещё их дают за каждые 3 победы в рейтинге</div></div>
-            <button className="gel violet" style={{ padding: '6px 12px', fontSize: 13 }} disabled={busy || eco.gems < eco.shop.ticket.gems} onClick={() => onBuy(eco.shop.ticket.id)}>💎 {eco.shop.ticket.gems}</button>
-          </div>
           {eco.shop.boosts.map((b) => (
             <div key={b.id} className="row">
               <span style={{ fontSize: 24 }}>⚡</span>

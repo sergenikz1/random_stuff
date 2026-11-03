@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/client/net.js';
 import { Bar, Card, Seg, ago, plural } from './ui.jsx';
 import { PlayerRow } from './Home.jsx';
-import { BeltsList, TourneyCard } from './Compete.jsx';
+import { BeltsList, TourneysView } from './Compete.jsx';
 
-export default function Top({ openPlayer, openClan, toast, version, onTitleChallenge, profile, onTourneyRegister, onTourneyPlay, status, feed, community }) {
+export default function Top({ openPlayer, openClan, toast, version, onTitleChallenge, profile, onTourneyStart, onTourneyPlay, status, feed, community }) {
   const [type, setType] = useState('belts');
   const [data, setData] = useState(null);
   const [clans, setClans] = useState(null);
@@ -22,8 +22,8 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
   const unit = type === 'week' ? 'повт.' : 'Эло';
   return (
     <div className="page">
-      <div className="page-head"><h1>Слава</h1><p>Пояса, турнир, рейтинги и жизнь сообщества</p></div>
-      <Seg value={type} onChange={setType} options={[['belts', 'Пояса'], ['tourney', 'Турнир'], ['rating', 'Эло'], ['week', 'Неделя'], ['friends', 'Друзья'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
+      <div className="page-head"><h1>Слава</h1><p>Пояса, турниры, рейтинги и жизнь сообщества</p></div>
+      <Seg value={type} onChange={setType} options={[['belts', 'Пояса'], ['tourney', 'Турниры'], ['rating', 'Эло'], ['week', 'Неделя'], ['friends', 'Друзья'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
       {type === 'feed' ? (
         <>
           {community && (
@@ -45,7 +45,7 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
         </>
       )
       : type === 'belts' ? <BeltsList openPlayer={openPlayer} onChallenge={onTitleChallenge} toast={toast} version={version} />
-      : type === 'tourney' ? <TourneyCard profile={profile} onRegister={onTourneyRegister} onPlay={onTourneyPlay} status={status} version={version} toast={toast} />
+      : type === 'tourney' ? <TourneysView profile={profile} onStart={onTourneyStart} onPlay={onTourneyPlay} status={status} version={version} toast={toast} />
       : type === 'clans' ? (
         <Card title="Кланы недели" icon="🛡️" tone="violet">
           {!clans ? <div className="empty">Загрузка…</div> : !clans.length ? <div className="empty">Кланов пока нет — создайте первый во вкладке «Клан»</div> : (

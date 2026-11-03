@@ -12,6 +12,7 @@ import {
 import { rankOf, START_RATING, AVATARS } from '../duel.js';
 import { QUEST_GEMS } from '../economy.js';
 import { cleanLook, lookFor, cleanCrest, crestOf, CREST_CHARGES } from '../heraldry.js';
+import { isPhotoUrl } from './photos.js';
 import { ecoView, ensureEco, boostActive } from './economy.js';
 
 const CLAN_MAX = 30;
@@ -61,6 +62,8 @@ export class Store {
     } else if (defaults.username && p.username !== defaults.username) {
       p.username = defaults.username;
     }
+    // Ссылку на фото Telegram обновляем при каждом входе: пользователь мог сменить фото.
+    if (isPhotoUrl(defaults.photo)) p.tgPhoto = defaults.photo;
     p.lastSeen = Date.now();
     return { player: p, referral };
   }
@@ -314,11 +317,17 @@ export function giftStatus(p) {
   return out;
 }
 
+// Облик аватара для клиента: если выбрано фото Telegram и оно есть — добавляем ссылку на него.
+function lookOut(p, store) {
+  const hasPhoto = isPhotoUrl(p.tgPhoto) || (!!store?.photoBot && !!p.tgId);
+  return hasPhoto && p.look.src === 'tg' ? { ...p.look, photo: `/api/photo/${p.id}` } : p.look;
+}
+
 // Что видят другие игроки.
 export function publicCard(p, store) {
   const clan = store && p.clanId ? store.clans.get(p.clanId) : null;
   return {
-    id: p.id, name: p.name, avatar: p.avatar, look: p.look, rating: p.rating, rank: rankOf(p.rating).name,
+    id: p.id, name: p.name, avatar: p.avatar, look: lookOut(p, store), rating: p.rating, rank: rankOf(p.rating).name,
     level: levelInfo(p.xp).level, frame: p.equipped.frame, trail: p.equipped.trail,
     title: COSMETICS.title[p.equipped.title]?.name || '',
     wins: p.wins, games: p.games, bestReps: p.bestReps, totalReps: p.totalReps,

@@ -12,7 +12,7 @@ export function authenticate(auth, config, startParamHint = '') {
     if (!v) return null;
     const u = v.user;
     const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'Игрок';
-    return { id: `tg${u.id}`, tgId: u.id, name, username: u.username || '', startParam: v.startParam || sp };
+    return { id: `tg${u.id}`, tgId: u.id, name, username: u.username || '', photo: u.photo_url || '', startParam: v.startParam || sp };
   }
   if (s.startsWith('guest ') && config.allowGuests) {
     const token = s.slice(6);

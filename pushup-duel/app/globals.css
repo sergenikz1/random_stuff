@@ -880,3 +880,9 @@ input, textarea, input::placeholder, textarea::placeholder { -webkit-text-fill-c
 .pack-screen .pack-summary { padding: 0 4px; }
 .pack-take { max-width: 420px; position: relative; z-index: 2; }
 :root[data-theme="midnight"] .pcard-elo b { color: var(--cta); }
+
+/* Фото Telegram в аватаре: окантовка и форма из конструктора сохраняются. */
+.ava .face.photo { overflow: hidden; }
+.ava .face.photo img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.fig-grid .tg-pick { padding: 0; overflow: hidden; display: grid; place-items: center; font-weight: 900; font-size: 13px; color: var(--accent); }
+.fig-grid .tg-pick img { width: 100%; height: 100%; object-fit: cover; }

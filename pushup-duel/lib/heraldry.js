@@ -21,7 +21,8 @@ export const paint = (id, fallback = 'blue') => (PAINT[id] || PAINT[fallback]).h
 export const AVATAR_SHAPES = { hex: 'Шестигранник', circle: 'Медальон', shield: 'Щит', square: 'Плита' };
 export const AVATAR_RIMS = { plain: 'Простая', double: 'Двойная', meander: 'Меандр', dots: 'Жемчуг', laurel: 'Лавр', rope: 'Канат' };
 
-export const DEFAULT_LOOK = { shape: 'hex', rim: 'plain', rimColor: 'blue', bg: 'sand', figColor: 'blue' };
+// src: 'tg' — фото из Telegram (по умолчанию), 'fig' — фигура из набора.
+export const DEFAULT_LOOK = { src: 'tg', shape: 'hex', rim: 'plain', rimColor: 'blue', bg: 'sand', figColor: 'blue' };
 
 // Стартовый облик выводим из id игрока, чтобы новички не были одинаковыми.
 export function lookFor(id = '') {
@@ -30,12 +31,13 @@ export function lookFor(id = '') {
   h = Math.abs(h);
   const pairs = [['blue', 'sand', 'blue'], ['red', 'black', 'ochre'], ['ochre', 'navy', 'ochre'], ['blue', 'white', 'navy'], ['olive', 'sand', 'olive'], ['terra', 'black', 'terra']];
   const [rimColor, bg, figColor] = pairs[h % pairs.length];
-  return { shape: Object.keys(AVATAR_SHAPES)[h % 4], rim: ['plain', 'double', 'meander', 'dots'][(h >> 3) % 4], rimColor, bg, figColor };
+  return { src: 'tg', shape: Object.keys(AVATAR_SHAPES)[h % 4], rim: ['plain', 'double', 'meander', 'dots'][(h >> 3) % 4], rimColor, bg, figColor };
 }
 
 export function cleanLook(look, base = DEFAULT_LOOK) {
   const l = { ...base, ...(look && typeof look === 'object' ? look : {}) };
   return {
+    src: l.src === 'fig' ? 'fig' : 'tg',
     shape: AVATAR_SHAPES[l.shape] ? l.shape : base.shape,
     rim: AVATAR_RIMS[l.rim] ? l.rim : base.rim,
     rimColor: PAINT[l.rimColor] ? l.rimColor : base.rimColor,

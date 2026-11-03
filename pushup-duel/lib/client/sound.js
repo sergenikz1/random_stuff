@@ -46,5 +46,12 @@ export const sfx = {
   level: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, { type: 'square', vol: 0.09, delay: i * 0.09 })),
   whoosh: () => tone(180, 0.7, { type: 'sawtooth', vol: 0.05, slide: 6 }),
   impact: () => { tone(90, 0.5, { type: 'sine', vol: 0.4, slide: 0.4 }); tone(60, 0.6, { type: 'square', vol: 0.08, slide: 0.5 }); tone(1200, 0.25, { type: 'triangle', vol: 0.06, slide: 0.3 }); },
+  // Трещина в вазе: сухой щелчок и глухой стук, с каждым ударом ниже.
+  crack: (k = 1) => { tone(2300 - k * 160, 0.05, { type: 'square', vol: 0.07, slide: 0.4 }); tone(150 + k * 12, 0.14, { type: 'sine', vol: 0.28, slide: 0.6 }); },
+  // Ваза разбивается: удар и звон осколков.
+  shatter: () => {
+    tone(90, 0.5, { type: 'sine', vol: 0.4, slide: 0.4 });
+    [0, 0.03, 0.07, 0.11, 0.16, 0.22].forEach((d, i) => tone(2800 - i * 280, 0.09, { type: 'square', vol: 0.05, slide: 0.5, delay: d }));
+  },
   found: () => { tone(740, 0.15, { type: 'triangle' }); tone(988, 0.25, { type: 'triangle', delay: 0.12 }); },
 };

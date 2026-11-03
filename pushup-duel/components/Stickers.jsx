@@ -6,7 +6,7 @@ import { STICKERS, STICKER_RARITY, STICKER_RARITY_ORDER, PACKS, CARD_STICKERS_MA
 import { sfx } from '../lib/client/sound.js';
 import { haptic } from '../lib/client/tg.js';
 import { askTiltPermission } from '../lib/client/tilt.js';
-import { Card, Sheet } from './ui.jsx';
+import { Card, Sheet, plural } from './ui.jsx';
 import { PlayerCard } from './PlayerCard.jsx';
 
 // Наклейка с белой «вырубкой». У эпических и легендарных — голограмма от наклона телефона.
@@ -78,25 +78,104 @@ export function PackSlots({ eco, profileAt, onUnlock, onOpen }) {
 }
 
 // Открытие: пакетик трясётся и рвётся, наклейки вылетают по одной — редкие в конце со вспышкой.
+// ---- Открытие набора: ваза трескается от шести ударов, разбивается, осколки разлетаются ----
+const HITS = 6;
+const AMPHORA_D = 'M15 3 h10 v5 c8 3 11 11 11 19 c0 9 -6 16 -13 19 h-6 c-7 -3 -13 -10 -13 -19 c0 -8 3 -16 11 -19 z';
+// Трещины по ударам: каждая следующая продолжает предыдущие.
+const CRACKS = [
+  'M21 17 L23 21 L20 24 L22 28',
+  'M23 21 L27 23 L29 27 L33 26',
+  'M20 24 L15 26 L13 30 L9 29',
+  'M22 28 L21 33 L24 37 L23 43',
+  'M27 23 L28 17 L31 14 M15 26 L14 20 L10 18 M29 27 L31 33 L28 38',
+];
+function VaseArt({ type, cracks = 0 }) {
+  const [fill, mark] = AMPHORA[type] || AMPHORA.basic;
+  return (
+    <svg viewBox="-2 -2 44 52" width="100%" height="100%" aria-hidden="true">
+      <g stroke="var(--ink)" strokeWidth="1.6" strokeLinejoin="round">
+        <path d={AMPHORA_D} fill={fill} />
+        <path d="M15 9 c-6 0 -7 7 -2 9 M25 9 c6 0 7 7 2 9" fill="none" />
+        <path d="M6 22 h28 M5.5 30 h29" fill="none" />
+        <path d="M8 28 v-4 h3 v3 h-1.5 M13 28 v-4 h3 v3 h-1.5 M18 28 v-4 h3 v3 h-1.5 M23 28 v-4 h3 v3 h-1.5 M28 28 v-4 h3 v3 h-1.5" fill="none" strokeWidth="1" />
+      </g>
+      <text x="20" y="41" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="var(--ink)">{mark}</text>
+      <g className="cracks" fill="none" stroke="#140b07" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
+        {CRACKS.slice(0, cracks).map((d, i) => <path key={i} d={d} className="crack" />)}
+      </g>
+    </svg>
+  );
+}
+
+// Осколки: клинья из точки удара, каждый — та же ваза, обрезанная clip-path.
+const SHARDS = Array.from({ length: 11 }, (_, i) => {
+  const a0 = (i / 11) * Math.PI * 2 + (i % 3) * 0.12, a1 = ((i + 1) / 11) * Math.PI * 2 + ((i + 1) % 3) * 0.12;
+  const am = (a0 + a1) / 2;
+  const pt = (a, r) => `${(50 + Math.cos(a) * r).toFixed(1)}% ${(52 + Math.sin(a) * r).toFixed(1)}%`;
+  return {
+    clip: `polygon(50% 52%, ${pt(a0, 140)}, ${pt(am, 60 + (i % 4) * 18)}, ${pt(a1, 140)})`,
+    dx: `${Math.round(Math.cos(am) * (150 + (i % 3) * 40))}px`,
+    dy: `${Math.round(Math.sin(am) * (130 + (i % 4) * 30) + 90)}px`,
+    rot: `${(i % 2 ? 1 : -1) * (40 + i * 23)}deg`,
+  };
+});
+
 export function PackOpenModal({ loot, onClose }) {
-  const [shown, setShown] = useState(-1); // -1 — пакетик ещё целый
+  const [hits, setHits] = useState(0);
+  const [shown, setShown] = useState(-1); // индекс показанной наклейки; -1 — ещё ваза
   const total = loot.stickers.length;
   useEffect(() => { askTiltPermission(); sfx.whoosh(); }, []);
-  const next = () => {
-    if (shown > total) return;
-    const i = shown + 1;
+  const broken = hits >= HITS;
+  const done = shown >= total; // после последней наклейки — итог
+
+  const reveal = (i) => {
     setShown(i);
-    if (i === 0) { sfx.impact(); haptic('heavy'); return; }
-    const s = loot.stickers[i - 1];
-    if (s && (s.rarity === 'epic' || s.rarity === 'legend')) { sfx.level(); haptic('success'); } else { sfx.rep(i); haptic('light'); }
+    const s = loot.stickers[i];
+    if (!s) return;
+    if (s.rarity === 'epic' || s.rarity === 'legend') { sfx.level(); haptic('success'); } else { sfx.rep(i + 1); haptic('light'); }
   };
-  const done = shown > total; // после последней наклейки — итог
-  const cur = shown >= 1 && shown <= total ? loot.stickers[shown - 1] : null;
+  const tap = () => {
+    if (!broken) {
+      const h = hits + 1;
+      setHits(h);
+      if (h < HITS) { sfx.crack(h); haptic(h < 4 ? 'light' : 'medium'); return; }
+      sfx.shatter(); haptic('heavy');
+      setTimeout(() => reveal(0), 950); // сначала разлетаются осколки, потом первая наклейка
+      return;
+    }
+    if (shown < 0 || done) return;
+    reveal(shown + 1);
+  };
+  const cur = shown >= 0 && shown < total ? loot.stickers[shown] : null;
+
   return (
-    <Sheet onClose={done ? onClose : next} center>
-      <div className="pack-open" onClick={next} role="button" tabIndex={0}>
-        {shown < 0 && <><PackIcon type={loot.type} size={150} className="shake" /><p className="center muted" style={{ fontWeight: 800, marginTop: 10 }}>Нажмите, чтобы открыть</p></>}
-        {shown === 0 && <><PackIcon type={loot.type} size={150} className="tear" /><p className="center muted" style={{ fontWeight: 800 }}>Ещё раз!</p></>}
+    <Sheet onClose={done ? onClose : tap} center>
+      <div className={`pack-open r-${loot.type === 'basic' ? 'common' : loot.type}`} onClick={tap} role="button" tabIndex={0}>
+        {shown < 0 && (
+          <div className={`vase-stage ${broken ? 'broken' : ''}`} style={{ '--hits': hits }}>
+            <div className="vase-rays" />
+            {!broken && (
+              <div key={hits} className={`vase ${hits ? 'hit' : 'idle'}`}>
+                <VaseArt type={loot.type} cracks={Math.min(hits, CRACKS.length)} />
+                {hits > 0 && Array.from({ length: 3 + hits }, (_, i) => (
+                  <i key={i} className="chip" style={{ '--dx': `${(i % 2 ? 1 : -1) * (14 + i * 9)}px`, '--dy': `${40 + i * 12}px`, '--r': `${i * 70}deg` }} />
+                ))}
+              </div>
+            )}
+            {broken && SHARDS.map((s, i) => (
+              <div key={i} className="shard" style={{ clipPath: s.clip, '--dx': s.dx, '--dy': s.dy, '--rot': s.rot }}>
+                <VaseArt type={loot.type} cracks={CRACKS.length} />
+              </div>
+            ))}
+            {broken && <div className="vase-burst" />}
+          </div>
+        )}
+        {shown < 0 && !broken && (
+          <>
+            <div className="hit-dots">{Array.from({ length: HITS }, (_, i) => <i key={i} className={i < hits ? 'on' : ''} />)}</div>
+            <p className="center muted" style={{ fontWeight: 800 }}>{hits === 0 ? 'Тапайте по вазе, чтобы разбить' : `Ещё ${HITS - hits} ${plural(HITS - hits, 'удар', 'удара', 'ударов')}`}</p>
+          </>
+        )}
         {cur && (
           <div key={shown} className={`reveal r-${cur.rarity}`}>
             <div className="reveal-glow" />
@@ -105,7 +184,7 @@ export function PackOpenModal({ loot, onClose }) {
             <div className="reveal-meta" style={{ color: STICKER_RARITY[cur.rarity].color }}>
               {STICKER_RARITY[cur.rarity].name}{cur.isNew ? ' · новая!' : cur.converted ? ` · лишняя → +${cur.converted} 🪙` : ' · ещё копия'}
             </div>
-            <div className="small muted">{shown} из {total} · нажмите дальше</div>
+            <div className="small muted">{shown + 1} из {total} · нажмите дальше</div>
           </div>
         )}
         {done && (
@@ -121,7 +200,8 @@ export function PackOpenModal({ loot, onClose }) {
           </div>
         )}
       </div>
-      {done ? <button className="gel xl" onClick={onClose}>Забрать</button> : <button className="glass-btn" onClick={(e) => { e.stopPropagation(); setShown(total + 1); }}>Показать все</button>}
+      {done ? <button className="gel xl" onClick={onClose}>Забрать</button>
+        : <button className="glass-btn" onClick={(e) => { e.stopPropagation(); setHits(HITS); setShown(total); }}>Показать все</button>}
     </Sheet>
   );
 }

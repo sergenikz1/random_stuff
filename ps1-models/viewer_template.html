@@ -1,0 +1,484 @@
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: экран консоли сверху, под ним приборная полоса с кнопками, цифрами и палитрой */
+:root {
+  --bg: #12131c;
+  --panel: #1b1d2b;
+  --line: #2e3147;
+  --fg: #e6e4ee;
+  --muted: #9a9cb3;
+  --gold: #e2b042;
+  --red: #c8201a;
+  --focus: #ffd66b;
+  --display: "Press Start 2P", "Courier New", monospace;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; }
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(20px, 4vw, 30px);
+  line-height: 1.25;
+  margin: 0;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+h1 span { color: var(--gold); }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.screen {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  background: #000;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+.screen:active { cursor: grabbing; }
+canvas#view { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.scan {
+  pointer-events: none;
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.osd {
+  position: absolute; left: 12px; top: 10px;
+  font-family: var(--display); font-size: 11px;
+  color: var(--fg);
+  text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+.hint {
+  position: absolute; right: 12px; bottom: 10px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--fg); opacity: 0.8;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+  font: 500 14px/1 var(--body);
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px 14px;
+  cursor: pointer;
+  display: inline-flex; gap: 8px; align-items: center;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button[aria-pressed="true"] { border-color: var(--gold); }
+button .state { font-family: var(--mono); font-size: 12px; color: var(--gold); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+h2 {
+  font-family: var(--display); font-weight: 400; font-size: 11px; line-height: 1.5;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--gold); margin: 0 0 12px;
+}
+dl.stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; margin: 0; }
+dl.stats dt { color: var(--muted); }
+dl.stats dd { margin: 0; white-space: nowrap; font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+ul.swatches { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 12px; }
+ul.swatches li { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+ul.swatches i { width: 16px; height: 16px; flex: none; border: 1px solid rgba(0,0,0,0.5); image-rendering: pixelated; }
+ul.files { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.files code { font-family: var(--mono); font-size: 13px; color: var(--fg); }
+ul.files span { color: var(--muted); font-size: 13px; display: block; }
+a { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .scan { display: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>__TITLE_HTML__</h1>
+    <p class="lede">__LEDE__</p>
+  </header>
+
+  <div class="screen" id="screen">
+    <canvas id="view" aria-label="Трёхмерная модель, её можно вращать мышью или пальцем"></canvas>
+    <div class="scan" id="scan"></div>
+    <div class="osd" id="osd">320×240</div>
+    <div class="hint">тяните, чтобы вращать</div>
+  </div>
+
+  <div class="controls" role="group" aria-label="Настройки просмотра">
+    <button id="btn-spin" aria-pressed="true">Вращение <span class="state">вкл</span></button>
+    <button id="btn-ps1" aria-pressed="true">Эффекты PS1 <span class="state">вкл</span></button>
+    <button id="btn-res">Разрешение <span class="state">320×240</span></button>
+    <button id="btn-wire" aria-pressed="false">Сетка <span class="state">выкл</span></button>
+    <button id="btn-front">Вид спереди</button>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Модель</h2>
+      <dl class="stats">
+        <dt>Треугольников</dt><dd id="s-tris">—</dd>
+        <dt>Вершин (с разбивкой граней)</dt><dd id="s-verts">—</dd>
+        <dt>Цветов в палитре</dt><dd id="s-cols">—</dd>
+        <dt>Высота</dt><dd id="s-h">—</dd>
+        <dt>Ширина × глубина</dt><dd id="s-wd">—</dd>
+        <dt>Текстура-палитра</dt><dd>64×64 px</dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h2>Палитра</h2>
+      <ul class="swatches" id="swatches"></ul>
+    </section>
+    <section class="card">
+      <h2>Файлы в папке ps1-models/__FOLDER__</h2>
+      <ul class="files">
+        <li><code>__FILE__.glb</code><span>для Blender, Godot, Unity, three.js; палитра уже внутри</span></li>
+        <li><code>__FILE__.obj</code> + <code>__FILE__.mtl</code> + <code>palette.png</code><span>то же самое в OBJ</span></li>
+        <li><code>../__FILE__.py</code><span>описание модели: правите позу или пропорции и пересобираете через build.py</span></li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script type="application/json" id="mesh-data">__MESH_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  const data = JSON.parse(document.getElementById("mesh-data").textContent);
+
+
+  // ---------- статистика и палитра
+  const triCount = data.col.length;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < data.pos.length; i++) { const a = i % 3; lo[a] = Math.min(lo[a], data.pos[i]); hi[a] = Math.max(hi[a], data.pos[i]); }
+  const fmt = (n) => n.toLocaleString("ru-RU");
+  document.getElementById("s-tris").textContent = fmt(triCount);
+  document.getElementById("s-verts").textContent = fmt(triCount * 3);
+  document.getElementById("s-cols").textContent = data.names.length;
+  const m = (v) => (v / 1000).toFixed(2).replace(".", ",");
+  document.getElementById("s-h").textContent = m(hi[1] - lo[1]) + " м";
+  document.getElementById("s-wd").textContent = m(hi[0] - lo[0]) + " × " + m(hi[2] - lo[2]) + " м";
+  const sw = document.getElementById("swatches");
+  data.names.forEach((n, i) => {
+    const li = document.createElement("li");
+    const c = data.palette[i];
+    li.innerHTML = '<i style="background:rgb(' + c.join(",") + ')"></i>' + (data.names_ru[i] || n);
+    sw.appendChild(li);
+  });
+
+  // ---------- WebGL
+  const canvas = document.getElementById("view");
+  const gl = canvas.getContext("webgl", { antialias: false, preserveDrawingBuffer: false });
+  if (!gl) {
+    document.getElementById("osd").textContent = "WebGL недоступен в этом браузере";
+    return;
+  }
+
+  const VS = `
+attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol;
+uniform mat4 uVP; uniform vec3 uEye; uniform vec2 uRes; uniform float uSnap;
+uniform vec3 uLight; uniform float uLit; uniform float uFogNear; uniform float uFogFar;
+varying vec3 vCol; varying float vFog;
+void main() {
+  vec4 clip = uVP * vec4(aPos, 1.0);
+  if (uSnap > 0.5) {
+    vec2 half_ = uRes * 0.5;
+    vec2 ndc = clip.xy / clip.w;
+    ndc = floor(ndc * half_ + 0.5) / half_;
+    clip.xy = ndc * clip.w;
+  }
+  gl_Position = clip;
+  float diff = max(dot(normalize(aNrm), uLight), 0.0);
+  float back = max(dot(normalize(aNrm), normalize(vec3(0.5, 0.2, -0.8))), 0.0);
+  float l = mix(1.0, 0.42 + 0.68 * diff + 0.18 * back, uLit);
+  vCol = aCol * l;
+  vFog = clamp((distance(aPos, uEye) - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+}`;
+  const FS = `
+precision mediump float;
+varying vec3 vCol; varying float vFog;
+uniform vec3 uFogCol; uniform float uDither; uniform float uAlpha;
+float bayer(vec2 p) {
+  vec2 q = mod(floor(p), 4.0);
+  float i = q.x + q.y * 4.0;
+  // 4x4 матрица Байера, развёрнутая в выражение
+  float m = 0.0;
+  if (i == 0.0) m = 0.0;  else if (i == 1.0) m = 8.0;  else if (i == 2.0) m = 2.0;  else if (i == 3.0) m = 10.0;
+  else if (i == 4.0) m = 12.0; else if (i == 5.0) m = 4.0; else if (i == 6.0) m = 14.0; else if (i == 7.0) m = 6.0;
+  else if (i == 8.0) m = 3.0;  else if (i == 9.0) m = 11.0; else if (i == 10.0) m = 1.0; else if (i == 11.0) m = 9.0;
+  else if (i == 12.0) m = 15.0; else if (i == 13.0) m = 7.0; else if (i == 14.0) m = 13.0; else m = 5.0;
+  return m / 16.0 - 0.5;
+}
+void main() {
+  vec3 c = mix(vCol, uFogCol, vFog);
+  if (uDither > 0.5) {
+    c += bayer(gl_FragCoord.xy) * (1.0 / 31.0);
+    c = floor(clamp(c, 0.0, 1.0) * 31.0 + 0.5) / 31.0;
+  }
+  gl_FragColor = vec4(c, uAlpha);
+}`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const A = { pos: gl.getAttribLocation(prog, "aPos"), nrm: gl.getAttribLocation(prog, "aNrm"), col: gl.getAttribLocation(prog, "aCol") };
+  const U = {};
+  ["uVP", "uEye", "uRes", "uSnap", "uLight", "uLit", "uFogNear", "uFogFar", "uFogCol", "uDither", "uAlpha"].forEach((n) => { U[n] = gl.getUniformLocation(prog, n); });
+
+  // ---------- геометрия
+  function Builder() { this.p = []; this.n = []; this.c = []; }
+  Builder.prototype.tri = function (a, b, c, col) {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    for (const p of [a, b, c]) { this.p.push(p[0], p[1], p[2]); this.n.push(nx, ny, nz); this.c.push(col[0], col[1], col[2]); }
+  };
+  function upload(b) {
+    const mk = (arr) => { const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW); return buf; };
+    const count = b.p.length / 3;
+    const lines = [];
+    for (let t = 0; t < count; t += 3) {
+      for (const [i, j] of [[0, 1], [1, 2], [2, 0]]) {
+        lines.push(b.p[(t + i) * 3], b.p[(t + i) * 3 + 1], b.p[(t + i) * 3 + 2], b.p[(t + j) * 3], b.p[(t + j) * 3 + 1], b.p[(t + j) * 3 + 2]);
+      }
+    }
+    const lineN = new Array(lines.length).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0));
+    const lineC = new Array(lines.length).fill(0).map((_, i) => [1.0, 0.85, 0.42][i % 3]);
+    return { pos: mk(b.p), nrm: mk(b.n), col: mk(b.c), count, lpos: mk(lines), lnrm: mk(lineN), lcol: mk(lineC), lcount: lines.length / 3 };
+  }
+
+  // модель
+  const kb = new Builder();
+  const pal = data.palette.map((c) => c.map((v) => v / 255));
+  for (let t = 0; t < triCount; t++) {
+    const o = t * 9, P = data.pos;
+    kb.tri([P[o] / 1000, P[o + 1] / 1000, P[o + 2] / 1000], [P[o + 3] / 1000, P[o + 4] / 1000, P[o + 5] / 1000],
+      [P[o + 6] / 1000, P[o + 7] / 1000, P[o + 8] / 1000], pal[data.col[t]]);
+  }
+  const model = upload(kb);
+
+  // окружение: трава, ели, скала, небо
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const env = new Builder();
+  const N = 14, S = 1.6;
+  const gh = (x, z) => { const r = Math.hypot(x, z); return r < 2.2 ? 0 : (r - 2.2) * 0.08 * Math.sin(x * 0.7 + z * 0.4) ; };
+  for (let i = -N; i < N; i++) for (let j = -N; j < N; j++) {
+    const x0 = i * S, z0 = j * S, x1 = x0 + S, z1 = z0 + S;
+    const g = 0.75 + rnd() * 0.3;
+    const col = (i + j) & 1 ? [0.22 * g, 0.48 * g, 0.16 * g] : [0.27 * g, 0.55 * g, 0.18 * g];
+    const a = [x0, gh(x0, z0), z0], b = [x1, gh(x1, z0), z0], c = [x1, gh(x1, z1), z1], d = [x0, gh(x0, z1), z1];
+    env.tri(a, c, b, col); env.tri(a, d, c, col);
+  }
+  function tree(x, z, h) {
+    const trunk = [0.32, 0.2, 0.1];
+    const ring = (y, r, n) => { const out = []; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2; out.push([x + Math.cos(a) * r, y, z + Math.sin(a) * r]); } return out; };
+    const t0 = ring(0, 0.12, 5), t1 = ring(h * 0.3, 0.1, 5);
+    for (let k = 0; k < 5; k++) { const k2 = (k + 1) % 5; env.tri(t0[k], t1[k], t1[k2], trunk); env.tri(t0[k], t1[k2], t0[k2], trunk); }
+    for (let tier = 0; tier < 3; tier++) {
+      const y0 = h * (0.22 + tier * 0.24), r = h * (0.32 - tier * 0.08);
+      const base = ring(y0, r, 6), apex = [x, y0 + h * 0.42, z];
+      const g = 0.75 + rnd() * 0.2;
+      for (let k = 0; k < 6; k++) env.tri(base[k], apex, base[(k + 1) % 6], [0.1 * g, 0.3 * g, 0.16 * g]);
+      const c = [x, y0, z];
+      for (let k = 0; k < 6; k++) env.tri(base[k], base[(k + 1) % 6], c, [0.06, 0.18, 0.1]);
+    }
+  }
+  [[-4.5, -5.5, 4.2], [-6.5, -3.0, 3.4], [3.8, -6.5, 4.8], [6.5, -4.0, 3.6], [-2.0, -9.0, 5.2], [1.2, -10.5, 4.6],
+   [9.0, -8.0, 5.0], [-9.5, -7.5, 4.4], [-7.5, 2.0, 3.6], [8.0, 3.0, 4.0], [-3.5, 8.0, 3.6], [5.0, 9.0, 4.2]].forEach((t) => tree(t[0], t[1], t[2]));
+  // скала на заднем плане
+  const rock = [0.52, 0.5, 0.48], rock2 = [0.4, 0.39, 0.38];
+  const peak = [-8, 9, -19], m1 = [-18, 0, -16], m2 = [2, 0, -20], m3 = [-9, 0, -12], m4 = [-12, 5.5, -16];
+  env.tri(m1, m4, m3, rock2); env.tri(m4, peak, m3, rock); env.tri(m3, peak, m2, rock2); env.tri(m1, peak, m4, rock);
+  const envMesh = upload(env);
+
+  // тень-пятно под моделью
+  const sh = new Builder();
+  for (let k = 0; k < 10; k++) {
+    const a0 = (k / 10) * Math.PI * 2, a1 = ((k + 1) / 10) * Math.PI * 2;
+    sh.tri([0.02, 0.01, 0.04], [0.02 + Math.cos(a1) * 0.62, 0.01, 0.04 + Math.sin(a1) * 0.5], [0.02 + Math.cos(a0) * 0.62, 0.01, 0.04 + Math.sin(a0) * 0.5], [0, 0, 0]);
+  }
+  const shadow = upload(sh);
+
+  // небо — полноэкранный градиент
+  const skyBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
+  const SKY_TOP = [0.16, 0.17, 0.36], SKY_LOW = [0.55, 0.6, 0.78];
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0]), gl.STATIC_DRAW);
+  const skyCol = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyCol);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([].concat(SKY_LOW, SKY_LOW, SKY_TOP, SKY_LOW, SKY_TOP, SKY_TOP)), gl.STATIC_DRAW);
+  const skyNrm = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyNrm);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(18).map((_, i) => (i % 3 === 1 ? 1 : 0)), gl.STATIC_DRAW);
+
+  // ---------- матрицы
+  function persp(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  }
+  function lookAt(e, t, u) {
+    let zx = e[0] - t[0], zy = e[1] - t[1], zz = e[2] - t[2];
+    let l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
+    let xx = u[1] * zz - u[2] * zy, xy = u[2] * zx - u[0] * zz, xz = u[0] * zy - u[1] * zx;
+    l = Math.hypot(xx, xy, xz); xx /= l; xy /= l; xz /= l;
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    return [xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0,
+      -(xx * e[0] + xy * e[1] + xz * e[2]), -(yx * e[0] + yy * e[1] + yz * e[2]), -(zx * e[0] + zy * e[1] + zz * e[2]), 1];
+  }
+  function mul(a, b) {
+    const o = new Array(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+      let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s;
+    }
+    return o;
+  }
+
+  // ---------- состояние
+  const RES = [[320, 240], [640, 480]];
+  const modelH = (hi[1] - lo[1]) / 1000;
+  const state = { yaw: -0.38, pitch: 0.12, dist: Math.max(3.2, modelH * 1.9), spin: true, ps1: true, res: 0, wire: false };
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) state.spin = false;
+
+  function setBtn(id, on, text) {
+    const b = document.getElementById(id);
+    if (on !== null) b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.querySelector(".state").textContent = text;
+  }
+  function syncUI() {
+    setBtn("btn-spin", state.spin, state.spin ? "вкл" : "выкл");
+    setBtn("btn-ps1", state.ps1, state.ps1 ? "вкл" : "выкл");
+    setBtn("btn-res", null, RES[state.res].join("×"));
+    setBtn("btn-wire", state.wire, state.wire ? "вкл" : "выкл");
+    document.getElementById("btn-res").disabled = !state.ps1;
+    document.getElementById("scan").hidden = !state.ps1;
+    document.getElementById("osd").textContent = state.ps1 ? RES[state.res].join("×") : "без эффектов";
+    canvas.style.imageRendering = state.ps1 ? "pixelated" : "auto";
+  }
+  document.getElementById("btn-spin").onclick = () => { state.spin = !state.spin; syncUI(); };
+  document.getElementById("btn-ps1").onclick = () => { state.ps1 = !state.ps1; syncUI(); };
+  document.getElementById("btn-res").onclick = () => { state.res = (state.res + 1) % RES.length; syncUI(); };
+  document.getElementById("btn-wire").onclick = () => { state.wire = !state.wire; syncUI(); };
+  document.getElementById("btn-front").onclick = () => { state.yaw = 0; state.pitch = 0.1; state.spin = false; syncUI(); };
+  syncUI();
+
+  // вращение мышью и пальцем
+  const screen = document.getElementById("screen");
+  let drag = null;
+  screen.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; screen.setPointerCapture(e.pointerId); });
+  screen.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    state.yaw -= (e.clientX - drag.x) * 0.01;
+    state.pitch = Math.max(-0.2, Math.min(1.1, state.pitch + (e.clientY - drag.y) * 0.006));
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  const endDrag = () => { drag = null; };
+  screen.addEventListener("pointerup", endDrag);
+  screen.addEventListener("pointercancel", endDrag);
+  screen.addEventListener("wheel", (e) => { e.preventDefault(); state.dist = Math.max(2.2, Math.min(9, state.dist * (1 + Math.sign(e.deltaY) * 0.1))); }, { passive: false });
+
+  // ---------- отрисовка
+  function bind(m, lines) {
+    const set = (loc, buf) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); };
+    set(A.pos, lines ? m.lpos : m.pos); set(A.nrm, lines ? m.lnrm : m.nrm); set(A.col, lines ? m.lcol : m.col);
+  }
+  const ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const FOG = [0.5, 0.56, 0.74];
+  const light = (() => { const v = [-0.45, 0.75, 0.55], l = Math.hypot(...v); return v.map((x) => x / l); })();
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (state.spin && !drag) state.yaw += dt * 0.45;
+
+    const rect = canvas.getBoundingClientRect();
+    let w, h;
+    if (state.ps1) { [w, h] = RES[state.res]; }
+    else { const dpr = Math.min(window.devicePixelRatio || 1, 2); w = Math.round(rect.width * dpr); h = Math.round(rect.height * dpr); }
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+
+    const target = [0, modelH * 0.46, 0];
+    const eye = [target[0] + Math.sin(state.yaw) * Math.cos(state.pitch) * state.dist,
+      target[1] + Math.sin(state.pitch) * state.dist,
+      target[2] + Math.cos(state.yaw) * Math.cos(state.pitch) * state.dist];
+    const vp = mul(persp(0.75, w / h, 0.1, 60), lookAt(eye, target, [0, 1, 0]));
+
+    gl.uniform2f(U.uRes, w, h);
+    gl.uniform1f(U.uSnap, state.ps1 ? 1 : 0);
+    gl.uniform1f(U.uDither, state.ps1 ? 1 : 0);
+    gl.uniform3fv(U.uEye, eye);
+    gl.uniform3fv(U.uLight, light);
+    gl.uniform3fv(U.uFogCol, FOG);
+    gl.uniform1f(U.uAlpha, 1);
+
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+    // небо
+    gl.uniformMatrix4fv(U.uVP, false, ident);
+    gl.uniform1f(U.uLit, 0); gl.uniform1f(U.uFogNear, 1e3); gl.uniform1f(U.uFogFar, 1e3 + 1);
+    gl.uniform1f(U.uSnap, 0);
+    const setRaw = (loc, buf) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); };
+    setRaw(A.pos, skyBuf); setRaw(A.nrm, skyNrm); setRaw(A.col, skyCol);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.uniform1f(U.uSnap, state.ps1 ? 1 : 0);
+
+    gl.enable(gl.DEPTH_TEST); gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
+    gl.uniformMatrix4fv(U.uVP, false, vp);
+
+    // окружение
+    gl.uniform1f(U.uLit, 1); gl.uniform1f(U.uFogNear, 5); gl.uniform1f(U.uFogFar, 24);
+    gl.disable(gl.CULL_FACE);
+    bind(envMesh, false); gl.drawArrays(gl.TRIANGLES, 0, envMesh.count);
+    gl.enable(gl.CULL_FACE);
+
+    // тень
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.uniform1f(U.uLit, 0); gl.uniform1f(U.uAlpha, 0.38); gl.uniform1f(U.uFogNear, 1e3); gl.uniform1f(U.uFogFar, 1e3 + 1);
+    gl.disable(gl.CULL_FACE);
+    bind(shadow, false); gl.drawArrays(gl.TRIANGLES, 0, shadow.count);
+    gl.enable(gl.CULL_FACE);
+    gl.depthMask(true); gl.disable(gl.BLEND); gl.uniform1f(U.uAlpha, 1);
+
+    // модель
+    gl.uniform1f(U.uLit, 1); gl.uniform1f(U.uFogNear, 9); gl.uniform1f(U.uFogFar, 30);
+    bind(model, false); gl.drawArrays(gl.TRIANGLES, 0, model.count);
+    if (state.wire) {
+      gl.uniform1f(U.uLit, 0); gl.disable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(U.uAlpha, 0.55);
+      bind(model, true); gl.drawArrays(gl.LINES, 0, model.lcount);
+      gl.disable(gl.BLEND); gl.uniform1f(U.uAlpha, 1); gl.enable(gl.DEPTH_TEST);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>

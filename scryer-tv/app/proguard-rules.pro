@@ -1,2 +1,0 @@
--dontwarn org.slf4j.**
--keep class org.scryertv.client.data.** { *; }

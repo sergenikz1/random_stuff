@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 import { useEffect, useRef, useState } from 'react';
 import {
   CATEGORIES, COSMETICS, PASS_REWARDS, PREMIUM_REWARDS, PREMIUM_XP_MULT, MAX_LEVEL, ACHIEVEMENT_REWARDS, cosmeticName, isGift,
@@ -32,7 +33,7 @@ export function RewardIcon({ k }) {
 }
 
 // Примерочная: синтетический человек отжимается со скином, скелетом и всплеском.
-function Preview({ skin, trail, burst, victory, frame, avatar }) {
+function Preview({ skin, trail, burst, victory, frame, avatar, look }) {
   const ref = useRef(null);
   const victoryRef = useRef(null);
   useEffect(() => {
@@ -60,7 +61,7 @@ function Preview({ skin, trail, burst, victory, frame, avatar }) {
     <div style={{ position: 'relative' }}>
       <canvas ref={ref} className="preview" />
       <canvas ref={victoryRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', borderRadius: 16 }} />
-      <div style={{ position: 'absolute', left: 10, top: 14 }}><Avatar emoji={avatar} frame={frame} size="md" /></div>
+      <div style={{ position: 'absolute', left: 10, top: 14 }}><Avatar emoji={avatar} look={look} frame={frame} size="md" /></div>
     </div>
   );
 }
@@ -108,7 +109,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
         <div className="rows">
           {p.quests.map((q) => (
             <div key={q.id} className="row">
-              <span style={{ fontSize: 20 }}>{q.done ? '✅' : '⬜'}</span>
+              <Glyph e={q.done ? '✅' : '⬜'} size={25} />
               <div className="grow">
                 <div className="title" style={q.done ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>{q.text}</div>
                 {!q.done && q.goal > 1 && <div style={{ marginTop: 5 }}><Bar value={q.progress} max={q.goal} /></div>}
@@ -123,8 +124,8 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div className="lvl-num" style={{ width: 62, height: 62, fontSize: 30, color: 'var(--accent-ink)', background: 'var(--accent)', borderColor: 'var(--accent-edge)' }}>{roman(p.level)}</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 900, fontSize: 18, color: 'var(--heading)' }}>Уровень {p.level} из {MAX_LEVEL} {p.premium && <span className="chip gold">🌟 премиум</span>}</div>
-            <div className="small muted" style={{ fontWeight: 700, margin: '4px 0 6px' }}>{p.max ? 'Сезон пройден полностью! 👑' : `${p.xpInLevel} / ${p.xpNeed} опыта до следующего`}</div>
+            <div style={{ fontWeight: 900, fontSize: 18, color: 'var(--heading)' }}>Уровень {p.level} из {MAX_LEVEL} {p.premium && <span className="chip gold"><Glyph e="🌟" size="1.25em" /> премиум</span>}</div>
+            <div className="small muted" style={{ fontWeight: 700, margin: '4px 0 6px' }}>{rich(p.max ? 'Сезон пройден полностью! 👑' : `${p.xpInLevel} / ${p.xpNeed} опыта до следующего`)}</div>
             <Bar value={p.max ? 1 : p.xpInLevel} max={p.max ? 1 : p.xpNeed} tone="gold" />
           </div>
         </div>
@@ -136,9 +137,9 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
       {!p.premium && (
         <Card className="premium-card" title="Премиум-пропуск" icon="🌟">
           <div className="rows">
-            <div className="row"><span style={{ fontSize: 22 }}>🎁</span><div className="grow"><div className="title">Настоящие подарки Telegram</div><div className="sub">на 8, 16, 24 и 30 уровнях — приходят от бота</div></div></div>
-            <div className="row"><span style={{ fontSize: 22 }}>🦸</span><div className="grow"><div className="title">Скины Супергерой, Кибер, Дух огня</div><div className="sub">и сияние, звездопад, корона, аватары 🦸 💎</div></div></div>
-            <div className="row"><span style={{ fontSize: 22 }}>⚡</span><div className="grow"><div className="title">+{Math.round((PREMIUM_XP_MULT - 1) * 100)}% опыта</div><div className="sub">до конца сезона, а ещё жетон «Звёздный»</div></div></div>
+            <div className="row"><Glyph e="🎁" size={28} /><div className="grow"><div className="title">Настоящие подарки Telegram</div><div className="sub">на 8, 16, 24 и 30 уровнях — приходят от бота</div></div></div>
+            <div className="row"><Glyph e="🦸" size={28} /><div className="grow"><div className="title">Скины Супергерой, Кибер, Дух огня</div><div className="sub">и сияние, звездопад, корона, аватары <Glyph e="🦸" size="1.25em" /> <Glyph e="💎" size="1.25em" /></div></div></div>
+            <div className="row"><Glyph e="⚡" size={28} /><div className="grow"><div className="title">+{Math.round((PREMIUM_XP_MULT - 1) * 100)}% опыта</div><div className="sub">до конца сезона, а ещё жетон «Звёздный»</div></div></div>
           </div>
           <button className="gel xl star-btn" style={{ marginTop: 12 }} disabled={buying} onClick={onBuy}>
             {buying ? 'Открываем оплату…' : `Купить за ${p.premiumPrice} ⭐`}
@@ -149,7 +150,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
 
       <Card title="Примерочная" icon="🪞">
         <Preview skin={p.equipped.skin} trail={p.equipped.trail} burst={p.equipped.burst} victory={victoryPreview ? victoryPreview.split(':')[0] : null}
-          frame={p.equipped.frame} avatar={p.avatar} key={victoryPreview || 'pv'} />
+          frame={p.equipped.frame} avatar={p.avatar} look={p.look} key={victoryPreview || 'pv'} />
         <div style={{ marginTop: 12, overflowX: 'auto' }}>
           <Seg value={cat} onChange={setCat} options={[['skin', 'Скин'], ['trail', 'Скелет'], ['burst', 'Повтор'], ['frame', 'Рамка'], ['victory', 'Победа'], ['music', 'Музыка'], ['title', 'Титул']]} />
         </div>
@@ -160,7 +161,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
             const on = p.equipped[cat] === id;
             return (
               <div key={id} className={`item ${on ? 'on' : ''} ${own ? '' : 'locked'}`} role="button" tabIndex={0} onClick={() => own && equip(key)}>
-                {cat === 'frame' ? <Avatar emoji={p.avatar} frame={id} size="sm" /> : <span className="emo">{ITEM_EMOJI[cat]?.[id] || '🏷️'}</span>}
+                {cat === 'frame' ? <Avatar emoji={p.avatar} look={p.look} frame={id} size="sm" /> : <span className="emo">{rich(ITEM_EMOJI[cat]?.[id] || '🏷️')}</span>}
                 <span>{item.name}</span>
                 <span className="small muted">{on ? 'надето' : own ? 'надеть' : sourceOf(key)}</span>
                 {cat === 'music' && id !== 'none' && (
@@ -177,7 +178,7 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
 
       <Card title="Награды сезона" icon="🎁">
         <div className="small muted" style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', margin: '-4px 0 8px 48px' }}>
-          <span>Бесплатно</span><span>🌟 Премиум</span>
+          <span>Бесплатно</span><span><Glyph e="🌟" size="1.25em" /> Премиум</span>
         </div>
         <div className="track">
           {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map((lvl) => {

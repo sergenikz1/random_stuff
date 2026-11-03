@@ -1,4 +1,5 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 // Греческие элементы: стрик с вулканом, окно извержения, выбор режима, пиктограммы.
 import { useEffect, useState } from 'react';
 import { Sheet } from './ui.jsx';
@@ -57,7 +58,7 @@ export function StreakBar({ profile, onOpen }) {
       <span className="sb-days">
         {days.map((x, i) => (
           <span key={i} className={`sb-day ${x.done ? 'done' : ''} ${x.today ? 'today' : ''}`}>
-            <i>{x.done ? '✓' : ''}</i>{x.label}
+            <i>{rich(x.done ? '✓' : '')}</i>{x.label}
           </span>
         ))}
       </span>
@@ -106,11 +107,11 @@ export function VolcanoSheet({ profile, onClose }) {
         <span style={{ fontSize: 30 }}>{S.icon}</span>
         <div className="grow">
           <div className="title">Сейчас ваша статуя — {S.name}</div>
-          <div className="sub">{st === 'obsidian' ? 'Вы держите пояс — высшая честь' : next && S.at ? `До «${next.name}»: ${Math.max(0, S.at - (profile?.rating || 0))} 🏆 рейтинга` : 'Завоюйте пояс арены, чтобы стать обсидианом'}</div>
+          <div className="sub">{rich(st === 'obsidian' ? 'Вы держите пояс — высшая честь' : next && S.at ? `До «${next.name}»: ${Math.max(0, S.at - (profile?.rating || 0))} 🏆 рейтинга` : 'Завоюйте пояс арены, чтобы стать обсидианом')}</div>
         </div>
       </div>
       <div className="streak-head">
-        <span className="greek-title" style={{ fontSize: 20 }}>🔥 Серия {profile?.dayStreak || 0} {profile?.dayStreak === 1 ? 'день' : 'дней'}</span>
+        <span className="greek-title" style={{ fontSize: 20 }}><Glyph e="🔥" size="1.25em" /> Серия {profile?.dayStreak || 0} {profile?.dayStreak === 1 ? 'день' : 'дней'}</span>
         <span className="small muted" style={{ fontWeight: 800 }}>опыт ×{(profile?.multiplier || 1).toFixed(1)}</span>
       </div>
       <div className="cal">{cal.map((x, i) => <i key={i} className={`${x.done ? 'd' : ''} ${x.today ? 't' : ''}`}>{x.date}</i>)}</div>
@@ -167,7 +168,7 @@ export function ModeSheet({ settings, updateSettings, onClose, onJoinCode, toast
       <div className="fmt-grid">
         {FORMATS.map((f) => (
           <button key={f.id} className={`fmt ${settings.format === f.id ? 'on' : ''}`} onClick={() => updateSettings({ format: f.id })}>
-            <b>{f.icon}</b>{f.name}
+            <b><Glyph e={f.icon} size={22} /></b>{f.name}
           </button>
         ))}
       </div>

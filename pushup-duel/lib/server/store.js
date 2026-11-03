@@ -11,6 +11,7 @@ import {
 } from '../pass.js';
 import { rankOf, START_RATING, AVATARS } from '../duel.js';
 import { QUEST_GEMS } from '../economy.js';
+import { cleanLook, lookFor, cleanCrest, crestOf, CREST_CHARGES } from '../heraldry.js';
 import { ecoView, ensureEco, boostActive } from './economy.js';
 
 const CLAN_MAX = 30;
@@ -168,7 +169,7 @@ export class Store {
   clanCard(c) {
     const owner = this.players.get(c.ownerId);
     return {
-      id: c.id, name: c.name, emoji: c.emoji, about: c.about || '',
+      id: c.id, name: c.name, emoji: c.emoji, crest: crestOf(c), about: c.about || '',
       members: c.members.length, max: CLAN_MAX, week: this.clanScore(c),
       owner: owner ? owner.name : '',
     };
@@ -186,7 +187,7 @@ export class Store {
     return [...this.clans.values()].map((c) => this.clanCard(c)).sort((a, b) => b.week - a.week || b.members - a.members);
   }
 
-  createClan(p, { name, emoji, about }) {
+  createClan(p, { name, emoji, about, crest }) {
     if (p.clanId && this.clans.has(p.clanId)) throw new UserError('Сначала выйдите из текущего клана');
     const n = cleanName(name, 24);
     if (n.length < 3) throw new UserError('Название — от 3 символов');
@@ -198,10 +199,21 @@ export class Store {
       id, name: n, emoji: CLAN_EMOJI.includes(emoji) ? emoji : '🛡️', about: cleanName(about, 120),
       ownerId: p.id, members: [p.id], createdAt: Date.now(),
     };
+    if (crest) { c.crest = cleanCrest(crest); c.emoji = c.crest.charge; }
     this.clans.set(id, c);
     p.clanId = id;
     grantExtra(p, ACHIEVEMENT_REWARDS.captain.items);
     this.addFeed(c.emoji, `${p.name} основывает клан «${c.name}»`);
+    return c;
+  }
+
+  // Капитан меняет герб клана.
+  setCrest(p, crest) {
+    const c = this.clans.get(p.clanId);
+    if (!c) throw new UserError('Вы не в клане');
+    if (c.ownerId !== p.id) throw new UserError('Герб меняет только капитан');
+    c.crest = cleanCrest(crest, crestOf(c));
+    c.emoji = c.crest.charge;
     return c;
   }
 
@@ -233,7 +245,7 @@ export class Store {
 
 export class UserError extends Error {}
 
-export const CLAN_EMOJI = ['🛡️', '⚔️', '🔥', '⚡', '🐺', '🦅', '🐉', '💪', '🏆', '🌊', '❄️', '🚀', '👑', '💀', '🦁', '🌪️'];
+export const CLAN_EMOJI = CREST_CHARGES;
 
 function migrate(p) {
   return {
@@ -248,6 +260,7 @@ function migrate(p) {
     premium: null, gifts: {}, badges: [], bestDayStreak: 0,
     createdAt: Date.now(),
     ...p,
+    look: cleanLook(p.look, lookFor(p.id)),
   };
 }
 
@@ -305,12 +318,12 @@ export function giftStatus(p) {
 export function publicCard(p, store) {
   const clan = store && p.clanId ? store.clans.get(p.clanId) : null;
   return {
-    id: p.id, name: p.name, avatar: p.avatar, rating: p.rating, rank: rankOf(p.rating).name,
+    id: p.id, name: p.name, avatar: p.avatar, look: p.look, rating: p.rating, rank: rankOf(p.rating).name,
     level: levelInfo(p.xp).level, frame: p.equipped.frame, trail: p.equipped.trail,
     title: COSMETICS.title[p.equipped.title]?.name || '',
     wins: p.wins, games: p.games, bestReps: p.bestReps, totalReps: p.totalReps,
     bestWinStreak: p.bestWinStreak,
-    clan: clan ? { id: clan.id, name: clan.name, emoji: clan.emoji } : null,
+    clan: clan ? { id: clan.id, name: clan.name, emoji: clan.emoji, crest: crestOf(clan) } : null,
     tg: !!p.tgId,
     premium: isPremium(p),
     badges: showcaseBadges(earnedBadges(badgeStats(p, store)), p.badges),
@@ -491,6 +504,7 @@ export function updateProfile(p, body, store = null) {
     if (!unlocked.has(`avatar:${body.avatar}`)) throw new UserError('Этот аватар ещё не открыт');
     p.avatar = body.avatar;
   }
+  if (body.look !== undefined) p.look = cleanLook(body.look, p.look);
   if (body.badges !== undefined) {
     const earned = new Set(earnedBadges(badgeStats(p, store)));
     if (!Array.isArray(body.badges) || body.badges.length > 3 || body.badges.some((b) => !earned.has(b))) {

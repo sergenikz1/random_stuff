@@ -154,6 +154,7 @@ export class Api {
             if (body.action === 'accept' || body.action === 'decline') { this.compete.respondWar(p, c, body.action === 'accept'); s.save(); return this.myClan(p); }
             return undefined;
           }
+          if (b === 'crest') { s.setCrest(p, body.crest); s.save(); return this.myClan(p); }
           if (c === 'join') { s.joinClan(p, b); s.save(); return this.myClan(p); }
           return undefined;
         }

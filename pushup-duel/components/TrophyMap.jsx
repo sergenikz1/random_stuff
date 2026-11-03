@@ -11,7 +11,7 @@ import { Avatar } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
 import { PackIcon } from './Stickers.jsx';
 import { roman } from './Greek.jsx';
-import { Glyph, Icon } from './Icon.jsx';
+import { Glyph, rich, Icon } from './Icon.jsx';
 
 const W = 390;          // ширина карты в её собственных координатах (дальше масштабируем под экран)
 const H = 920;         // высота участка одной арены
@@ -128,7 +128,7 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
                     <div className="greek-title">{b.name}</div>
                     <div className="small">{b.id === 1 ? 'старт' : `от ${b.min} 🏆`} · пояс чемпиона</div>
                   </div>
-                  <span className="gate-lock">{reached ? '✓' : '🔒'}</span>
+                  <span className="gate-lock">{rich(reached ? '✓' : '🔒')}</span>
                 </div>
               </div>
             );
@@ -142,15 +142,15 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
             return (
               <div key={r.at}>
                 <div className={`tmap-link ${r.status}`} style={{ top: y - 1.5, left: x + 14, width: W * 0.51 - x - 14 }} />
-                <div className={`tmap-node ${r.status}`} style={{ left: x - 19, top: y - 19 }}>{r.status === 'claimed' ? '✓' : r.at}</div>
+                <div className={`tmap-node ${r.status}`} style={{ left: x - 19, top: y - 19 }}>{rich(r.status === 'claimed' ? '✓' : r.at)}</div>
                 <div className={`tmap-reward ${r.status}`} style={{ top: y - 32 }}>
                   {t.pack ? <PackIcon type={t.pack} size={36} /> : t.item ? <RewardIcon k={t.item} /> : <span className="rw-ico"><Icon name={t.icon} size={34} /></span>}
                   <div className="grow">
                     <div className="title">{t.text}</div><div className="sub">{r.at} 🏆</div>
                     {r.status === 'ready' && <button className="gel green" onClick={() => onClaim(r.at)}>Забрать</button>}
                   </div>
-                  {r.status === 'claimed' && <span className="rw-st">✅</span>}
-                  {r.status === 'locked' && <span className="rw-st">🔒</span>}
+                  {r.status === 'claimed' && <span className="rw-st"><Glyph e="✅" size="1.25em" /></span>}
+                  {r.status === 'locked' && <span className="rw-st"><Glyph e="🔒" size="1.25em" /></span>}
                 </div>
               </div>
             );
@@ -164,8 +164,8 @@ export default function TrophyMap({ eco, profile, theme, onClose, onClaim }) {
           </div>
 
           {/* Игрок на дороге */}
-          <div className="tmap-me" style={{ left: xOf(meY) - 28, top: meY - 64 }}>
-            <Avatar emoji={profile?.avatar} frame={profile?.equipped?.frame} size="md" />
+          <div className="tmap-me" style={{ left: xOf(meY) > 120 ? xOf(meY) - 96 : xOf(meY) + 22, top: meY - 34 }}>
+            <Avatar emoji={profile?.avatar} look={profile?.look} frame={profile?.equipped?.frame} size="md" />
             <span className="me-tag">Вы · {trophies} 🏆</span>
           </div>
         </div>

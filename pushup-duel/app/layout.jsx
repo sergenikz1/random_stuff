@@ -1,10 +1,10 @@
 import Script from 'next/script';
-import { Nunito, Forum } from 'next/font/google';
+import { Manrope, Cormorant_SC } from 'next/font/google';
 import './globals.css';
 
-const font = Nunito({ subsets: ['latin', 'cyrillic'], weight: ['500', '600', '700', '800', '900'], variable: '--font', display: 'swap' });
-// Заголовки — шрифт в духе античных надписей.
-const display = Forum({ subsets: ['latin', 'cyrillic'], weight: '400', variable: '--font-display', display: 'swap' });
+const font = Manrope({ subsets: ['latin', 'cyrillic'], weight: ['500', '600', '700', '800'], variable: '--font', display: 'swap' });
+// Заголовки — капитель в духе античных надписей.
+const display = Cormorant_SC({ subsets: ['latin', 'cyrillic'], weight: ['600', '700'], variable: '--font-display', display: 'swap' });
 
 export const metadata = {
   title: 'PushDuel',
@@ -17,7 +17,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#1566cc',
+  themeColor: '#f3f6fb',
 };
 
 export default function RootLayout({ children }) {

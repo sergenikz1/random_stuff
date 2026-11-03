@@ -1,6 +1,10 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/client/net.js';
+import { Crest, CrestEditor, CrestSheet } from './Emblem.jsx';
+import { DEFAULT_CREST } from '../lib/heraldry.js';
+import { Icon } from './Icon.jsx';
 import { Card } from './ui.jsx';
 import { PlayerRow } from './Home.jsx';
 
@@ -21,14 +25,14 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
     return (
       <Card title="Война кланов" icon="⚔️">
         <div className="war-board">
-          <div><span className="war-emoji">{my.emoji}</span><b>{my.name}</b><span className="war-score mine">{w.score.mine}</span></div>
+          <div><Crest crest={my.crest} size={46} /><b>{my.name}</b><span className="war-score mine">{w.score.mine}</span></div>
           <div className="war-vs">VS<small>осталось <WarTimer end={w.end} /></small></div>
-          <button onClick={() => openClan(w.enemy.id)}><span className="war-emoji">{w.enemy.emoji}</span><b>{w.enemy.name}</b><span className="war-score enemy">{w.score.enemy}</span></button>
+          <button onClick={() => openClan(w.enemy.id)}><Crest crest={w.enemy.crest} size={46} /><b>{w.enemy.name}</b><span className="war-score enemy">{w.score.enemy}</span></button>
         </div>
         <p className="small" style={{ fontWeight: 700, textAlign: 'center', margin: '8px 0' }}>
           {lead > 0 ? `Ведём на ${lead}` : lead < 0 ? `Отстаём на ${-lead}` : 'Равный счёт'} · ваш вклад: {w.myContrib} · боёв выиграно: {w.duels.mine}–{w.duels.enemy}
         </p>
-        <button className="gel xl rose" disabled={status !== 'online'} onClick={onWarDuel}>⚔️ Бой войны (+{w.duelWin} за победу)</button>
+        <button className="gel xl rose" disabled={status !== 'online'} onClick={onWarDuel}><Glyph e="⚔️" size="1.25em" /> Бой войны (+{w.duelWin} за победу)</button>
         <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Каждое отжимание участников в любом режиме — очко клану. Бой против игрока вражеского клана — ещё +{w.duelWin} за победу.</p>
       </Card>
     );
@@ -36,10 +40,10 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
   if (w && w.status === 'pending') {
     return (
       <Card title="Война кланов" icon="📯">
-        <p style={{ fontWeight: 700 }}>{w.attacker ? `Ждём ответа клана «${w.enemy.name}»…` : `Клан «${w.enemy.emoji} ${w.enemy.name}» вызывает вас на войну на ${w.hours} часа!`}</p>
+        <p style={{ fontWeight: 700 }}>{w.attacker ? `Ждём ответа клана «${w.enemy.name}»…` : `Клан «${w.enemy.name}» вызывает вас на войну на ${w.hours} часа!`}</p>
         {w.canRespond && (
           <div className="row-actions" style={{ marginTop: 10 }}>
-            <button className="gel rose" onClick={() => onRespondWar(w.id, 'accept')}>⚔️ Принять</button>
+            <button className="gel rose" onClick={() => onRespondWar(w.id, 'accept')}><Glyph e="⚔️" size="1.25em" /> Принять</button>
             <button className="glass-btn" onClick={() => onRespondWar(w.id, 'decline')}>Отклонить</button>
           </div>
         )}
@@ -60,14 +64,14 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
           <div className="rows" style={{ marginTop: 10 }}>
             {enemies.length ? enemies.slice(0, 12).map((c) => (
               <div key={c.id} className="row">
-                <span className="tile violet" style={{ width: 34, height: 34 }}>{c.emoji}</span>
+                <Crest crest={c.crest} size={32} />
                 <div className="grow"><div className="title">{c.name}</div><div className="sub">{c.members} чел. · {c.week} за неделю</div></div>
                 <button className="gel rose" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => { setPicking(false); onDeclareWar(c.id); }}>Вызвать</button>
               </div>
             )) : <div className="empty">Других кланов пока нет</div>}
             <button className="glass-btn" onClick={() => setPicking(false)}>Отмена</button>
           </div>
-        ) : <button className="gel wide rose" style={{ marginTop: 10 }} onClick={() => setPicking(true)}>📯 Объявить войну</button>
+        ) : <button className="gel wide rose" style={{ marginTop: 10 }} onClick={() => setPicking(true)}><Glyph e="📯" size="1.25em" /> Объявить войну</button>
       ) : <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Объявить войну может капитан клана.</p>}
     </Card>
   );
@@ -76,8 +80,9 @@ function WarCard({ my, data, status, onWarDuel, onDeclareWar, onRespondWar, open
 export default function Clan({ profile, config, openPlayer, openClan, toast, onShareClan, onChanged, version, status, onSpar, onWarDuel, onChallenge, onDeclareWar, onRespondWar }) {
   const [data, setData] = useState(null);
   const [q, setQ] = useState('');
-  const [form, setForm] = useState({ name: '', emoji: '🛡️', about: '' });
+  const [form, setForm] = useState({ name: '', crest: DEFAULT_CREST, about: '' });
   const [busy, setBusy] = useState(false);
+  const [crestOpen, setCrestOpen] = useState(false);
 
   const load = () => api('clans', { query: q ? { q } : undefined }).then(setData).catch((e) => toast(e.message));
   useEffect(() => { load(); }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,7 +98,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
   if (my) {
     return (
       <div className="page">
-        <div className="page-head"><h1>{my.emoji} {my.name}</h1><p>{my.place ? `#${my.place} из ${my.of} кланов на этой неделе` : 'Клан'}</p></div>
+        <div className="page-head clan-head"><Crest crest={my.crest} size={56} /><div><h1>{my.name}</h1><p>{my.place ? `#${my.place} из ${my.of} кланов на этой неделе` : 'Клан'}</p></div></div>
         <Card>
           {my.about && <p style={{ fontWeight: 600, marginBottom: 10 }}>{my.about}</p>}
           <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
@@ -101,12 +106,17 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
             <div className="stat"><b>{my.members}/{my.max}</b><span>участников</span></div>
             <div className="stat"><b>{my.id}</b><span>код клана</span></div>
           </div>
-          <button className="gel wide violet" style={{ marginTop: 12 }} onClick={() => onShareClan(my)}>📨 Позвать в клан</button>
+          <div className="row-actions" style={{ marginTop: 12 }}>
+            <button className="gel violet" onClick={() => onShareClan(my)}><Icon name="mail" size={22} /> Позвать</button>
+            {my.captain && <button className="glass-btn" onClick={() => setCrestOpen(true)}><Icon name="shield" size={22} /> Герб</button>}
+          </div>
         </Card>
+        {crestOpen && <CrestSheet crest={my.crest} onClose={() => setCrestOpen(false)}
+          onSave={(crest) => { setCrestOpen(false); act(() => api('clans/crest', { method: 'POST', body: { crest } })); }} />}
         <WarCard my={my} data={data} status={status} onWarDuel={onWarDuel} onDeclareWar={onDeclareWar} onRespondWar={onRespondWar} openClan={openClan} />
         <Card title="Спарринги" icon="🤼">
           <p className="small" style={{ fontWeight: 600, marginBottom: 10 }}>Тренируйтесь с соклановцами: без влияния на рейтинг, но с опытом и очками для клана.</p>
-          <button className="gel xl green" disabled={status !== 'online' || my.members < 2} onClick={onSpar}>🤼 Найти спарринг в клане</button>
+          <button className="gel xl green" disabled={status !== 'online' || my.members < 2} onClick={onSpar}><Glyph e="🤼" size="1.25em" /> Найти спарринг в клане</button>
           <p className="small muted" style={{ marginTop: 6, fontWeight: 600 }}>
             В сети: {my.roster.filter((m) => m.online && m.id !== profile?.id).length} · можно вызвать конкретного участника кнопкой ⚔ в составе
           </p>
@@ -118,8 +128,8 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
                 right={(
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {m.online && <span className="live-dot" title="в сети" />}
-                    <span className="chip">{m.owner ? '👑 ' : ''}{m.week}</span>
-                    {m.id !== profile?.id && <span className="spar-btn" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); onChallenge(m); }}>⚔</span>}
+                    <span className="chip">{m.owner && <Glyph e="👑" size="1.2em" />} {m.week}</span>
+                    {m.id !== profile?.id && <span className="spar-btn" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); onChallenge(m); }}><Glyph e="⚔" size="1.25em" /></span>}
                   </span>
                 )} />
             ))}
@@ -141,9 +151,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
         </div>
         <div className="field" style={{ marginBottom: 10 }}>
           <span>Герб</span>
-          <div className="emoji-grid">
-            {(config?.clanEmoji || ['🛡️']).map((e) => <button key={e} className={form.emoji === e ? 'on' : ''} onClick={() => setForm({ ...form, emoji: e })}>{e}</button>)}
-          </div>
+          <CrestEditor value={form.crest} onChange={(crest) => setForm({ ...form, crest })} />
         </div>
         <div className="field" style={{ marginBottom: 12 }}>
           <span>Девиз</span>
@@ -161,7 +169,7 @@ export default function Clan({ profile, config, openPlayer, openClan, toast, onS
           <div className="rows">
             {data.clans.map((c) => (
               <div key={c.id} className="row">
-                <span className="tile violet" style={{ width: 36, height: 36, fontSize: 19 }}>{c.emoji}</span>
+                <Crest crest={c.crest} size={34} />
                 <button className="grow" style={{ border: 0, background: 'none', textAlign: 'left', padding: 0 }} onClick={() => openClan(c.id)}>
                   <div className="title">{c.name}</div><div className="sub">{c.members}/{c.max} · {c.week} за неделю</div>
                 </button>

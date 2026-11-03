@@ -1,4 +1,6 @@
 'use client';
+import { Glyph, rich } from './Icon.jsx';
+import { Crest } from './Emblem.jsx';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/client/net.js';
 import { Bar, Card, Seg, ago, plural } from './ui.jsx';
@@ -23,7 +25,11 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
   return (
     <div className="page">
       <div className="page-head"><h1>Слава</h1><p>Пояса, турниры, рейтинги и жизнь сообщества</p></div>
-      <Seg value={type} onChange={setType} options={[['belts', 'Пояса'], ['tourney', 'Турниры'], ['rating', 'Эло'], ['week', 'Неделя'], ['friends', 'Друзья'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
+      <Seg value={['rating', 'week', 'friends'].includes(type) ? 'ranks' : type} onChange={(v) => setType(v === 'ranks' ? 'rating' : v)}
+        options={[['belts', 'Пояса'], ['tourney', 'Турниры'], ['ranks', 'Рейтинги'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
+      {['rating', 'week', 'friends'].includes(type) && (
+        <div className="subseg"><Seg value={type} onChange={setType} options={[['rating', 'По Эло'], ['week', 'За неделю'], ['friends', 'Друзья']]} /></div>
+      )}
       {type === 'feed' ? (
         <>
           {community && (
@@ -39,7 +45,7 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
           )}
           <Card title="Что происходит" icon="📣">
             {feed?.length ? feed.slice(0, 30).map((f, i) => (
-              <div key={i} className="feed-row"><span>{f.icon}</span><span>{f.text}</span><span className="when">{ago(f.at)}</span></div>
+              <div key={i} className="feed-row"><Glyph e={f.icon} size={20} /><span>{rich(f.text)}</span><span className="when">{ago(f.at)}</span></div>
             )) : <div className="empty">Пока тихо. Сыграйте первую дуэль!</div>}
           </Card>
         </>
@@ -53,7 +59,7 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
               {clans.map((c, i) => (
                 <button key={c.id} className="row" style={{ textAlign: 'left', width: '100%' }} onClick={() => openClan(c.id)}>
                   <span className="place">{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</span>
-                  <span className="tile violet" style={{ width: 36, height: 36, fontSize: 19 }}>{c.emoji}</span>
+                  <Crest crest={c.crest} size={34} />
                   <div className="grow"><div className="title">{c.name}</div><div className="sub">{c.members}/{c.max} участников · капитан {c.owner}</div></div>
                   <span className="chip">{c.week}</span>
                 </button>

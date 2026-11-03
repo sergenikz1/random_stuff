@@ -33,7 +33,7 @@ export class Store {
       this.feed = data.feed || [];
       if (data.community) this.community = data.community;
       this.belts = data.belts || {};
-      this.tourneys = data.tourneys || {};
+      this.wars = data.wars || [];
       this.beltWeek = data.beltWeek || '';
     }
   }
@@ -92,7 +92,7 @@ export class Store {
       feed: this.feed,
       community: this.community,
       belts: this.belts || {},
-      tourneys: this.tourneys || {},
+      wars: this.wars || [],
       beltWeek: this.beltWeek || '',
     }));
     fs.renameSync(tmp, this.file);
@@ -379,7 +379,7 @@ export function applyActivity(p, act, store) {
   const items = [];
   const reps = Math.max(0, act.reps | 0);
   const combo = combosFromTimes(act.repTimes || []);
-  const isDuel = ['ranked', 'friend', 'tournament', 'title'].includes(act.type);
+  const isDuel = ['ranked', 'friend', 'tournament', 'title', 'spar', 'war'].includes(act.type);
 
   if (reps) items.push({ label: `Отжимания ×${reps}`, xp: reps * XP.perRep });
   if (combo.xp) items.push({ label: `Комбо (лучшее ×${combo.best})`, xp: combo.xp });
@@ -441,6 +441,7 @@ export function applyActivity(p, act, store) {
   const week = weekKey();
   if (p.week !== week) { p.week = week; p.weekReps = 0; }
   p.weekReps += reps;
+  if (store?.onActivity) store.onActivity(p, reps); // очки клановой войны
 
   const before = levelInfo(p.xp).level;
   const unlockedBefore = new Set(unlockedOf(p));

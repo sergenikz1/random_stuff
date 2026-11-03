@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/client/net.js';
 import { Bar, Card, Seg, ago, plural } from './ui.jsx';
 import { PlayerRow } from './Home.jsx';
-import { BeltsList, TourneyCard } from './Compete.jsx';
+import { BeltsList, TourneysView } from './Compete.jsx';
 
-export default function Top({ openPlayer, openClan, toast, version, onTitleChallenge, profile, onTourneyRegister, onTourneyPlay, status, feed, community }) {
+export default function Top({ openPlayer, openClan, toast, version, onTitleChallenge, profile, onTourneyStart, onTourneyPlay, status, feed, community }) {
   const [type, setType] = useState('belts');
   const [data, setData] = useState(null);
   const [clans, setClans] = useState(null);
@@ -22,12 +22,12 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
   const unit = type === 'week' ? 'повт.' : 'Эло';
   return (
     <div className="page">
-      <div className="page-head"><h1>Слава</h1><p>Пояса, турнир, рейтинги и жизнь сообщества</p></div>
-      <Seg value={type} onChange={setType} options={[['belts', 'Пояса'], ['tourney', 'Турнир'], ['rating', 'Эло'], ['week', 'Неделя'], ['friends', 'Друзья'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
+      <div className="page-head"><h1>Слава</h1><p>Пояса, турниры, рейтинги и жизнь сообщества</p></div>
+      <Seg value={type} onChange={setType} options={[['belts', 'Пояса'], ['tourney', 'Турниры'], ['rating', 'Эло'], ['week', 'Неделя'], ['friends', 'Друзья'], ['clans', 'Кланы'], ['feed', 'Лента']]} />
       {type === 'feed' ? (
         <>
           {community && (
-            <Card title="Цель недели" icon="🌍" tone="teal" wave={['#5ee8d8', '#43a8ff']}>
+            <Card title="Цель недели" icon="🌍">
               <div style={{ fontWeight: 800, fontSize: 15 }}>Всем сообществом — {community.goal.toLocaleString('ru-RU')} отжиманий</div>
               <div style={{ margin: '10px 0 6px' }}><Bar value={community.total} max={community.goal} tone="blue" /></div>
               <div className="small muted" style={{ fontWeight: 700 }}>
@@ -37,7 +37,7 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
               {profile && <div className="small" style={{ fontWeight: 700, marginTop: 6 }}>Ваш вклад: {profile.weekReps}</div>}
             </Card>
           )}
-          <Card title="Что происходит" icon="📣" tone="blue">
+          <Card title="Что происходит" icon="📣">
             {feed?.length ? feed.slice(0, 30).map((f, i) => (
               <div key={i} className="feed-row"><span>{f.icon}</span><span>{f.text}</span><span className="when">{ago(f.at)}</span></div>
             )) : <div className="empty">Пока тихо. Сыграйте первую дуэль!</div>}
@@ -45,9 +45,9 @@ export default function Top({ openPlayer, openClan, toast, version, onTitleChall
         </>
       )
       : type === 'belts' ? <BeltsList openPlayer={openPlayer} onChallenge={onTitleChallenge} toast={toast} version={version} />
-      : type === 'tourney' ? <TourneyCard profile={profile} onRegister={onTourneyRegister} onPlay={onTourneyPlay} status={status} version={version} toast={toast} />
+      : type === 'tourney' ? <TourneysView profile={profile} onStart={onTourneyStart} onPlay={onTourneyPlay} status={status} version={version} toast={toast} />
       : type === 'clans' ? (
-        <Card title="Кланы недели" icon="🛡️" tone="violet">
+        <Card title="Кланы недели" icon="🛡️">
           {!clans ? <div className="empty">Загрузка…</div> : !clans.length ? <div className="empty">Кланов пока нет — создайте первый во вкладке «Клан»</div> : (
             <div className="rows">
               {clans.map((c, i) => (

@@ -1,7 +1,8 @@
 'use client';
-// Элементы «Aero × Греция»: стрик с вулканом, окно извержения, выбор режима, пиктограммы.
+// Греческие элементы: стрик с вулканом, окно извержения, выбор режима, пиктограммы.
 import { useEffect, useState } from 'react';
 import { Sheet } from './ui.jsx';
+import { Icon } from './Icon.jsx';
 
 export const roman = (n) => [['M', 1000], ['CM', 900], ['D', 500], ['CD', 400], ['C', 100], ['XC', 90], ['L', 50], ['XL', 40], ['X', 10], ['IX', 9], ['V', 5], ['IV', 4], ['I', 1]]
   .reduce((s, [r, v]) => { while (n >= v) { s += r; n -= v; } return s; }, '') || '0';
@@ -52,7 +53,7 @@ export function StreakBar({ profile, onOpen }) {
   const days = streakDays(profile);
   return (
     <button className="glass-panel streakbar" onClick={onOpen}>
-      <span className="sb-fire"><b>🔥{profile?.dayStreak || 0}</b><small>подряд</small></span>
+      <span className="sb-fire"><Icon name="flame" size={22} /><b>{profile?.dayStreak || 0}</b><small>подряд</small></span>
       <span className="sb-days">
         {days.map((x, i) => (
           <span key={i} className={`sb-day ${x.done ? 'done' : ''} ${x.today ? 'today' : ''}`}>
@@ -61,7 +62,7 @@ export function StreakBar({ profile, onOpen }) {
         ))}
       </span>
       <span className="sb-volc">
-        <span className="tile rose">🌋</span>
+        <Icon name="volcano" size={30} />
         <span><b>{d}д {h}ч</b><small>до вулкана</small></span>
       </span>
     </button>
@@ -71,17 +72,13 @@ export function StreakBar({ profile, onOpen }) {
 function VolcanoArt() {
   return (
     <svg viewBox="0 0 360 150" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <linearGradient id="vsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--volc-sky1)" /><stop offset="1" stopColor="var(--volc-sky2)" /></linearGradient>
-        <linearGradient id="vmount" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--volc-m1)" /><stop offset="1" stopColor="var(--volc-m2)" /></linearGradient>
-      </defs>
-      <rect width="360" height="150" fill="url(#vsky)" />
+      <rect width="360" height="150" fill="var(--volc-sky1)" />
       {Array.from({ length: 7 }, (_, i) => <circle key={i} className="smoke" cx={170 + (i % 2 ? 14 : -10) + i * 4} cy={42 - i * 9} r={12 + i * 5} style={{ animationDelay: `${-i * 0.6}s` }} />)}
-      <path d="M60 150 L150 52 Q180 44 210 52 L300 150 Z" fill="url(#vmount)" />
+      <path d="M60 150 L150 52 Q180 44 210 52 L300 150 Z" fill="var(--volc-m1)" stroke="var(--accent)" strokeWidth="2" />
       <path d="M156 56 Q180 66 204 56" fill="#ff6a1a" />
       <path className="lavaflow" d="M176 60 C172 80 186 92 178 112 C172 128 184 138 180 150" stroke="#ff6a1a" strokeWidth="5" fill="none" />
       <path className="lavaflow" d="M190 60 C200 84 194 100 206 120" stroke="#ffb35a" strokeWidth="3" fill="none" />
-      <rect y="138" width="360" height="12" fill="var(--volc-ground)" />
+      <rect y="138" width="360" height="12" fill="var(--volc-ground)" /><path d="M0 138 H360" stroke="var(--accent)" strokeWidth="2" />
     </svg>
   );
 }

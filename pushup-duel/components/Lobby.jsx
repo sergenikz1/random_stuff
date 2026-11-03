@@ -55,9 +55,10 @@ export default function Lobby({ flow, profile, stats, onCancel, onBot, onShareRo
   return (
     <div className="lobby">
       <div className="radar"><span /><span /><span /><Avatar emoji={profile?.avatar} frame={profile?.frame} size="lg" side="me" /></div>
-      <h1>{flow.tournament ? '🎟️ Турнир: ищем соперника…' : 'Ищем соперника…'}</h1>
+      <h1>{{ small: '🏅 Малый турнир', big: '🏆 Большой турнир', clan: '🤼 Спарринг в клане', war: '⚔️ Бой войны' }[flow.queue] || 'Ищем соперника…'}</h1>
+      {flow.queue && <p style={{ marginTop: -8 }}>{flow.queue === 'clan' ? 'Ждём соклановца, который тоже ищет спарринг' : flow.queue === 'war' ? 'Ищем бойца вражеского клана' : 'Ищем соперника'}</p>}
       <p>{fmtTime(elapsed)} · рейтинг {profile?.rating} · онлайн {stats?.online ?? '—'}, в поиске {stats?.queue ?? '—'}</p>
-      {elapsed > 20000 && !flow.tournament && (
+      {elapsed > 20000 && !flow.queue && (
         <>
           <p style={{ opacity: 0.85 }}>Пока никого — позовите друзей или сразитесь с ботом</p>
           <button className="gel orange" onClick={onBot}>🤖 Бой с ботом</button>

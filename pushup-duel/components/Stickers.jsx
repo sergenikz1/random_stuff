@@ -21,22 +21,21 @@ export function Sticker({ id, size = 56, className = '', style }) {
   );
 }
 
-// Набор наклеек — глянцевая амфора, цвет по редкости.
-const AMPHORA = { basic: ['#ffd9a0', '#d98a3a', '★'], rare: ['#9fe3ff', '#2a8fd6', '★★'], epic: ['#d9a6ff', '#7a3ad8', '★★★'], legend: ['#ffe27a', '#d9900b', '♛'] };
+// Набор наклеек — амфора в плоском стиле: заливка по редкости, контур цветом текста, меандр на пояске.
+const AMPHORA = { basic: ['#d98a3a', '★'], rare: ['#2a7fd0', '★★'], epic: ['#7a3ad8', '★★★'], legend: ['#d9a521', '♛'] };
 export function PackIcon({ type = 'basic', size = 52, className = '' }) {
-  const [a, b, mark] = AMPHORA[type] || AMPHORA.basic;
-  const id = `amph-${type}`;
+  const [fill, mark] = AMPHORA[type] || AMPHORA.basic;
   return (
     <span className={`pack-ico amphora p-${type} ${className}`} style={{ '--sz': `${size}px` }}>
-      <svg viewBox="0 0 40 48" width={size * 0.8} height={size} aria-hidden="true">
-        <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor={b} /><stop offset="0.42" stopColor={a} /><stop offset="1" stopColor={b} /></linearGradient></defs>
-        <path d="M15 3 h10 v5 c8 3 11 11 11 19 c0 9 -6 16 -13 19 h-6 c-7 -3 -13 -10 -13 -19 c0 -8 3 -16 11 -19 z" fill={`url(#${id})`} stroke="rgba(0,0,0,0.35)" strokeWidth="1.2" />
-        <path d="M15 9 c-6 0 -7 7 -2 9 M25 9 c6 0 7 7 2 9" fill="none" stroke={b} strokeWidth="2.4" />
-        <path d="M7 24 h26" stroke="#1a0f08" strokeWidth="3" opacity=".5" /><path d="M8 29 h24" stroke="#1a0f08" strokeWidth="1.5" opacity=".45" />
-        <ellipse cx="14" cy="18" rx="3" ry="7" fill="rgba(255,255,255,0.55)" />
-        <text x="20" y="41" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#1a0f08" opacity=".7">{mark}</text>
+      <svg viewBox="-2 -2 44 52" width={size * 0.8} height={size} aria-hidden="true">
+        <g stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round">
+          <path d="M15 3 h10 v5 c8 3 11 11 11 19 c0 9 -6 16 -13 19 h-6 c-7 -3 -13 -10 -13 -19 c0 -8 3 -16 11 -19 z" fill={fill} />
+          <path d="M15 9 c-6 0 -7 7 -2 9 M25 9 c6 0 7 7 2 9" fill="none" />
+          <path d="M6 22 h28 M5.5 30 h29" fill="none" />
+          <path d="M8 28 v-4 h3 v3 h-1.5 M13 28 v-4 h3 v3 h-1.5 M18 28 v-4 h3 v3 h-1.5 M23 28 v-4 h3 v3 h-1.5 M28 28 v-4 h3 v3 h-1.5" fill="none" strokeWidth="1.2" />
+        </g>
+        <text x="20" y="41" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="var(--ink)">{mark}</text>
       </svg>
-      {(type === 'epic' || type === 'legend') && <span className="stk-holo" />}
     </span>
   );
 }
@@ -209,7 +208,7 @@ export function CardEditor({ profile, onSave, onClose }) {
 export function Album({ eco }) {
   const owned = eco?.stickers || {};
   return (
-    <Card title={`Альбом наклеек · ${eco?.collected || 0}/${eco?.totalStickers || STICKERS.length}`} icon="📒" tone="rose">
+    <Card title={`Альбом наклеек · ${eco?.collected || 0}/${eco?.totalStickers || STICKERS.length}`} icon="📒">
       {STICKER_RARITY_ORDER.slice().reverse().map((r) => (
         <div key={r} style={{ marginBottom: 12 }}>
           <div className="small" style={{ fontWeight: 900, color: STICKER_RARITY[r].color, marginBottom: 6 }}>{STICKER_RARITY[r].name.toUpperCase()}</div>

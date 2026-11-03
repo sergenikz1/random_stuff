@@ -15,10 +15,10 @@ import { Avatar, fmtTime } from './ui.jsx';
 import { VersusIntro } from './PlayerCard.jsx';
 
 const COMBO_WORDS = ['Огонь!', 'Машина!', 'Неудержим!', 'Зверь!', 'Легенда!', 'Бог отжиманий!'];
-const TAGS = { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', training: 'ТРЕНИРОВКА', tournament: 'ТУРНИР НЕДЕЛИ', title: 'ТИТУЛЬНЫЙ БОЙ' };
+const TAGS = { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', training: 'ТРЕНИРОВКА', tournament: 'ТУРНИР', title: 'ТИТУЛЬНЫЙ БОЙ', spar: 'СПАРРИНГ В КЛАНЕ', war: 'БОЙ ВОЙНЫ КЛАНОВ' };
 
 export default function Game({ mode, durationMs, opponent, belt = null, socket, settings, updateSettings, profile, onDone, onCancel }) {
-  const online = ['ranked', 'friend', 'tournament', 'title'].includes(mode);
+  const online = ['ranked', 'friend', 'tournament', 'title', 'spar', 'war'].includes(mode);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const st = useRef({

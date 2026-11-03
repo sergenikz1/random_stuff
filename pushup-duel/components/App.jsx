@@ -22,8 +22,11 @@ import { PackOpenModal, TrophyRoad } from './Economy.jsx';
 import { CardEditor } from './Stickers.jsx';
 import { startTilt } from '../lib/client/tilt.js';
 import { Sheet } from './ui.jsx';
+import { VolcanoSheet, ModeSheet } from './Greek.jsx';
+import { InboxCard } from './Compete.jsx';
 
-const TABS = [['shop', '🛒', 'Магазин'], ['pass', '🎖️', 'Пропуск'], ['home', '⚔️', 'Бой'], ['clan', '🛡️', 'Клан'], ['top', '🏆', 'Рейтинг']];
+// Вкладки: плитка-иконка с глянцем (тон задаёт цвет), подпись.
+const TABS = [['shop', '🏺', 'Агора', 'orange'], ['pass', '📜', 'Пропуск', 'violet'], ['home', '⚔️', 'Бой', 'blue'], ['clan', '🛡️', 'Клан', 'green'], ['top', '🏛️', 'Слава', 'gold']];
 
 export default function App() {
   const [settings, updateSettings] = useSettings();
@@ -147,7 +150,7 @@ export default function App() {
   const preload = () => { loadPose().catch(() => {}); };
   const startRanked = () => { preload(); unlockAudio(); setFlow({ kind: 'queue' }); send({ t: 'queue' }); };
   const startFriend = () => { preload(); unlockAudio(); setFlow({ kind: 'room' }); send({ t: 'room_create', durationSec: settings.friendSec }); };
-  const startJoin = () => { preload(); setFlow({ kind: 'join' }); };
+  const startJoin = () => { preload(); setSheet(null); setFlow({ kind: 'join' }); };
   const startTraining = () => { unlockAudio(); setFlow({ kind: 'game', mode: 'training', durationMs: settings.soloSec * 1000, opponent: null, key: Date.now() }); };
   const startBot = () => {
     unlockAudio();
@@ -155,6 +158,15 @@ export default function App() {
     const opp = { ...makeOpponent(profile?.rating || 1000, profile?.avatar), bot: true };
     setFlow({ kind: 'game', mode: 'bot', durationMs: settings.soloSec * 1000, opponent: opp, key: Date.now() });
   };
+  // «В бой» запускает формат, выбранный в окне режима (по умолчанию — рейтинг).
+  const playSelected = () => {
+    const f = settings.format || 'ranked';
+    if (f === 'friend') startFriend();
+    else if (f === 'training') startTraining();
+    else if (f === 'bot') startBot();
+    else startRanked();
+  };
+
   const challenge = (player, title = false) => {
     setSheet(null);
     preload();
@@ -320,26 +332,33 @@ export default function App() {
         <div className="shell">
           {tab === 'shop' && <Shop profile={profile} onBuy={shopBuy} onPremium={buyPremium} busy={ecoBusy} />}
           {tab === 'home' && (
-            <Home profile={profile} onUnlockPack={unlockPack} onOpenPack={openPack} onRoad={() => setSheet({ kind: 'road' })} onProfile={() => setTab('me')}
-              onClaimInbox={claimInbox} onTourneyRegister={tourneyRegister} onTourneyPlay={tourneyPlay} version={version} toast={toast} stats={stats} community={community} feed={feed} status={status}
-              onRanked={startRanked} onFriend={startFriend} onJoinCode={startJoin} onTraining={startTraining} onBot={startBot}
-              goTab={setTab} />
+            <Home profile={profile} status={status} settings={settings} theme={theme} version={version}
+              onPlay={playSelected} onMode={() => setSheet({ kind: 'mode' })} onStreak={() => setSheet({ kind: 'streak' })}
+              onUnlockPack={unlockPack} onOpenPack={openPack} onRoad={() => setSheet({ kind: 'road' })} onProfile={() => setTab('me')}
+              onInbox={() => setSheet({ kind: 'inbox' })} />
           )}
           {tab === 'top' && <Top openPlayer={openPlayer} openClan={openClan} toast={toast} version={version} onTitleChallenge={titleChallenge}
-            profile={profile} onTourneyRegister={tourneyRegister} onTourneyPlay={tourneyPlay} status={status} />}
+            profile={profile} onTourneyRegister={tourneyRegister} onTourneyPlay={tourneyPlay} status={status} feed={feed} community={community} />}
           {tab === 'clan' && <Clan profile={profile} config={config} openPlayer={openPlayer} openClan={openClan} toast={toast} onShareClan={shareClan} onChanged={() => { setVersion((v) => v + 1); api('me').then((r) => setProfile(r.profile)).catch(() => {}); }} version={version} />}
           {tab === 'pass' && <Pass profile={profile} onEquip={equip} onBuy={buyPremium} onClaimGift={claimGift} buying={buying} />}
           {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} />}
           <nav className="tabbar">
-            {TABS.map(([id, icon, label]) => (
+            {TABS.map(([id, icon, label, tone]) => (
               <button key={id} className={tab === id ? 'on' : ''} onClick={() => { setTab(id); haptic('select'); }}>
-                <span className="ti">{icon}</span>{label}
+                <span className={`tile ${tone}`}>{icon}</span>{label}
               </button>
             ))}
           </nav>
         </div>
       )}
 
+      {sheet?.kind === 'streak' && <VolcanoSheet profile={profile} onClose={closeSheet} />}
+      {sheet?.kind === 'mode' && <ModeSheet settings={settings} updateSettings={updateSettings} onClose={closeSheet} onJoinCode={startJoin} toast={toast} />}
+      {sheet?.kind === 'inbox' && (
+        <Sheet onClose={closeSheet}>
+          {profile?.eco?.inbox?.length ? <InboxCard eco={profile.eco} onClaim={(id) => { setSheet(null); claimInbox(id); }} /> : <div className="empty">Наград нет</div>}
+        </Sheet>
+      )}
       {sheet?.kind === 'road' && <TrophyRoad eco={profile?.eco} onClose={closeSheet} onClaim={claimRoad} />}
       {sheet?.kind === 'card' && profile && <CardEditor profile={profile} onSave={saveCard} onClose={closeSheet} />}
       {sheet?.kind === 'packGems' && (

@@ -141,7 +141,7 @@ export default function Profile({ profile, settings, updateSettings, onSave, onI
         </div>
         <div className="field" style={{ marginBottom: 12 }}>
           <span>Тема</span>
-          <Seg value={settings.theme} onChange={(v) => updateSettings({ theme: v })} options={[['auto', inTg ? 'Как в Telegram' : 'Авто'], ['aqua', 'Aqua'], ['midnight', 'Midnight']]} />
+          <Seg value={settings.theme} onChange={(v) => updateSettings({ theme: v })} options={[['auto', inTg ? 'Как в Telegram' : 'Авто'], ['aqua', 'Эгея'], ['midnight', 'Амфора']]} />
         </div>
         <label className="switch"><span>Музыка в бою</span><input type="checkbox" checked={settings.music} onChange={(e) => updateSettings({ music: e.target.checked })} /></label>
         <label className="switch"><span>Звук</span><input type="checkbox" checked={settings.sound} onChange={(e) => updateSettings({ sound: e.target.checked })} /></label>

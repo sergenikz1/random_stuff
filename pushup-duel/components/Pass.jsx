@@ -101,7 +101,22 @@ export default function Pass({ profile, onEquip, onBuy, onClaimGift, buying }) {
 
   return (
     <div className="page">
-      <div className="page-head"><h1>Боевой пропуск</h1><p>{p.season.name} · ещё {daysLeft} {plural(daysLeft, 'день', 'дня', 'дней')}</p></div>
+      <div className="page-head"><h1>Боевой пропуск</h1><p>{p.season.name} · ещё {daysLeft} {plural(daysLeft, 'день', 'дня', 'дней')} до извержения</p></div>
+
+      <Card title="Задания дня" icon="🎯" tone="rose">
+        <div className="rows">
+          {p.quests.map((q) => (
+            <div key={q.id} className="row">
+              <span style={{ fontSize: 20 }}>{q.done ? '✅' : '⬜'}</span>
+              <div className="grow">
+                <div className="title" style={q.done ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>{q.text}</div>
+                {!q.done && q.goal > 1 && <div style={{ marginTop: 5 }}><Bar value={q.progress} max={q.goal} /></div>}
+              </div>
+              <span className="chip gold">+{q.xp}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card wave={['#ffe27a', '#ff9f43']}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

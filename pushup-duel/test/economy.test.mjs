@@ -86,7 +86,7 @@ test('дорога трофеев: только после порога, оди�
   assert.throws(() => claimRoad(p, 1050), /уже получена/);
   p.rating = 900; ensureEco(p);
   assert.equal(p.bestRating, 1080);
-  assert.equal(arenaOf(1460).name, 'Боксёрский ринг');
+  assert.equal(arenaOf(1460).name, 'Театр Диониса');
 });
 
 test('магазин: наклейки и косметика за монеты, наборы и билет за кристаллы, буст', () => {

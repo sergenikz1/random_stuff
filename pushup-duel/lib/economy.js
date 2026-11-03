@@ -28,13 +28,13 @@ export const SHOP_POOL = [
 
 // ---- Арены и дорога трофеев (кубки = рейтинг Эло) ----
 export const ARENAS = [
-  { id: 1, min: 0,    name: 'Дворовая площадка',   emoji: '🛝', colors: ['#7fd36a', '#2f8f4a'] },
-  { id: 2, min: 1050, name: 'Подвальная качалка',  emoji: '🏚️', colors: ['#b4a08a', '#5d4a3a'] },
-  { id: 3, min: 1150, name: 'Школьный спортзал',   emoji: '🏫', colors: ['#ffbe5c', '#c9600f'] },
-  { id: 4, min: 1300, name: 'Фитнес-клуб',         emoji: '🏋️', colors: ['#5ee8d8', '#0b7fa8'] },
-  { id: 5, min: 1450, name: 'Боксёрский ринг',     emoji: '🥊', colors: ['#ff8fa5', '#b0173a'] },
-  { id: 6, min: 1600, name: 'Олимпийский стадион', emoji: '🏟️', colors: ['#9fc4ff', '#2a4fd6'] },
-  { id: 7, min: 1800, name: 'Зал славы',           emoji: '🏛️', colors: ['#ffe27a', '#8a5a00'] },
+  { id: 1, min: 0,    name: 'Агора',         emoji: '🫒', colors: ['#7fd36a', '#2f8f4a'] },
+  { id: 2, min: 1050, name: 'Палестра',      emoji: '🤼', colors: ['#c9b08a', '#7a5a3a'] },
+  { id: 3, min: 1150, name: 'Гимнасий',      emoji: '🏛️', colors: ['#ffbe5c', '#c9600f'] },
+  { id: 4, min: 1300, name: 'Стадион',       emoji: '🏟️', colors: ['#5ee8d8', '#0b7fa8'] },
+  { id: 5, min: 1450, name: 'Театр Диониса', emoji: '🎭', colors: ['#ff8fa5', '#b0173a'] },
+  { id: 6, min: 1600, name: 'Олимпия',       emoji: '🔥', colors: ['#9fc4ff', '#2a4fd6'] },
+  { id: 7, min: 1800, name: 'Олимп',         emoji: '⛰️', colors: ['#ffe27a', '#8a5a00'] },
 ];
 
 export function arenaOf(trophies) {

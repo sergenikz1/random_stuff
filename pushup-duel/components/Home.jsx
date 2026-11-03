@@ -1,147 +1,81 @@
 'use client';
-import { Avatar, Bar, Card, ago, plural } from './ui.jsx';
-import { PASS_REWARDS, cosmeticName } from '../lib/pass.js';
-import { RewardIcon } from './Pass.jsx';
-import { ArenaCard, PackSlots, Currency } from './Economy.jsx';
-import { InboxCard, TourneyCard } from './Compete.jsx';
+// Главная («Бой»): неподвижный экран. Сверху профиль и валюта, под ними стрик и отсчёт до вулкана,
+// по центру арена с кнопкой «В бой» и выбором режима, внизу — амфоры (наборы наклеек).
+import { useEffect, useMemo, useState } from 'react';
+import { Avatar } from './ui.jsx';
+import { PackSlots, Currency } from './Economy.jsx';
 import { ARENAS } from '../lib/economy.js';
+import { api } from '../lib/client/net.js';
+import { arenaSvg } from '../lib/client/arenaArt.js';
+import { StreakBar, ExerciseIcon, EXERCISES, FORMATS, roman } from './Greek.jsx';
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return 'Доброй ночи';
-  if (h < 12) return 'Доброе утро';
-  if (h < 18) return 'Добрый день';
-  return 'Добрый вечер';
-}
-
-export default function Home({ profile, stats, community, feed, status, onRanked, onFriend, onJoinCode, onTraining, onBot, goTab, onUnlockPack, onOpenPack, onRoad, onProfile, onClaimInbox, onTourneyRegister, onTourneyPlay, version, toast }) {
+export default function Home({ profile, status, settings, theme, onPlay, onMode, onStreak, onUnlockPack, onOpenPack, onRoad, onProfile, onInbox, version }) {
   const p = profile;
-  const nextReward = p && !p.max ? Object.keys(PASS_REWARDS).map(Number).find((l) => l > p.level) : null;
+  const eco = p?.eco;
+  const myArena = eco?.arena?.id || 1;
+  const [view, setView] = useState(myArena);
+  const [belts, setBelts] = useState([]);
+  useEffect(() => { setView(myArena); }, [myArena]);
+  useEffect(() => { api('belts').then((r) => setBelts(r.belts)).catch(() => {}); }, [version]);
+  const dark = theme === 'midnight';
+  const art = useMemo(() => arenaSvg(view, dark), [view, dark]);
+  if (!p) return <div className="page home" />;
+
+  const arena = ARENAS.find((a) => a.id === view);
+  const next = ARENAS.find((a) => a.min > arena.min);
+  const locked = (p.eco?.bestRating || p.rating) < arena.min;
+  const belt = belts.find((b) => b.arena.id === view);
+  const roadReady = eco?.road?.filter((r) => r.status === 'ready').length || 0;
+  const ex = EXERCISES.find((e) => e.id === settings.exercise) || EXERCISES[0];
+  const fmt = FORMATS.find((f) => f.id === settings.format) || FORMATS[0];
+  const needsOnline = fmt.id === 'ranked' || fmt.id === 'friend';
+
   return (
-    <div className="page">
-      {p && (
-        <div className="topbar">
-          <button className="topbar-me" onClick={onProfile} aria-label="Профиль">
-            <Avatar emoji={p.avatar} frame={p.equipped?.frame} size="sm" />
-            <span className="topbar-lvl">{p.level}</span>
+    <div className="page home">
+      <div className="topbar">
+        <button className="topbar-me" onClick={onProfile} aria-label="Профиль">
+          <Avatar emoji={p.avatar} frame={p.equipped?.frame} size="sm" />
+          <span className="topbar-lvl">{roman(p.level)}</span>
+          <span className="topbar-col">
             <span className="topbar-name">{p.name}</span>
-          </button>
-          <Currency eco={p.eco} />
-        </div>
-      )}
-      <div className="page-head">
-        <h1>{greeting()}, {p?.name || 'атлет'}!</h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <span className="streak-pill">🔥 {p?.dayStreak || 0} {plural(p?.dayStreak || 0, 'день', 'дня', 'дней')} подряд{p?.multiplier > 1 ? ` · опыт ×${p.multiplier.toFixed(1)}` : ''}</span>
-          {!p?.playedToday && <span className="streak-pill">Отожмись сегодня, чтобы {p?.dayStreak ? 'не потерять' : 'начать'} серию</span>}
-        </div>
+            <span className="topbar-xp"><i style={{ width: `${p.max ? 100 : Math.round((p.xpInLevel / p.xpNeed) * 100)}%` }} /></span>
+          </span>
+        </button>
+        <Currency eco={eco} />
       </div>
 
-      {p?.eco && <ArenaCard eco={p.eco} onRoad={onRoad} />}
-      {p?.belt && (
-        <button className="arena-card champ-card" onClick={() => goTab('top')}>
-          <span className="arena-emoji">🥊</span>
-          <div className="grow" style={{ textAlign: 'left' }}>
-            <div className="arena-name">Вы — чемпион арены «{ARENAS.find((a) => a.id === p.belt)?.name}»</div>
-            <div className="arena-sub">Удержите пояс до понедельника, чтобы получить награду</div>
-          </div>
-          <span className="arena-go">›</span>
+      <StreakBar profile={p} onOpen={onStreak} />
+
+      <section className="glass-panel arena-stage">
+        <div className={`arena-art ${locked ? 'locked' : ''}`} dangerouslySetInnerHTML={{ __html: art }} />
+        <button className="arena-plate" onClick={onRoad}>
+          <span className="greek-title">Арена {roman(arena.id)} · {arena.name}</span>
+          <span className="small">
+            {locked ? `🔒 откроется на ${arena.min} 🏆`
+              : view === myArena ? `🏆 ${p.rating}${next ? ` / ${next.min}` : ''}${belt?.holder ? ` · пояс: ${belt.mine ? 'ваш!' : belt.holder.name}` : ' · пояс свободен'}`
+                : belt?.holder ? `пояс: ${belt.holder.name}` : 'пояс свободен'}
+          </span>
+          {roadReady > 0 && <span className="badge-dot">{roadReady}</span>}
         </button>
-      )}
-      <InboxCard eco={p?.eco} onClaim={onClaimInbox} />
-
-      <Card className="hero" wave={['#4fdcc8', '#6fd36a']}>
-        <div className="online">
-          <span className="live-dot" style={status !== 'online' ? { background: '#f59e0b', animation: 'none' } : undefined} />
-          {status === 'online' ? `${stats?.online ?? 0} онлайн · ${stats?.playing ?? 0} в бою` : 'Подключаюсь к серверу…'}
+        {view > 1 && <button className="arena-arrow l" onClick={() => setView(view - 1)} aria-label="Предыдущая арена">‹</button>}
+        {view < ARENAS.length && <button className="arena-arrow r" onClick={() => setView(view + 1)} aria-label="Следующая арена">›</button>}
+        {eco?.inbox?.length > 0 && (
+          <button className="inbox-btn" onClick={onInbox} aria-label="Награды"><span className="tile gold">📬</span><span className="badge-dot">{eco.inbox.length}</span></button>
+        )}
+        <div className="meander-band" />
+        <div className="arena-actions">
+          <button className="gel battle-btn" disabled={needsOnline && status !== 'online'} onClick={onPlay}>
+            ⚔ В БОЙ
+          </button>
+          <button className="mode-pick" onClick={onMode}>
+            <ExerciseIcon kind={ex.id} size={40} />
+            <b>{ex.name}</b>
+            <span>{fmt.icon} {fmt.name} ▾</span>
+          </button>
         </div>
-        <div className="hero-title">Онлайн-дуэль</div>
-        <p className="muted small" style={{ fontWeight: 600, marginBottom: 12 }}>Минута, реальный соперник, кто больше отожмётся. Победа поднимает рейтинг.</p>
-        <button className="gel xl" onClick={onRanked} disabled={status !== 'online'}>⚔️ Найти соперника</button>
-        <div className="mode-grid">
-          <button className="mode-btn" onClick={onFriend} disabled={status !== 'online'}><span className="tile violet">🤝</span>С другом</button>
-          <button className="mode-btn" onClick={onTraining}><span className="tile green">🏋️</span>Тренировка</button>
-          <button className="mode-btn" onClick={onBot}><span className="tile orange">🤖</span>С ботом</button>
-        </div>
-        <button className="card-link" style={{ marginTop: 8 }} onClick={onJoinCode}>У меня есть код комнаты</button>
-      </Card>
+      </section>
 
-      {p?.eco && (
-        <Card title="Наборы наклеек" icon="🎴" tone="orange" link="Альбом" onLink={onProfile}>
-          <PackSlots eco={p.eco} profileAt={p._at || Date.now()} onUnlock={onUnlockPack} onOpen={onOpenPack} />
-          <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>
-            Набор — за каждую победу в рейтинге. Каждые 3 победы — билет на турнир ({p.eco.winsTowardTicket}/3).
-          </p>
-        </Card>
-      )}
-
-      {p && <TourneyCard profile={p} onRegister={onTourneyRegister} onPlay={onTourneyPlay} status={status} version={version} toast={toast} compact />}
-
-      {p && (
-        <Card title="Боевой пропуск" icon="🎖️" tone="gold" link="Награды" onLink={() => goTab('pass')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="big-num">{p.level}</div>
-            <div style={{ flex: 1 }}>
-              <div className="small muted" style={{ fontWeight: 700, marginBottom: 6 }}>{p.season.name} · {p.max ? 'максимальный уровень' : `${p.xpInLevel} / ${p.xpNeed} опыта`}</div>
-              <Bar value={p.max ? 1 : p.xpInLevel} max={p.max ? 1 : p.xpNeed} tone="gold" />
-            </div>
-          </div>
-          {nextReward && (
-            <div className="row" style={{ marginTop: 10 }}>
-              <RewardIcon k={PASS_REWARDS[nextReward][0]} />
-              <div className="grow"><div className="title">{cosmeticName(PASS_REWARDS[nextReward][0])}</div><div className="sub">награда за {nextReward} уровень</div></div>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {p && (
-        <Card title="Задания дня" icon="🎯" tone="rose">
-          <div className="rows">
-            {p.quests.map((q) => (
-              <div key={q.id} className="row">
-                <span style={{ fontSize: 20 }}>{q.done ? '✅' : '⬜'}</span>
-                <div className="grow">
-                  <div className="title" style={q.done ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>{q.text}</div>
-                  {!q.done && q.goal > 1 && <div style={{ marginTop: 5 }}><Bar value={q.progress} max={q.goal} /></div>}
-                </div>
-                <span className="chip gold">+{q.xp}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {community && (
-        <Card title="Цель недели" icon="🌍" tone="teal" wave={['#5ee8d8', '#43a8ff']}>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>
-            Всем сообществом — {community.goal.toLocaleString('ru-RU')} отжиманий
-          </div>
-          <div style={{ margin: '10px 0 6px' }}><Bar value={community.total} max={community.goal} tone="blue" /></div>
-          <div className="small muted" style={{ fontWeight: 700 }}>
-            {community.total.toLocaleString('ru-RU')} от {community.people} {plural(community.people, 'участника', 'участников', 'участников')}
-            {community.reached ? ' · цель выполнена! 🎉' : ` · награда +${community.reward} опыта и титул тем, кто сделал от ${community.minReps}`}
-          </div>
-          {p && <div className="small" style={{ fontWeight: 700, marginTop: 6 }}>Ваш вклад: {p.weekReps}</div>}
-        </Card>
-      )}
-
-      <Card title="Что происходит" icon="📣" tone="blue">
-        {feed?.length ? feed.slice(0, 7).map((f, i) => (
-          <div key={i} className="feed-row"><span>{f.icon}</span><span>{f.text}</span><span className="when">{ago(f.at)}</span></div>
-        )) : <div className="empty">Пока тихо. Сыграйте первую дуэль!</div>}
-      </Card>
-
-      {p && (
-        <Card title="Мой прогресс" icon="📈" tone="violet" link="Профиль" onLink={() => goTab('me')}>
-          <div className="stat-grid">
-            <div className="stat"><b>{p.rating}</b><span>рейтинг</span></div>
-            <div className="stat"><b>{p.wins}</b><span>побед</span></div>
-            <div className="stat"><b>{p.bestReps}</b><span>рекорд</span></div>
-            <div className="stat"><b>{p.totalReps}</b><span>всего</span></div>
-          </div>
-        </Card>
-      )}
+      <PackSlots eco={eco} profileAt={p._at || Date.now()} onUnlock={onUnlockPack} onOpen={onOpenPack} />
     </div>
   );
 }

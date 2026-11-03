@@ -21,13 +21,21 @@ export function Sticker({ id, size = 56, className = '', style }) {
   );
 }
 
-// Фольгированный пакетик набора.
+// Набор наклеек — глянцевая амфора, цвет по редкости.
+const AMPHORA = { basic: ['#ffd9a0', '#d98a3a', '★'], rare: ['#9fe3ff', '#2a8fd6', '★★'], epic: ['#d9a6ff', '#7a3ad8', '★★★'], legend: ['#ffe27a', '#d9900b', '♛'] };
 export function PackIcon({ type = 'basic', size = 52, className = '' }) {
-  const def = PACKS[type] || PACKS.basic;
+  const [a, b, mark] = AMPHORA[type] || AMPHORA.basic;
+  const id = `amph-${type}`;
   return (
-    <span className={`pack-ico p-${type} ${className}`} style={{ '--sz': `${size}px`, '--p1': def.colors[0], '--p2': def.colors[1] }}>
-      <span className="pack-crimp" />
-      <span className="pack-label">{{ basic: '★', rare: '★★', epic: '★★★', legend: '👑' }[type]}</span>
+    <span className={`pack-ico amphora p-${type} ${className}`} style={{ '--sz': `${size}px` }}>
+      <svg viewBox="0 0 40 48" width={size * 0.8} height={size} aria-hidden="true">
+        <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor={b} /><stop offset="0.42" stopColor={a} /><stop offset="1" stopColor={b} /></linearGradient></defs>
+        <path d="M15 3 h10 v5 c8 3 11 11 11 19 c0 9 -6 16 -13 19 h-6 c-7 -3 -13 -10 -13 -19 c0 -8 3 -16 11 -19 z" fill={`url(#${id})`} stroke="rgba(0,0,0,0.35)" strokeWidth="1.2" />
+        <path d="M15 9 c-6 0 -7 7 -2 9 M25 9 c6 0 7 7 2 9" fill="none" stroke={b} strokeWidth="2.4" />
+        <path d="M7 24 h26" stroke="#1a0f08" strokeWidth="3" opacity=".5" /><path d="M8 29 h24" stroke="#1a0f08" strokeWidth="1.5" opacity=".45" />
+        <ellipse cx="14" cy="18" rx="3" ry="7" fill="rgba(255,255,255,0.55)" />
+        <text x="20" y="41" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#1a0f08" opacity=".7">{mark}</text>
+      </svg>
       {(type === 'epic' || type === 'legend') && <span className="stk-holo" />}
     </span>
   );

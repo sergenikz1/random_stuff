@@ -18,11 +18,11 @@ export function initTelegram(theme) {
 export function applyTelegramColors(theme) {
   const t = tg();
   if (!t) return;
-  const color = theme === 'midnight' ? '#08103a' : '#1566cc';
+  const color = theme === 'midnight' ? '#120805' : '#1566cc';
   try {
     t.setHeaderColor?.(color);
     t.setBackgroundColor?.(color);
-    t.setBottomBarColor?.(theme === 'midnight' ? '#101a4e' : '#dff1ff');
+    t.setBottomBarColor?.(theme === 'midnight' ? '#1e1009' : '#dff1ff');
   } catch { /* версия API ниже 6.1 */ }
 }
 

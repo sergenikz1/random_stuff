@@ -1,0 +1,149 @@
+'use client';
+import { useState } from 'react';
+import { COSMETICS, cosmeticName, REFERRAL_XP, BADGES, RARITY } from '../lib/pass.js';
+import { PlayerCard, Badge } from './PlayerCard.jsx';
+import { Avatar, Card, Seg, ago, fmtTime } from './ui.jsx';
+import { RewardIcon } from './Pass.jsx';
+
+const OUT = { win: ['Победа', 'green'], loss: ['Поражение', 'red'], draw: ['Ничья', ''] };
+const MODE = { ranked: '⚔️', friend: '🤝', bot: '🤖', training: '🏋️' };
+
+export default function Profile({ profile, settings, updateSettings, onSave, onInvite, inTg }) {
+  const [name, setName] = useState(profile?.name || '');
+  if (!profile) return <div className="page"><div className="page-head"><h1>Профиль</h1></div></div>;
+  const p = profile;
+  const unlocked = new Set(p.unlocked);
+  const avatars = Object.keys(COSMETICS.avatar);
+
+  return (
+    <div className="page">
+      <Card wave={['#43a8ff', '#7ff2cf']}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <Avatar emoji={p.avatar} frame={p.equipped.frame} size="lg" />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--heading)' }}>{p.name}</div>
+            <div className="small" style={{ fontWeight: 700 }}>{p.title}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              <span className="chip gold">{p.rank} · {p.rating}</span>
+              <span className="chip">ур. {p.level}</span>
+              {p.clan && <span className="chip">{p.clan.emoji} {p.clan.name}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="stat-grid" style={{ marginTop: 14 }}>
+          <div className="stat"><b>{p.games}</b><span>дуэлей</span></div>
+          <div className="stat"><b>{p.games ? Math.round((p.wins / p.games) * 100) : 0}%</b><span>побед</span></div>
+          <div className="stat"><b>{p.bestCombo}</b><span>комбо</span></div>
+          <div className="stat"><b>{p.bestWinStreak}</b><span>серия</span></div>
+        </div>
+      </Card>
+
+      <Card title="Моя карточка" icon="🃏" tone="violet" wave={['#b06bff', '#43a8ff']}>
+        <p className="small" style={{ fontWeight: 600, marginBottom: 12 }}>Её видит соперник в интро перед боем. Выберите до трёх жетонов для витрины.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><PlayerCard player={p} /></div>
+        <div className="rows">
+          {BADGES.map((b) => {
+            const own = p.earnedBadges.includes(b.id);
+            const chosen = p.badges.includes(b.id);
+            const toggle = () => {
+              if (!own) return;
+              const cur = p.chosenBadges?.length ? p.chosenBadges : p.badges;
+              const next = cur.includes(b.id) ? cur.filter((x) => x !== b.id) : [...cur, b.id].slice(-3);
+              onSave({ badges: next });
+            };
+            return (
+              <button key={b.id} className={`row ${chosen ? 'me' : ''}`} style={{ textAlign: 'left', width: '100%', opacity: own ? 1 : 0.45 }} onClick={toggle}>
+                <Badge id={b.id} />
+                <div className="grow"><div className="title">{b.name}</div><div className="sub">{b.need}</div></div>
+                <span className="chip" style={{ color: RARITY[b.rarity].color, borderColor: RARITY[b.rarity].color }}>{own ? (chosen ? '✓ в витрине' : RARITY[b.rarity].name) : '🔒'}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card title="Пригласить друзей" icon="🎁" tone="green" wave={['#6fe08a', '#5ee8d8']}>
+        <p style={{ fontWeight: 600 }}>За каждого друга — <b>+{REFERRAL_XP.inviter} опыта</b>, другу — +{REFERRAL_XP.invitee}. И музыка для боя:</p>
+        <div className="rows" style={{ marginTop: 8 }}>
+          {[[1, '🌆 Синтвейв + аватар 🤝'], [3, '👾 8-бит + титул «Вербовщик»'], [5, '🥁 Драм-н-бейс'], [10, '⚔️ Эпик + рамка «Легион»']].map(([n, text]) => (
+            <div key={n} className="row" style={{ opacity: p.invites >= n ? 1 : 0.7 }}>
+              <span className="chip">{n} {n === 1 ? 'друг' : n < 5 ? 'друга' : 'друзей'}</span>
+              <div className="grow"><div className="title">{text}</div></div>
+              <span>{p.invites >= n ? '✅' : '🔒'}</span>
+            </div>
+          ))}
+        </div>
+        <div className="row" style={{ margin: '10px 0' }}>
+          <span style={{ fontSize: 22 }}>👥</span>
+          <div className="grow"><div className="title">Приглашено: {p.invites}</div><div className="sub">Друзей в PushDuel: {p.friends}</div></div>
+        </div>
+        <button className="gel wide green" onClick={onInvite}>📨 Позвать друга</button>
+      </Card>
+
+      <Card title="Достижения" icon="🏅" tone="gold">
+        <div className="rows">
+          {p.achievements.map((a) => (
+            <div key={a.id} className="row" style={a.done ? undefined : { opacity: 0.6 }}>
+              <RewardIcon k={a.items[0]} />
+              <div className="grow"><div className="title">{a.need}</div><div className="sub">{a.items.map(cosmeticName).join(', ')}</div></div>
+              <span>{a.done ? '✅' : '🔒'}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Имя и аватар" icon="🎭" tone="violet">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input className="input" maxLength={16} value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="gel" disabled={name.trim() === p.name || name.trim().length < 2} onClick={() => onSave({ name: name.trim() })}>OK</button>
+        </div>
+        <div className="emoji-grid">
+          {avatars.map((a) => (
+            <button key={a} className={p.avatar === a ? 'on' : ''} disabled={!unlocked.has(`avatar:${a}`)} onClick={() => onSave({ avatar: a })}>{a}</button>
+          ))}
+        </div>
+        <p className="small muted" style={{ marginTop: 8, fontWeight: 600 }}>Редкие аватары открываются в боевом пропуске и за приглашения.</p>
+      </Card>
+
+      <Card title="История" icon="📜" tone="blue">
+        {!p.history.length ? <div className="empty">Сыграйте первую дуэль</div> : (
+          <div className="rows">
+            {p.history.slice(0, 15).map((h, i) => (
+              <div key={i} className="row">
+                <span style={{ fontSize: 20 }}>{MODE[h.mode]}</span>
+                <div className="grow">
+                  <div className="title">{h.opp ? `${h.reps} : ${h.oppReps} — ${h.opp}` : `${h.reps} отжиманий`}</div>
+                  <div className="sub">{ago(h.at)} назад · {fmtTime(h.durationMs)}{h.delta ? ` · ${h.delta > 0 ? '+' : ''}${h.delta} Эло` : ''}</div>
+                </div>
+                {h.outcome && <span className={`chip ${OUT[h.outcome][1]}`}>{OUT[h.outcome][0]}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Настройки" icon="⚙️" tone="teal">
+        <div className="field" style={{ marginBottom: 12 }}>
+          <span>Тренировка и бот</span>
+          <Seg value={settings.soloSec} onChange={(v) => updateSettings({ soloSec: v })} options={[[30, '0:30'], [60, '1:00'], [90, '1:30'], [120, '2:00']]} />
+        </div>
+        <div className="field" style={{ marginBottom: 12 }}>
+          <span>Дуэль с другом</span>
+          <Seg value={settings.friendSec} onChange={(v) => updateSettings({ friendSec: v })} options={[[30, '0:30'], [60, '1:00'], [90, '1:30'], [120, '2:00']]} />
+        </div>
+        <div className="field" style={{ marginBottom: 12 }}>
+          <span>Строгость засчёта</span>
+          <Seg value={settings.strictness} onChange={(v) => updateSettings({ strictness: v })} options={[['easy', 'Мягко'], ['normal', 'Обычно'], ['strict', 'Строго']]} />
+        </div>
+        <div className="field" style={{ marginBottom: 12 }}>
+          <span>Тема</span>
+          <Seg value={settings.theme} onChange={(v) => updateSettings({ theme: v })} options={[['auto', inTg ? 'Как в Telegram' : 'Авто'], ['aqua', 'Aqua'], ['midnight', 'Midnight']]} />
+        </div>
+        <label className="switch"><span>Музыка в бою</span><input type="checkbox" checked={settings.music} onChange={(e) => updateSettings({ music: e.target.checked })} /></label>
+        <label className="switch"><span>Звук</span><input type="checkbox" checked={settings.sound} onChange={(e) => updateSettings({ sound: e.target.checked })} /></label>
+        <label className="switch"><span>Вибрация на повтор</span><input type="checkbox" checked={settings.haptics} onChange={(e) => updateSettings({ haptics: e.target.checked })} /></label>
+        <label className="switch"><span>Показывать скелет</span><input type="checkbox" checked={settings.skeleton} onChange={(e) => updateSettings({ skeleton: e.target.checked })} /></label>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,43 @@
+name: PushDuel — тесты и сборка
+
+on:
+  push:
+    paths:
+      - "pushup-duel/**"
+      - ".github/workflows/pushup-duel.yml"
+  pull_request:
+    paths:
+      - "pushup-duel/**"
+      - ".github/workflows/pushup-duel.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pushup-duel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: pushup-duel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Docker image
+        run: docker build -t pushup-duel:${{ github.sha }} .

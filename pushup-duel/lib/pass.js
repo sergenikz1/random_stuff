@@ -250,6 +250,8 @@ export const BADGES = [
   { id: 'leader',    icon: '👑', name: 'Лидер',          need: 'Пригласи 10 друзей',          rarity: 'legend', test: (s) => s.invites >= 10 },
   { id: 'captain',   icon: '🏴', name: 'Капитан',        need: 'Создай клан',                 rarity: 'common', test: (s) => !!s.isCaptain },
   { id: 'pass30',    icon: '🎖️', name: 'Сезон закрыт',   need: '30 уровень пропуска',         rarity: 'epic',   test: (s) => s.level >= 30 },
+  { id: 'belt',      icon: '🥊', name: 'Чемпион арены',  need: 'Завоюй пояс арены',           rarity: 'epic',   test: (s) => !!s.everHeldBelt },
+  { id: 'beltweek',  icon: '🎗️', name: 'Неделя на троне', need: 'Удержи пояс до конца недели', rarity: 'legend', test: (s) => (s.beltWeeks || 0) >= 1 },
   { id: 'star',      icon: '🌟', name: 'Звёздный',       need: 'Купи премиум-пропуск',        rarity: 'legend', test: (s) => !!s.premium },
 ];
 

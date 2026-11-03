@@ -6,7 +6,9 @@ import {
 } from './store.js';
 import { eloDelta } from '../duel.js';
 import { winStreakElo } from '../pass.js';
-import { awardWinChest } from './economy.js';
+import { awardWin } from './economy.js';
+import { arenaOf, ARENAS } from '../economy.js';
+import { TOURNEY } from '../compete.js';
 
 const DURATIONS = [30, 60, 90, 120];
 
@@ -15,6 +17,8 @@ export class Hub {
     this.store = store;
     this.config = config;
     this.notify = opts.notify || null;           // (tgId, text, button, startParam) => Promise
+    this.compete = opts.compete || null;         // пояса и турнир (lib/server/compete.js)
+    this.tourneyMs = opts.tourneyMs ?? TOURNEY.durationSec * 1000;
     this.countdownMs = opts.countdownMs ?? 3500;
     this.rankedMs = opts.rankedMs ?? 60000;
     this.readyTimeoutMs = opts.readyTimeoutMs ?? 60000;
@@ -104,12 +108,12 @@ export class Hub {
   handle(conn, msg) {
     switch (msg.t) {
       case 'ping': return send(conn, { t: 'pong', at: msg.at });
-      case 'queue': return this.joinQueue(conn);
+      case 'queue': return this.joinQueue(conn, msg.kind === 'tournament' ? 'tournament' : 'ranked');
       case 'unqueue': return this.leaveQueue(conn, true);
       case 'room_create': return this.createRoom(conn, msg.durationSec);
       case 'room_join': return this.joinRoom(conn, msg.code);
       case 'room_leave': return this.closeRoom(conn, true);
-      case 'challenge': return this.challenge(conn, msg.playerId, msg.durationSec);
+      case 'challenge': return this.challenge(conn, msg.playerId, msg.durationSec, !!msg.title);
       case 'ready': return this.ready(conn);
       case 'rep': return this.rep(conn);
       case 'forfeit': return conn.match && this.leaveMatch(conn, 'forfeit');
@@ -129,9 +133,14 @@ export class Hub {
   }
 
   // ---- Рейтинговая очередь ----
-  joinQueue(conn) {
+  // kind: ranked — рейтинговая очередь, tournament — только участники турнира недели.
+  joinQueue(conn, kind = 'ranked') {
     this.ensureIdle(conn);
-    this.queue.push({ conn, since: Date.now() });
+    if (kind === 'tournament') {
+      if (!this.compete) throw new UserError('Турнир недоступен');
+      this.compete.canPlay(conn.player);
+    }
+    this.queue.push({ conn, since: Date.now(), kind });
     conn.state = 'queue';
     send(conn, { t: 'queued', ...this.stats() });
     this.matchmake();
@@ -155,6 +164,7 @@ export class Hub {
       let best = -1, bestDiff = Infinity;
       for (let j = i + 1; j < q.length; j++) {
         const b = q[j];
+        if ((a.kind || 'ranked') !== (b.kind || 'ranked')) continue;
         const waited = (now - Math.min(a.since, b.since)) / 1000;
         const window = Math.min(1500, 100 + 40 * waited);
         const diff = Math.abs(a.conn.player.rating - b.conn.player.rating);
@@ -165,23 +175,24 @@ export class Hub {
         q.splice(best, 1);
         q.splice(i, 1);
         i -= 1;
-        this.startMatch('ranked', a.conn, b.conn, this.rankedMs);
+        if (a.kind === 'tournament') this.startMatch('tournament', a.conn, b.conn, this.tourneyMs);
+        else this.startMatch('ranked', a.conn, b.conn, this.rankedMs);
       }
     }
   }
 
   // ---- Комнаты с другом ----
-  createRoom(conn, durationSec, invited = null) {
+  createRoom(conn, durationSec, invited = null, title = null) {
     this.ensureIdle(conn);
     const sec = DURATIONS.includes(Number(durationSec)) ? Number(durationSec) : 60;
     let code;
     do code = String(1000 + Math.floor(Math.random() * 9000));
     while (this.rooms.has(code));
-    const room = { code, host: conn, durationMs: sec * 1000, createdAt: Date.now(), invited };
+    const room = { code, host: conn, durationMs: sec * 1000, createdAt: Date.now(), invited, title };
     this.rooms.set(code, room);
     conn.room = room;
     conn.state = 'room';
-    send(conn, { t: 'room_created', code, durationSec: sec, invited: invited ? invited.name : null });
+    send(conn, { t: 'room_created', code, durationSec: sec, invited: invited ? invited.name : null, title });
     return room;
   }
 
@@ -192,7 +203,9 @@ export class Hub {
     this.ensureIdle(conn);
     this.rooms.delete(room.code);
     room.host.room = null;
-    this.startMatch('friend', room.host, conn, room.durationMs);
+    // Титульный бой может принять только сам чемпион.
+    if (room.title && room.invited && conn.player.id !== room.invited.id) throw new UserError('Это вызов за пояс другому игроку');
+    this.startMatch(room.title ? 'title' : 'friend', room.host, conn, room.durationMs, { title: room.title });
   }
 
   closeRoom(conn, notify = false) {
@@ -205,21 +218,27 @@ export class Hub {
   }
 
   // Вызов конкретного игрока: создаём комнату и шлём ему сообщение от бота.
-  async challenge(conn, playerId, durationSec) {
+  async challenge(conn, playerId, durationSec, title = false) {
     const target = this.store.get(String(playerId || ''));
     if (!target || target.id === conn.player.id) throw new UserError('Игрок не найден');
+    const beltArena = title ? this.compete?.canChallengeTitle(conn.player, target) : null;
+    if (title && !beltArena) throw new UserError('Титульные бои недоступны');
     const key = `${conn.player.id}>${target.id}`;
     if (Date.now() - (this.challengeAt.get(key) || 0) < 60000) throw new UserError('Этого игрока можно вызывать раз в минуту');
     this.challengeAt.set(key, Date.now());
-    const room = this.createRoom(conn, durationSec, target);
+    const room = this.createRoom(conn, durationSec, target, beltArena);
     const online = this.conns.get(target.id);
     if (online && online.state === 'idle') {
-      send(online, { t: 'challenged', code: room.code, from: publicCard(conn.player, this.store), durationSec: room.durationMs / 1000 });
+      send(online, { t: 'challenged', code: room.code, from: publicCard(conn.player, this.store), durationSec: room.durationMs / 1000, title: beltArena });
     }
+    const beltName = beltArena ? ARENAS.find((a) => a.id === beltArena).name : '';
     let delivered = !!online;
     if (this.notify && target.tgId) {
       try {
-        await this.notify(target.tgId, `${conn.player.name} вызывает тебя на дуэль отжиманий (${fmtSec(room.durationMs / 1000)})! Комната ${room.code}.`, '⚔️ Принять вызов', `duel_${room.code}`);
+        await this.notify(target.tgId, beltArena
+          ? `${conn.player.name} бросает тебе вызов за пояс арены «${beltName}» 🥊 Комната ${room.code}. Защити титул!`
+          : `${conn.player.name} вызывает тебя на дуэль отжиманий (${fmtSec(room.durationMs / 1000)})! Комната ${room.code}.`,
+        beltArena ? '🥊 Защитить пояс' : '⚔️ Принять вызов', `duel_${room.code}`);
         delivered = true;
       } catch (e) { console.warn('notify:', e.message); }
     }
@@ -227,10 +246,10 @@ export class Hub {
   }
 
   // ---- Матч ----
-  startMatch(mode, a, b, durationMs) {
+  startMatch(mode, a, b, durationMs, extra = {}) {
     const m = {
       id: Math.random().toString(36).slice(2, 10),
-      mode, durationMs, phase: 'prep', ready: new Set(),
+      mode, durationMs, phase: 'prep', ready: new Set(), title: extra.title || null,
       sides: [a, b].map((conn) => ({ conn, player: conn.player, reps: [], left: false })),
       liveAt: 0, endAt: 0, timer: null,
     };
@@ -239,9 +258,14 @@ export class Hub {
       s.conn.match = m;
       s.conn.state = 'match';
       const opp = m.sides.find((x) => x !== s);
+      // Рейтинговый бой против чемпиона своей арены — тоже бой за пояс.
+      const oppBelt = this.compete?.beltOf(opp.player.id);
+      const beltAtStake = m.title || (mode === 'ranked' && oppBelt && oppBelt === arenaOf(s.player.rating).id ? oppBelt : null)
+        || (mode === 'ranked' && this.compete?.beltOf(s.player.id) === arenaOf(opp.player.rating).id ? this.compete.beltOf(s.player.id) : null);
       send(s.conn, {
         t: 'matched', matchId: m.id, mode, durationMs,
         opponent: publicCard(opp.player, this.store),
+        belt: beltAtStake || null,
       });
     }
     m.timer = setTimeout(() => {
@@ -316,6 +340,7 @@ export class Hub {
     const outcome = (s) => (s === 1 ? 'win' : s === 0 ? 'loss' : 'draw');
 
     const ratingsBefore = [A.player.rating, B.player.rating];
+    const arenasBefore = [arenaOf(A.player.rating).id, arenaOf(B.player.rating).id];
     const deltas = [0, 0];
     const streakBonus = [0, 0];
     if (m.mode === 'ranked') {
@@ -337,9 +362,10 @@ export class Hub {
         if (res === 'win') streakBonus[i] = winStreakElo(p.winStreak);
         p.rating = Math.max(100, p.rating + deltas[i] + streakBonus[i]);
         p.bestRating = Math.max(p.bestRating || 0, p.rating);
-        // Сундук за победу в рейтинге (если есть свободный слот).
-        if (res === 'win') s.chest = awardWinChest(p);
+        // Набор наклеек и прогресс к билету за победу в рейтинге.
+        if (res === 'win') s.reward = awardWin(p);
       }
+      if (m.mode === 'tournament' && this.compete) s.tourney = this.compete.record(p, res, s.reps.length);
       if (m.mode === 'friend') addFriend(p, o.player);
       pushHistory(p, {
         mode: m.mode, outcome: res, reps: s.reps.length, oppReps: o.reps.length,
@@ -350,10 +376,20 @@ export class Hub {
 
     // Лента: заметные победы.
     const winner = sa === 1 ? A : sa === 0 ? B : null;
+    // Пояса: рейтинговый бой или титульный.
+    let belts = {};
+    if (winner && this.compete) {
+      const loser = winner === A ? B : A;
+      const wi = winner === A ? 0 : 1;
+      if (m.mode === 'ranked') belts = this.compete.onRanked(winner.player, loser.player, arenasBefore[wi], arenasBefore[1 - wi]);
+      if (m.mode === 'title' && m.title) belts = this.compete.onTitle(m.title, winner.player, loser.player);
+    }
     if (winner) {
       const loser = winner === A ? B : A;
       const how = reason === 'time' ? `${winner.reps.length}:${loser.reps.length}` : 'соперник сдался';
       if (m.mode === 'ranked') this.store.addFeed('🏆', `${winner.player.name} побеждает ${loser.player.name} — ${how}`);
+      else if (m.mode === 'tournament') this.store.addFeed('🎟️', `Турнир: ${winner.player.name} обыгрывает ${loser.player.name} — ${how}`);
+      else if (m.mode === 'title') { /* о поясе пишет compete */ }
       else this.store.addFeed('🤝', `Дружеская дуэль: ${winner.player.name} обыгрывает ${loser.player.name} — ${how}`);
       if (winner.reps.length >= 50) this.store.addFeed('💥', `${winner.player.name}: ${winner.reps.length} отжиманий за одну дуэль!`);
     }
@@ -371,7 +407,9 @@ export class Hub {
         },
         opp: { ...publicCard(o.player, this.store), reps: o.reps.length, ratingBefore: ratingsBefore[1 - i], delta: deltas[1 - i] + streakBonus[1 - i] },
         progress: s.progress,
-        chest: s.chest || null,
+        reward: s.reward || null,
+        tourney: s.tourney || null,
+        belt: belts[s.player.id] || null,
         profile: privateProfile(s.player, this.store),
       });
     });

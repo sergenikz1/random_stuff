@@ -1,8 +1,10 @@
 import Script from 'next/script';
-import { Nunito } from 'next/font/google';
+import { Nunito, Forum } from 'next/font/google';
 import './globals.css';
 
 const font = Nunito({ subsets: ['latin', 'cyrillic'], weight: ['500', '600', '700', '800', '900'], variable: '--font', display: 'swap' });
+// Заголовки — шрифт в духе античных надписей.
+const display = Forum({ subsets: ['latin', 'cyrillic'], weight: '400', variable: '--font-display', display: 'swap' });
 
 export const metadata = {
   title: 'PushDuel',
@@ -20,7 +22,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ru" className={font.variable} data-theme="aqua" suppressHydrationWarning>
+    <html lang="ru" className={`${font.variable} ${display.variable}`} data-theme="aqua" suppressHydrationWarning>
       <body>
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
         {children}

@@ -32,6 +32,9 @@ export class Store {
       for (const c of data.clans || []) this.clans.set(c.id, c);
       this.feed = data.feed || [];
       if (data.community) this.community = data.community;
+      this.belts = data.belts || {};
+      this.tourneys = data.tourneys || {};
+      this.beltWeek = data.beltWeek || '';
     }
   }
 
@@ -88,6 +91,9 @@ export class Store {
       clans: [...this.clans.values()],
       feed: this.feed,
       community: this.community,
+      belts: this.belts || {},
+      tourneys: this.tourneys || {},
+      beltWeek: this.beltWeek || '',
     }));
     fs.renameSync(tmp, this.file);
   }
@@ -308,6 +314,8 @@ export function publicCard(p, store) {
     tg: !!p.tgId,
     premium: isPremium(p),
     badges: showcaseBadges(earnedBadges(badgeStats(p, store)), p.badges),
+    card: p.card || [],
+    belt: store?.belts ? Number(Object.entries(store.belts).find(([, b]) => b?.holderId === p.id)?.[0]) || null : null,
   };
 }
 
@@ -371,7 +379,7 @@ export function applyActivity(p, act, store) {
   const items = [];
   const reps = Math.max(0, act.reps | 0);
   const combo = combosFromTimes(act.repTimes || []);
-  const isDuel = act.type === 'ranked' || act.type === 'friend';
+  const isDuel = ['ranked', 'friend', 'tournament', 'title'].includes(act.type);
 
   if (reps) items.push({ label: `Отжимания ×${reps}`, xp: reps * XP.perRep });
   if (combo.xp) items.push({ label: `Комбо (лучшее ×${combo.best})`, xp: combo.xp });

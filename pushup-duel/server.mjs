@@ -8,6 +8,7 @@ import { Hub } from './lib/server/hub.js';
 import { Api } from './lib/server/api.js';
 import { startBot } from './lib/server/telegram.js';
 import { Premium } from './lib/server/premium.js';
+import { Compete } from './lib/server/compete.js';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = Number(process.env.PORT) || 3000;
@@ -48,6 +49,12 @@ const hub = new Hub(store, config, {
 const api = new Api(store, hub, config);
 premium = new Premium(store, { bot, hub, price: store.premiumPrice, devPayments: !botToken && config.allowGuests });
 api.premium = premium;
+// Пояса и турнир: итоги недели подводятся раз в минуту (и при запросах турнира).
+const compete = new Compete(store, { premium });
+hub.compete = compete;
+api.compete = compete;
+setInterval(() => compete.settle().catch((e) => console.error('settle:', e)), 60000);
+compete.settle().catch((e) => console.error('settle:', e));
 
 // Route handlers Next.js собираются отдельным бандлом, поэтому общее состояние передаём через globalThis.
 globalThis.__pushduel = { api, hub, store, config };

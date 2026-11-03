@@ -1,6 +1,6 @@
 // REST API: всё, что не требует живого соединения. Next.js отдаёт сюда запросы из app/api/[...path].
 import { authenticate, refFrom } from './auth.js';
-import { unlockChest, openChest, claimRoad, buy } from './economy.js';
+import { unlockPack, openPack, claimRoad, buy, claimInbox, setCard } from './economy.js';
 import {
   privateProfile, publicCard, applyActivity, pushHistory, updateProfile, UserError, CLAN_EMOJI,
 } from './store.js';
@@ -14,6 +14,7 @@ export class Api {
     this.config = config;
     this.soloAt = new Map();
     this.premium = null; // задаёт server.mjs
+    this.compete = null;
   }
 
   // Возвращает { status, body }.
@@ -62,6 +63,12 @@ export class Api {
             myClan: p.clanId && s.clans.get(p.clanId) ? s.clanFull(s.clans.get(p.clanId)) : null,
           };
         }
+        case 'belts': return { belts: this.compete ? this.compete.beltsView(p) : [] };
+        case 'tourney': {
+          if (!this.compete) return { tourney: null };
+          await this.compete.settle();
+          return { tourney: this.compete.tourneyView(p) };
+        }
         case 'players': {
           const t = s.get(String(b || ''));
           if (!t) throw new UserError('Игрок не найден');
@@ -83,12 +90,37 @@ export class Api {
           s.save();
           return { profile: privateProfile(p, s) };
         case 'solo': return this.solo(p, body);
-        // Сундуки: POST chests/<слот>/unlock · chests/<слот>/open { gems }
-        case 'chests': {
+        // Наборы наклеек: POST packs/<слот>/unlock · packs/<слот>/open { gems }
+        case 'packs': {
           const slot = Number(b);
           if (!(slot >= 0 && slot < 4)) throw new UserError('Нет такого слота');
-          if (c === 'unlock') { unlockChest(p, slot); s.save(); return { profile: privateProfile(p, s) }; }
-          if (c === 'open') { const loot = openChest(p, slot, { gems: !!body.gems }); s.save(); return { loot, profile: privateProfile(p, s) }; }
+          if (c === 'unlock') { unlockPack(p, slot); s.save(); return { profile: privateProfile(p, s) }; }
+          if (c === 'open') { const loot = openPack(p, slot, { gems: !!body.gems }); s.save(); return { loot, profile: privateProfile(p, s) }; }
+          return undefined;
+        }
+        // Наклейки на карточке: POST card { items: [{ id, x, y, r, s }] }
+        case 'card': {
+          setCard(p, body.items);
+          s.save();
+          return { profile: privateProfile(p, s) };
+        }
+        // Почта: забрать награду (подарок Telegram — повторная отправка).
+        case 'inbox': {
+          const it = (p.inbox || []).find((x) => x.id === b);
+          if (it?.gift) {
+            if (!this.premium) throw new UserError('Подарки отключены');
+            const r = await this.premium.sendStarsGift(p, it.gift, `PushDuel · ${it.title}`);
+            if (r.status === 'sent') p.inbox = p.inbox.filter((x) => x.id !== b);
+            s.save();
+            return { gift: r, profile: privateProfile(p, s) };
+          }
+          const r = claimInbox(p, String(b || ''));
+          s.save();
+          return { ...r, profile: privateProfile(p, s) };
+        }
+        case 'tourney': {
+          if (!this.compete) throw new UserError('Турнир недоступен');
+          if (b === 'register') { this.compete.register(p); s.save(); return { tourney: this.compete.tourneyView(p), profile: privateProfile(p, s) }; }
           return undefined;
         }
         case 'road': {

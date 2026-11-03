@@ -18,10 +18,15 @@ import Game from './Game.jsx';
 import Result from './Result.jsx';
 import { PlayerSheet, ClanSheet, ChallengedSheet } from './Sheets.jsx';
 import Shop from './Shop.jsx';
-import { ChestOpenModal, TrophyRoad } from './Economy.jsx';
+import { PackOpenModal, TrophyRoad } from './Economy.jsx';
+import { CardEditor } from './Stickers.jsx';
+import { startTilt } from '../lib/client/tilt.js';
 import { Sheet } from './ui.jsx';
+import { VolcanoSheet, ModeSheet } from './Greek.jsx';
+import { InboxCard } from './Compete.jsx';
 
-const TABS = [['shop', '🛒', 'Магазин'], ['pass', '🎖️', 'Пропуск'], ['home', '⚔️', 'Бой'], ['clan', '🛡️', 'Клан'], ['top', '🏆', 'Рейтинг']];
+// Вкладки: плитка-иконка с глянцем (тон задаёт цвет), подпись.
+const TABS = [['shop', '🏺', 'Агора', 'orange'], ['pass', '📜', 'Пропуск', 'violet'], ['home', '⚔️', 'Бой', 'blue'], ['clan', '🛡️', 'Клан', 'green'], ['top', '🏛️', 'Слава', 'gold']];
 
 export default function App() {
   const [settings, updateSettings] = useSettings();
@@ -74,6 +79,7 @@ export default function App() {
 
   useEffect(() => {
     initTelegram(theme);
+    startTilt();
     api('me').then((r) => {
       setProfile(r.profile);
       setCommunity(r.community);
@@ -115,13 +121,13 @@ export default function App() {
       s.on('stats', (m) => setStats({ online: m.online, queue: m.queue, playing: m.playing })),
       s.on('queued', (m) => setStats({ online: m.online, queue: m.queue, playing: m.playing })),
       s.on('profile', (m) => setProfile(m.profile)),
-      s.on('room_created', (m) => setFlow({ kind: 'room', code: m.code, durationSec: m.durationSec, invited: m.invited })),
+      s.on('room_created', (m) => setFlow({ kind: 'room', code: m.code, durationSec: m.durationSec, invited: m.invited, title: m.title })),
       s.on('matched', (m) => {
         loadPose().catch(() => {});
         sfx.found();
         haptic('success');
         setSheet(null);
-        setFlow({ kind: 'game', mode: m.mode, durationMs: m.durationMs, opponent: m.opponent, key: m.matchId });
+        setFlow({ kind: 'game', mode: m.mode, durationMs: m.durationMs, opponent: m.opponent, belt: m.belt || null, key: m.matchId });
       }),
       s.on('challenged', (m) => { if (!flowRef.current) { haptic('warning'); setSheet({ kind: 'challenged', ...m }); } }),
       s.on('challenge_sent', (m) => toast(m.delivered ? `Вызов отправлен: ${m.to}` : `${m.to} не в сети — отправьте ссылку сами`)),
@@ -144,7 +150,7 @@ export default function App() {
   const preload = () => { loadPose().catch(() => {}); };
   const startRanked = () => { preload(); unlockAudio(); setFlow({ kind: 'queue' }); send({ t: 'queue' }); };
   const startFriend = () => { preload(); unlockAudio(); setFlow({ kind: 'room' }); send({ t: 'room_create', durationSec: settings.friendSec }); };
-  const startJoin = () => { preload(); setFlow({ kind: 'join' }); };
+  const startJoin = () => { preload(); setSheet(null); setFlow({ kind: 'join' }); };
   const startTraining = () => { unlockAudio(); setFlow({ kind: 'game', mode: 'training', durationMs: settings.soloSec * 1000, opponent: null, key: Date.now() }); };
   const startBot = () => {
     unlockAudio();
@@ -152,11 +158,24 @@ export default function App() {
     const opp = { ...makeOpponent(profile?.rating || 1000, profile?.avatar), bot: true };
     setFlow({ kind: 'game', mode: 'bot', durationMs: settings.soloSec * 1000, opponent: opp, key: Date.now() });
   };
-  const challenge = (player) => {
-    setSheet(null);
-    setFlow({ kind: 'room', invited: player.name });
-    send({ t: 'challenge', playerId: player.id, durationSec: settings.friendSec });
+  // «В бой» запускает формат, выбранный в окне режима (по умолчанию — рейтинг).
+  const playSelected = () => {
+    const f = settings.format || 'ranked';
+    if (f === 'friend') startFriend();
+    else if (f === 'training') startTraining();
+    else if (f === 'bot') startBot();
+    else startRanked();
   };
+
+  const challenge = (player, title = false) => {
+    setSheet(null);
+    preload();
+    setFlow({ kind: 'room', invited: player.name, title });
+    send({ t: 'challenge', playerId: player.id, durationSec: settings.friendSec, title });
+  };
+  const titleChallenge = (holder) => challenge(holder, true);
+  const tourneyRegister = () => ecoCall('tourney/register', null, () => { haptic('success'); sfx.level(); toast('Вы в турнире! Играйте с пятницы по воскресенье 🎟️'); setVersion((v) => v + 1); });
+  const tourneyPlay = () => { preload(); unlockAudio(); setFlow({ kind: 'queue', tournament: true }); send({ t: 'queue', kind: 'tournament' }); };
   const cancelLobby = useCallback(() => {
     const f = flowRef.current;
     if (f?.kind === 'queue') socketRef.current?.send({ t: 'unqueue' });
@@ -220,16 +239,24 @@ export default function App() {
       if (after) after(r);
     } catch (e) { toast(e.message); } finally { setEcoBusy(false); }
   };
-  const unlockChest = (slot) => ecoCall(`chests/${slot}/unlock`, null, () => { haptic('select'); toast('Сундук открывается ⏳'); });
-  const openChest = (slot, withGems, gems) => {
-    if (withGems) { setSheet({ kind: 'chestGems', slot, gems }); return; }
-    ecoCall(`chests/${slot}/open`, {}, (r) => setLoot(r.loot));
+  const unlockPack = (slot) => ecoCall(`packs/${slot}/unlock`, null, () => { haptic('select'); toast('Набор открывается ⏳'); });
+  const openPack = (slot, withGems, gems) => {
+    if (withGems) { setSheet({ kind: 'packGems', slot, gems }); return; }
+    ecoCall(`packs/${slot}/open`, {}, (r) => setLoot(r.loot));
   };
+  const claimInbox = (id) => ecoCall(`inbox/${id}`, null, (r) => {
+    haptic('success');
+    if (r.loot) setLoot(r.loot);
+    else if (r.gift) toast(r.gift.status === 'sent' ? 'Подарок отправлен 🎁' : r.gift.error || 'Не получилось');
+    else toast('Награда получена');
+  });
+  const saveCard = (items) => ecoCall('card', { items }, () => { setSheet(null); haptic('success'); toast('Карточка обновлена ✨'); });
   const claimRoad = (at) => ecoCall(`road/${at}/claim`, null, () => { sfx.level(); haptic('success'); toast('Награда получена 🏆'); });
   const shopBuy = (id) => ecoCall(`shop/${id}`, null, (r) => {
     haptic('success');
     if (r.loot) setLoot(r.loot);
     else if (r.name) toast(`Куплено: ${r.name}`);
+    else if (r.tickets) toast(`Билет куплен — теперь их ${r.tickets} 🎟️`);
     else if (r.boostUntil) toast('Буст ×2 активирован ⚡');
   });
 
@@ -250,6 +277,8 @@ export default function App() {
   };
   const again = (data) => {
     if (data.mode === 'ranked') startRanked();
+    else if (data.mode === 'tournament') tourneyPlay();
+    else if (data.mode === 'title' && data.opp?.id) challenge(data.opp, !!data.opp.belt);
     else if (data.mode === 'friend' && data.opp?.id) challenge(data.opp);
     else if (data.mode === 'bot') startBot();
     else startTraining();
@@ -282,7 +311,7 @@ export default function App() {
   if (flow?.kind === 'game') {
     return (
       <>
-        <Game key={flow.key} mode={flow.mode} durationMs={flow.durationMs} opponent={flow.opponent}
+        <Game key={flow.key} mode={flow.mode} durationMs={flow.durationMs} opponent={flow.opponent} belt={flow.belt}
           socket={socketRef.current} settings={settings} updateSettings={updateSettings} profile={profile}
           onDone={onGameDone} onCancel={onGameCancel} />
         <Toast text={toastText} />
@@ -303,36 +332,46 @@ export default function App() {
         <div className="shell">
           {tab === 'shop' && <Shop profile={profile} onBuy={shopBuy} onPremium={buyPremium} busy={ecoBusy} />}
           {tab === 'home' && (
-            <Home profile={profile} onUnlockChest={unlockChest} onOpenChest={openChest} onRoad={() => setSheet({ kind: 'road' })} onProfile={() => setTab('me')} stats={stats} community={community} feed={feed} status={status}
-              onRanked={startRanked} onFriend={startFriend} onJoinCode={startJoin} onTraining={startTraining} onBot={startBot}
-              goTab={setTab} />
+            <Home profile={profile} status={status} settings={settings} theme={theme} version={version}
+              onPlay={playSelected} onMode={() => setSheet({ kind: 'mode' })} onStreak={() => setSheet({ kind: 'streak' })}
+              onUnlockPack={unlockPack} onOpenPack={openPack} onRoad={() => setSheet({ kind: 'road' })} onProfile={() => setTab('me')}
+              onInbox={() => setSheet({ kind: 'inbox' })} />
           )}
-          {tab === 'top' && <Top openPlayer={openPlayer} openClan={openClan} toast={toast} version={version} />}
+          {tab === 'top' && <Top openPlayer={openPlayer} openClan={openClan} toast={toast} version={version} onTitleChallenge={titleChallenge}
+            profile={profile} onTourneyRegister={tourneyRegister} onTourneyPlay={tourneyPlay} status={status} feed={feed} community={community} />}
           {tab === 'clan' && <Clan profile={profile} config={config} openPlayer={openPlayer} openClan={openClan} toast={toast} onShareClan={shareClan} onChanged={() => { setVersion((v) => v + 1); api('me').then((r) => setProfile(r.profile)).catch(() => {}); }} version={version} />}
           {tab === 'pass' && <Pass profile={profile} onEquip={equip} onBuy={buyPremium} onClaimGift={claimGift} buying={buying} />}
-          {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} />}
+          {tab === 'me' && <Profile key={profile?.id} profile={profile} settings={settings} updateSettings={updateSettings} onSave={saveProfile} onInvite={invite} inTg={inTelegram()} onEditCard={() => setSheet({ kind: 'card' })} />}
           <nav className="tabbar">
-            {TABS.map(([id, icon, label]) => (
+            {TABS.map(([id, icon, label, tone]) => (
               <button key={id} className={tab === id ? 'on' : ''} onClick={() => { setTab(id); haptic('select'); }}>
-                <span className="ti">{icon}</span>{label}
+                <span className={`tile ${tone}`}>{icon}</span>{label}
               </button>
             ))}
           </nav>
         </div>
       )}
 
+      {sheet?.kind === 'streak' && <VolcanoSheet profile={profile} onClose={closeSheet} />}
+      {sheet?.kind === 'mode' && <ModeSheet settings={settings} updateSettings={updateSettings} onClose={closeSheet} onJoinCode={startJoin} toast={toast} />}
+      {sheet?.kind === 'inbox' && (
+        <Sheet onClose={closeSheet}>
+          {profile?.eco?.inbox?.length ? <InboxCard eco={profile.eco} onClaim={(id) => { setSheet(null); claimInbox(id); }} /> : <div className="empty">Наград нет</div>}
+        </Sheet>
+      )}
       {sheet?.kind === 'road' && <TrophyRoad eco={profile?.eco} onClose={closeSheet} onClaim={claimRoad} />}
-      {sheet?.kind === 'chestGems' && (
+      {sheet?.kind === 'card' && profile && <CardEditor profile={profile} onSave={saveCard} onClose={closeSheet} />}
+      {sheet?.kind === 'packGems' && (
         <Sheet onClose={closeSheet} center>
           <h2 className="center">Открыть сейчас?</h2>
-          <p className="center muted" style={{ fontWeight: 700 }}>Сундук откроется мгновенно за {sheet.gems} 💎 (у вас {profile?.eco?.gems ?? 0})</p>
+          <p className="center muted" style={{ fontWeight: 700 }}>Набор откроется мгновенно за {sheet.gems} 💎 (у вас {profile?.eco?.gems ?? 0})</p>
           <button className="gel xl violet" disabled={ecoBusy || (profile?.eco?.gems ?? 0) < sheet.gems}
-            onClick={() => { const slot = sheet.slot; setSheet(null); ecoCall(`chests/${slot}/open`, { gems: true }, (r) => setLoot(r.loot)); }}>💎 {sheet.gems} — открыть</button>
+            onClick={() => { const slot = sheet.slot; setSheet(null); ecoCall(`packs/${slot}/open`, { gems: true }, (r) => setLoot(r.loot)); }}>💎 {sheet.gems} — открыть</button>
           <button className="glass-btn" onClick={closeSheet}>Подождать</button>
         </Sheet>
       )}
-      {loot && <ChestOpenModal loot={loot} onClose={() => setLoot(null)} />}
-      {sheet?.kind === 'player' && <PlayerSheet id={sheet.id} onClose={closeSheet} toast={toast} canChallenge={status === 'online'} onChallenge={challenge} />}
+      {loot && <PackOpenModal loot={loot} onClose={() => setLoot(null)} />}
+      {sheet?.kind === 'player' && <PlayerSheet id={sheet.id} onClose={closeSheet} toast={toast} canChallenge={status === 'online'} onChallenge={challenge} myArena={profile?.eco?.arena?.id} />}
       {sheet?.kind === 'clan' && <ClanSheet id={sheet.id} invite={sheet.invite} onClose={closeSheet} toast={toast} openPlayer={openPlayer} onJoined={() => { setVersion((v) => v + 1); setTab('clan'); }} />}
       {sheet?.kind === 'challenged' && (
         <ChallengedSheet from={sheet.from} durationSec={sheet.durationSec} onClose={closeSheet}

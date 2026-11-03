@@ -5,7 +5,7 @@ import { api } from '../lib/client/net.js';
 import { Avatar, Sheet, ago, fmtTime } from './ui.jsx';
 import { PlayerRow } from './Home.jsx';
 
-export function PlayerSheet({ id, onClose, onChallenge, canChallenge, toast }) {
+export function PlayerSheet({ id, onClose, onChallenge, canChallenge, toast, myArena }) {
   const [d, setD] = useState(null);
   useEffect(() => { api(`players/${id}`).then(setD).catch((e) => { toast(e.message); onClose(); }); }, [id, onClose, toast]);
   return (
@@ -42,6 +42,9 @@ export function PlayerSheet({ id, onClose, onChallenge, canChallenge, toast }) {
           )}
           {!d.me && (
             <button className="gel xl" disabled={!canChallenge} onClick={() => onChallenge(d.player)}>⚔️ Вызвать на дуэль</button>
+          )}
+          {!d.me && d.player.belt && d.player.belt === myArena && (
+            <button className="gel xl orange" disabled={!canChallenge} onClick={() => onChallenge(d.player, true)}>🥊 Вызов за пояс</button>
           )}
           {!d.me && d.player.tg && <p className="small muted center" style={{ fontWeight: 600 }}>Вызов придёт игроку сообщением от бота в Telegram</p>}
         </>

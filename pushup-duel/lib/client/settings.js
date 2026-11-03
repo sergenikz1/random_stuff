@@ -11,7 +11,9 @@ export const DEFAULT_SETTINGS = {
   music: true,          // музыка во время боя
   haptics: true,
   skeleton: true,
-  theme: 'auto',        // auto | aqua | midnight
+  theme: 'auto',        // auto | aqua (Эгея, светлая) | midnight (Амфора, тёмная)
+  exercise: 'pushups',  // упражнение (пока доступны только отжимания)
+  format: 'ranked',     // формат боя по кнопке «В бой»: ranked | friend | training | bot
 };
 
 function read() {

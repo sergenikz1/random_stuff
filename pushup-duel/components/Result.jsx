@@ -6,8 +6,9 @@ import { haptic, bindBackButton } from '../lib/client/tg.js';
 import { cosmeticName, levelInfo } from '../lib/pass.js';
 import { Avatar, Bar, Card, fmtTime } from './ui.jsx';
 import { RewardIcon } from './Pass.jsx';
-import { ChestIcon } from './Economy.jsx';
-import { CHESTS } from '../lib/economy.js';
+import { PackIcon } from './Stickers.jsx';
+import { BeltIcon } from './Compete.jsx';
+import { PACKS, ARENAS } from '../lib/economy.js';
 
 const TITLES = { win: 'Победа!', loss: 'Поражение', draw: 'Ничья' };
 const REASONS = { forfeit: 'соперник сдался', disconnect: 'соперник отключился' };
@@ -35,7 +36,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
   // Если игрок сменил стиль победы прямо отсюда — эффекта не перезапускаем.
   const title = training ? 'Тренировка завершена' : TITLES[outcome] || 'Матч окончен';
   const sub = [
-    { ranked: 'Рейтинговая дуэль', friend: 'Дуэль с другом', bot: 'Бой с ботом', training: 'Тренировка' }[mode],
+    { ranked: 'Рейтинговая дуэль', friend: 'Дуэль с другом', bot: 'Бой с ботом', training: 'Тренировка', tournament: 'Турнир недели', title: 'Титульный бой' }[mode],
     fmtTime(data.durationMs),
     REASONS[data.reason],
   ].filter(Boolean).join(' · ');
@@ -78,16 +79,17 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
         )}
       </Card>
 
-      {data.chest && (
+      {(data.reward || data.belt || data.tourney) && (
         <Card>
-          {data.chest.full ? (
-            <div className="row"><span style={{ fontSize: 26 }}>🧰</span><div className="grow"><div className="title">Все слоты сундуков заняты</div><div className="sub">Откройте сундук, чтобы получать новые за победы</div></div></div>
-          ) : (
-            <div className="row new-reward" style={{ border: 0 }}>
-              <ChestIcon type={data.chest.type} size={56} className="bounce" />
-              <div className="grow"><div className="title">{CHESTS[data.chest.type].name} сундук!</div><div className="sub">Ждёт на главной в слоте {data.chest.slot + 1}</div></div>
-            </div>
-          )}
+          <div className="rows">
+            {data.belt?.won && <div className="row new-reward" style={{ border: 0 }}><BeltIcon arena={ARENAS.find((a) => a.id === data.belt.won)} size={56} /><div className="grow"><div className="title">Пояс чемпиона ваш!</div><div className="sub">Арена «{ARENAS.find((a) => a.id === data.belt.won).name}» — удержите его до понедельника</div></div></div>}
+            {data.belt?.defended && <div className="row"><span style={{ fontSize: 26 }}>🛡️</span><div className="grow"><div className="title">Пояс защищён</div><div className="sub">Ещё одна защита титула</div></div></div>}
+            {data.belt?.lost && <div className="row"><span style={{ fontSize: 26 }}>💔</span><div className="grow"><div className="title">Пояс потерян</div><div className="sub">Отберите его обратно в рейтинге или вызовом</div></div></div>}
+            {data.reward?.type && <div className="row new-reward" style={{ border: 0 }}><PackIcon type={data.reward.type} size={48} className="bounce" /><div className="grow"><div className="title">{PACKS[data.reward.type].name}!</div><div className="sub">Ждёт на главной в слоте {data.reward.slot + 1}</div></div></div>}
+            {data.reward?.full && <div className="row"><span style={{ fontSize: 26 }}>🎴</span><div className="grow"><div className="title">Все слоты наборов заняты</div><div className="sub">Откройте набор, чтобы получать новые за победы</div></div></div>}
+            {data.reward?.ticket && <div className="row"><span style={{ fontSize: 26 }}>🎟️</span><div className="grow"><div className="title">Билет на турнир!</div><div className="sub">За 3 победы в рейтинге</div></div></div>}
+            {data.tourney && <div className="row"><span style={{ fontSize: 26 }}>🏆</span><div className="grow"><div className="title">Турнир: {data.tourney.points} очков · #{data.tourney.place}</div><div className="sub">Сыграно матчей: {data.tourney.matches}</div></div></div>}
+          </div>
         </Card>
       )}
 
@@ -121,7 +123,7 @@ export default function Result({ data, profile, onAgain, onHome, onShare, onEqui
 
       <div className="rows">
         <button className="gel xl" onClick={onAgain}>
-          {mode === 'ranked' ? '⚔️ Новый соперник' : mode === 'friend' ? '🔁 Реванш' : mode === 'bot' ? '🤖 Ещё бой' : '🏋️ Ещё подход'}
+          {mode === 'ranked' ? '⚔️ Новый соперник' : mode === 'tournament' ? '🎟️ Следующий матч' : mode === 'friend' || mode === 'title' ? '🔁 Реванш' : mode === 'bot' ? '🤖 Ещё бой' : '🏋️ Ещё подход'}
         </button>
         <div className="row-actions">
           <button className="glass-btn" onClick={onShare}>📤 Поделиться</button>

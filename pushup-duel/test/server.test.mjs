@@ -7,6 +7,7 @@ import { Store } from '../lib/server/store.js';
 import { Hub } from '../lib/server/hub.js';
 import { Api } from '../lib/server/api.js';
 import { validateInitData, signInitData } from '../lib/server/telegram.js';
+import { Compete } from '../lib/server/compete.js';
 import { levelInfo, questsForDay, combosFromTimes } from '../lib/pass.js';
 
 const BOT = '123456:TEST-TOKEN';
@@ -16,6 +17,9 @@ async function setup(opts = {}) {
   const store = new Store(null);
   const hub = new Hub(store, config, { countdownMs: 50, rankedMs: 400, readyTimeoutMs: 2000, mmIntervalMs: 50, minRepGapMs: 0, ...opts });
   const api = new Api(store, hub, config);
+  const compete = new Compete(store);
+  hub.compete = compete;
+  api.compete = compete;
   const server = http.createServer();
   const wss = new WebSocketServer({ server });
   wss.on('connection', (ws) => hub.attach(ws));
@@ -204,4 +208,37 @@ test('пропуск: уровни, задания дня, комбо', () => {
   const c = combosFromTimes([0, 500, 1000, 1500, 2000, 9000]);
   assert.equal(c.best, 5);
   assert.equal(c.xp, 5);
+});
+
+test('титульный бой: вызов чемпиону своей арены, пояс переходит к победителю', async () => {
+  const s = await setup({ rankedMs: 5000 });
+  try {
+    const a = client(s.url, tgAuth(31, 'Чемп'));
+    const b = client(s.url, tgAuth(32, 'Претендент'));
+    await Promise.all([a.opened, b.opened, a.next('welcome'), b.next('welcome')]);
+    const champ = s.store.get('tg31'), chal = s.store.get('tg32');
+    champ.rating = 1200; chal.rating = 1180;
+    s.store.belts[3] = { holderId: 'tg31', since: Date.now(), defenses: 0 };
+    b.send({ t: 'challenge', playerId: 'tg31', title: true });
+    const room = await b.next('room_created');
+    assert.equal(room.title, 3);
+    const ch = await a.next('challenged');
+    assert.equal(ch.title, 3);
+    a.send({ t: 'room_join', code: ch.code });
+    const m = await b.next('matched');
+    assert.equal(m.mode, 'title');
+    assert.equal(m.belt, 3);
+    await a.next('matched');
+    a.send({ t: 'ready' }); b.send({ t: 'ready' });
+    await a.next('start');
+    a.send({ t: 'forfeit' });
+    const rb = await b.next('match_over');
+    assert.deepEqual(rb.belt, { won: 3 });
+    assert.equal(s.store.belts[3].holderId, 'tg32');
+    // Вызов чемпиону чужой арены отклоняется.
+    champ.rating = 1000;
+    a.send({ t: 'challenge', playerId: 'tg32', title: true });
+    assert.match((await a.next('error')).msg, /своей арены/);
+    a.ws.close(); b.ws.close();
+  } finally { await s.close(); }
 });

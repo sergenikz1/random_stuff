@@ -15,10 +15,10 @@ import { Avatar, fmtTime } from './ui.jsx';
 import { VersusIntro } from './PlayerCard.jsx';
 
 const COMBO_WORDS = ['Огонь!', 'Машина!', 'Неудержим!', 'Зверь!', 'Легенда!', 'Бог отжиманий!'];
-const TAGS = { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', training: 'ТРЕНИРОВКА' };
+const TAGS = { ranked: 'РЕЙТИНГОВЫЙ МАТЧ', friend: 'ДУЭЛЬ С ДРУГОМ', bot: 'БОЙ С БОТОМ', training: 'ТРЕНИРОВКА', tournament: 'ТУРНИР НЕДЕЛИ', title: 'ТИТУЛЬНЫЙ БОЙ' };
 
-export default function Game({ mode, durationMs, opponent, socket, settings, updateSettings, profile, onDone, onCancel }) {
-  const online = mode === 'ranked' || mode === 'friend';
+export default function Game({ mode, durationMs, opponent, belt = null, socket, settings, updateSettings, profile, onDone, onCancel }) {
+  const online = ['ranked', 'friend', 'tournament', 'title'].includes(mode);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const st = useRef({
@@ -338,7 +338,7 @@ export default function Game({ mode, durationMs, opponent, socket, settings, upd
       <div className="vignette" />
 
       <div className="hud">
-        <div className="hud-tag">{TAGS[mode]}</div>
+        <div className="hud-tag">{belt ? `🥊 ${TAGS.title}` : TAGS[mode]}</div>
         <div className="hud-row">
           <div className="hud-p">
             <Avatar emoji={profile?.avatar} frame={profile?.frame || profile?.equipped?.frame} size="sm" side="me" />
@@ -398,7 +398,7 @@ export default function Game({ mode, durationMs, opponent, socket, settings, upd
       {combo && <div key={combo.id} className="combo">{combo.word}<small>Комбо ×{combo.n}</small></div>}
       {floaters.map((f) => <div key={f.id} className={`plus ${f.opp ? 'opp' : ''}`} style={{ left: `${f.x}%`, top: `${f.y}%` }}>{f.text}</div>)}
 
-      {showIntro && phase !== 'loading' && phase !== 'camera_error' && <VersusIntro me={profile} opp={opponent} bot={!!opponent?.bot} mode={mode} onDone={endIntro} />}
+      {showIntro && phase !== 'loading' && phase !== 'camera_error' && <VersusIntro me={profile} opp={opponent} bot={!!opponent?.bot} mode={mode} belt={belt} onDone={endIntro} />}
 
       <div className="game-bottom">
         {(phase === 'waiting' || phase === 'loading') && <button className="gel green" onClick={manualReady} disabled={phase === 'loading'}>Я готов</button>}

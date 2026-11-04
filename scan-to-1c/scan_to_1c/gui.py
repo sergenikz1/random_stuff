@@ -16,7 +16,14 @@ from tkinter import filedialog, messagebox, ttk
 from . import __version__, ai, updater
 from .exporter import export_to_folder
 from .extract import ExtractedData, extract, parse_amount, parse_date
-from .loader import SUPPORTED_EXTENSIONS, configure_tesseract, is_supported, load_document, tesseract_available
+from .loader import (
+    MAX_IMAGE_PAGES,
+    SUPPORTED_EXTENSIONS,
+    configure_tesseract,
+    is_supported,
+    load_document,
+    tesseract_available,
+)
 from .onec import OneCClient, OneCError, merged_mapping
 from .settings import Settings
 
@@ -30,12 +37,21 @@ ST_NEW, ST_WORK, ST_READY, ST_WARN, ST_SENT, ST_ERROR = (
 @dataclass
 class DocItem:
     path: Path
+    extra_pages: list[Path] = field(default_factory=list)  # остальные фото того же документа
     status: str = ST_NEW
     data: ExtractedData | None = None
     text: str = ""
     message: str = ""
     onec_ref: str = ""
     iid: str = field(default="")
+
+    @property
+    def paths(self) -> list[Path]:
+        return [self.path, *self.extra_pages]
+
+    @property
+    def title(self) -> str:
+        return self.path.name + (f" (+{len(self.extra_pages)} стр.)" if self.extra_pages else "")
 
 
 def iso_to_ru(value: str) -> str:
@@ -57,6 +73,7 @@ class App:
         self.items: list[DocItem] = []
         self.events: queue.Queue = queue.Queue()
         self.busy = False
+        self.auto_pending = False  # добавили файлы во время распознавания — распознать их следом
         self.updating = False
         self.current: DocItem | None = None
 
@@ -80,8 +97,7 @@ class App:
                 "Не найден Tesseract OCR — сканы-изображения распознать не получится.\n"
                 "PDF с текстовым слоем читаются и без него.")
         if files:
-            self.add_paths([Path(f) for f in files])
-            self.recognize()
+            self.add_paths([Path(f) for f in files])  # распознавание стартует само
 
         updater.cleanup_old()
         if self.settings.auto_update:
@@ -95,7 +111,8 @@ class App:
         buttons = [
             ("Добавить файлы", self.ask_files),
             ("Добавить папку", self.ask_folder),
-            ("Распознать", self.recognize),
+            ("Распознать заново", self.recognize),
+            ("Объединить страницы", self.merge_pages),
             ("Загрузить в 1С", self.send),
             ("Удалить из списка", self.remove_selected),
             ("Настройки", self.open_settings),
@@ -132,24 +149,28 @@ class App:
         right = ttk.Notebook(paned)
         form = ttk.Frame(right, padding=10)
         right.add(form, text="Реквизиты")
+        extra = ttk.Frame(right, padding=10)
+        right.add(extra, text="Доп. реквизиты")
+        goods = ttk.Frame(right, padding=4)
+        right.add(goods, text="Товары")
         text_tab = ttk.Frame(right, padding=4)
         right.add(text_tab, text="Распознанный текст")
         paned.add(right, weight=2)
 
         self.vars: dict[str, tk.StringVar] = {}
 
-        def row(label, key, r, widget="entry", values=None):
-            ttk.Label(form, text=label).grid(row=r, column=0, sticky="w", pady=2, padx=(0, 8))
+        def row(label, key, r, widget="entry", values=None, parent=form):
+            ttk.Label(parent, text=label).grid(row=r, column=0, sticky="w", pady=2, padx=(0, 8))
             var = tk.StringVar()
             self.vars[key] = var
             if widget == "combo":
-                w = ttk.Combobox(form, textvariable=var, values=values)
+                w = ttk.Combobox(parent, textvariable=var, values=values)
             else:
-                w = ttk.Entry(form, textvariable=var)
+                w = ttk.Entry(parent, textvariable=var)
             w.grid(row=r, column=1, sticky="ew", pady=2)
 
-        def section(title, r):
-            ttk.Label(form, text=title, font=("Segoe UI", 9, "bold")).grid(
+        def section(title, r, parent=form):
+            ttk.Label(parent, text=title, font=("Segoe UI", 9, "bold")).grid(
                 row=r, column=0, columnspan=2, sticky="w", pady=(10, 2))
 
         form.columnconfigure(1, weight=1)
@@ -176,6 +197,34 @@ class App:
         ttk.Button(form, text="Сохранить правки", command=self.apply_form).grid(
             row=18, column=0, columnspan=2, sticky="w")
 
+        extra.columnconfigure(1, weight=1)
+        row("Основание", "basis", 0, parent=extra)
+        row("Документ об отгрузке", "shipment_doc", 1, parent=extra)
+        section("Грузоотправитель", 2, parent=extra)
+        row("Наименование", "shipper_name", 3, parent=extra)
+        row("ИНН", "shipper_inn", 4, parent=extra)
+        section("Грузополучатель", 5, parent=extra)
+        row("Наименование", "consignee_name", 6, parent=extra)
+        row("ИНН", "consignee_inn", 7, parent=extra)
+        ttk.Button(extra, text="Сохранить правки", command=self.apply_form).grid(
+            row=8, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
+        columns = ("n", "name", "code", "unit", "qty", "price", "amount", "rate", "vat", "total", "country", "gtd")
+        heads = {"n": ("№", 30), "name": ("Наименование", 220), "code": ("Код", 80), "unit": ("Ед.", 45),
+                 "qty": ("Кол-во", 60), "price": ("Цена", 80), "amount": ("Без НДС", 85), "rate": ("Ставка", 60),
+                 "vat": ("НДС", 70), "total": ("С НДС", 85), "country": ("Страна", 90), "gtd": ("Номер ГТД", 190)}
+        self.goods = ttk.Treeview(goods, columns=columns, show="headings", height=8)
+        for col, (title, width) in heads.items():
+            self.goods.heading(col, text=title)
+            self.goods.column(col, width=width, stretch=col == "name",
+                              anchor="e" if col in ("qty", "price", "amount", "vat", "total") else "w")
+        gx = ttk.Scrollbar(goods, orient="horizontal", command=self.goods.xview)
+        self.goods.configure(xscrollcommand=gx.set)
+        self.goods_note = ttk.Label(goods, foreground="#666", wraplength=520, justify="left")
+        self.goods_note.pack(side="bottom", anchor="w", pady=(4, 0))
+        gx.pack(side="bottom", fill="x")
+        self.goods.pack(fill="both", expand=True)
+
         self.text = tk.Text(text_tab, wrap="word", font=("Consolas", 9))
         tscroll = ttk.Scrollbar(text_tab, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=tscroll.set)
@@ -187,7 +236,7 @@ class App:
     def _build_statusbar(self):
         bar = ttk.Frame(self.root, padding=(8, 4))
         bar.pack(fill="x", side="bottom")
-        self.status = ttk.Label(bar, text="Добавьте сканы: PDF, JPG, PNG, TIFF, BMP, GIF, WEBP")
+        self.status = ttk.Label(bar, text="Добавьте сканы или фото документов — распознавание начнётся само")
         self.status.pack(side="left")
         self.progress = ttk.Progressbar(bar, length=220, mode="determinate")
         self.progress.pack(side="right")
@@ -221,7 +270,37 @@ class App:
             known.add(path.resolve())
             added += 1
         if added:
-            self._set_status(f"Добавлено файлов: {added}. Нажмите «Распознать».")
+            self._set_status(f"Добавлено файлов: {added}, распознаю…")
+            self.recognize_new()
+
+    def recognize_new(self):
+        """Распознаёт новые файлы сразу после добавления; если занято — сразу после текущей работы."""
+        if self.busy:
+            self.auto_pending = True
+            return
+        self.recognize(only_new=True)
+
+    def merge_pages(self):
+        """Несколько фото одного документа (например, двухстраничная ТОРГ-12) → один документ."""
+        selected = [i for i in self.items if i.iid in self.tree.selection()]
+        if len(selected) < 2:
+            messagebox.showinfo("Объединить страницы",
+                                "Выделите в списке фото одного документа (Ctrl+щелчок) в порядке страниц "
+                                "и нажмите «Объединить страницы».")
+            return
+        if self.busy:
+            messagebox.showinfo("Подождите", "Дождитесь окончания распознавания")
+            return
+        main = selected[0]
+        for other in selected[1:]:
+            main.extra_pages += other.paths
+            self.items.remove(other)
+            self.tree.delete(other.iid)
+        main.status, main.data, main.message, main.text = ST_NEW, None, "", ""
+        self._refresh_row(main)
+        self.tree.selection_set(main.iid)
+        self._set_status(f"Объединено страниц: {len(main.paths)}, распознаю…")
+        self.recognize(only_new=True)
 
     def remove_selected(self):
         if self.busy:
@@ -242,7 +321,7 @@ class App:
 
     def _refresh_row(self, item: DocItem):
         d = item.data
-        values = (item.path.name, item.status,
+        values = (item.title, item.status,
                   d.doc_type if d else "", d.number if d else "", iso_to_ru(d.date) if d else "",
                   (d.seller.name or d.seller.inn) if d else "", fmt_amount(d.total) if d else "")
         tag = {ST_ERROR: "error", ST_WARN: "warn", ST_SENT: "sent"}.get(item.status, "")
@@ -279,6 +358,9 @@ class App:
             "buyer_kpp": d.buyer.kpp if d else "",
             "total": fmt_amount(d.total) if d else "", "vat": fmt_amount(d.vat) if d else "",
             "vat_rate": d.vat_rate if d else "", "bik": d.bik if d else "", "account": d.account if d else "",
+            "basis": d.basis if d else "", "shipment_doc": d.shipment_doc if d else "",
+            "shipper_name": d.shipper.name if d else "", "shipper_inn": d.shipper.inn if d else "",
+            "consignee_name": d.consignee.name if d else "", "consignee_inn": d.consignee.inn if d else "",
         }
         for key, value in values.items():
             self.vars[key].set(value)
@@ -291,6 +373,18 @@ class App:
         self.text.delete("1.0", "end")
         if item:
             self.text.insert("1.0", item.text)
+        self.goods.delete(*self.goods.get_children())
+        for n, it in enumerate(d.items if d else [], 1):
+            qty = "" if it.quantity is None else f"{it.quantity:g}"
+            self.goods.insert("", "end", values=(
+                n, it.name, it.code, it.unit, qty, fmt_amount(it.price), fmt_amount(it.amount), it.vat_rate,
+                fmt_amount(it.vat), fmt_amount(it.total), it.country, it.gtd))
+        if d and d.items:
+            self.goods_note.configure(text=f"Строк: {len(d.items)}. При загрузке в 1С попадут в табличную часть «Товары».")
+        elif d:
+            self.goods_note.configure(text="Строки товаров извлекает распознавание ИИ (Настройки → Распознавание ИИ).")
+        else:
+            self.goods_note.configure(text="")
 
     def apply_form(self, quiet: bool = False):
         item = self.current
@@ -306,6 +400,9 @@ class App:
         d.total = parse_amount(v["total"]) if v["total"] else None
         d.vat = parse_amount(v["vat"]) if v["vat"] else None
         d.vat_rate, d.bik, d.account = v["vat_rate"], v["bik"], v["account"]
+        d.basis, d.shipment_doc = v["basis"], v["shipment_doc"]
+        d.shipper.name, d.shipper.inn = v["shipper_name"], v["shipper_inn"]
+        d.consignee.name, d.consignee.inn = v["consignee_name"], v["consignee_inn"]
         if d.to_dict() != before:
             if item.status in (ST_WARN, ST_ERROR):
                 item.status, item.message = ST_READY, "Исправлено вручную"
@@ -372,15 +469,20 @@ class App:
                     self.busy = False
                     errors = sum(1 for i in self.items if i.status == ST_ERROR)
                     self._set_status(f"Готово. Документов: {event[2]}" + (f", с ошибками: {errors}" if errors else ""))
+                    if self.auto_pending:
+                        self.auto_pending = False
+                        self.recognize(only_new=True)
         except queue.Empty:
             pass
         self.root.after(100, self._poll_events)
 
-    def recognize(self):
+    def recognize(self, only_new: bool = False):
         if self.current:
             self.apply_form(quiet=True)
         # Выделенные документы распознаются заново, без выделения — только новые и с ошибками.
-        if self.tree.selection():
+        if only_new:
+            items = [i for i in self.items if i.status == ST_NEW]
+        elif self.tree.selection():
             items = self._selected_or_all(lambda i: i.status != ST_SENT)
         else:
             items = [i for i in self.items if i.status in (ST_NEW, ST_ERROR)]
@@ -397,14 +499,21 @@ class App:
             item.status, item.message = ST_WORK, ""
             self.events.put(("row", item, 0))
 
-            def progress(page, total):
-                self.events.put(("status", f"{item.path.name}: страница {page} из {total}"))
+            texts, images = [], []
+            for number, path in enumerate(item.paths, 1):
+                label = f"{item.title}: файл {number} из {len(item.paths)}" if len(item.paths) > 1 else item.title
 
-            doc = load_document(item.path, progress=progress, keep_images=bool(client and s.ai_send_images))
-            item.text = doc.text
+                def progress(page, total, label=label):
+                    self.events.put(("status", f"{label}, страница {page} из {total} — распознаю текст"))
+
+                self.events.put(("status", f"{label} — распознаю текст…"))
+                doc = load_document(path, progress=progress, keep_images=bool(client and s.ai_send_images))
+                texts.append(doc.text)
+                images += doc.images
+            item.text = "\n\n".join(texts)
             if client:
-                self.events.put(("status", f"{item.path.name}: распознаёт ИИ…"))
-            item.data, item.message = ai.recognize(client, doc.text, doc.images, extract(doc.text))
+                self.events.put(("status", f"{item.title}: распознаёт ИИ…"))
+            item.data, item.message = ai.recognize(client, item.text, images[:MAX_IMAGE_PAGES], extract(item.text))
             item.status = ST_WARN if item.data.warnings else ST_READY
 
         self._run_background("Распознавание…", items, work)
@@ -425,7 +534,7 @@ class App:
                 return
 
             def work(item: DocItem):
-                target = export_to_folder(item.data, item.path, Path(s.exchange_dir), item.text)
+                target = export_to_folder(item.data, item.paths, Path(s.exchange_dir), item.text)
                 item.status, item.message = ST_SENT, f"Выгружено в {target}"
         else:
             try:
@@ -435,12 +544,13 @@ class App:
                 return
 
             def work(item: DocItem):
-                result = client.upload(item.data, item.path.name, mapping)
+                result = client.upload(item.data, ", ".join(p.name for p in item.paths), mapping)
                 item.onec_ref = result.ref_key
                 note = "создан" if result.created else "уже был в базе"
                 cp = ", контрагент создан" if result.counterparty_created else ""
+                extra = f"; {result.note}" if result.note else ""
                 item.status = ST_SENT
-                item.message = f"Документ {result.number or result.ref_key} {note}{cp}"
+                item.message = f"Документ {result.number or result.ref_key} {note}{cp}{extra}"
 
         self._run_background("Загрузка в 1С…", items, work)
 
@@ -662,10 +772,17 @@ class SettingsDialog(tk.Toplevel):
         self.destroy()
 
 
-HELP_TEXT = """1. Добавьте сканы (PDF, JPG, PNG, TIFF, BMP, GIF, WEBP) кнопками или перетащите файлы на значок программы.
-2. «Распознать» — программа прочитает текст и найдёт тип документа, номер, дату, ИНН/КПП сторон, суммы и НДС.
+HELP_TEXT = """1. Добавьте сканы или фото (PDF, JPG, PNG, TIFF, BMP, GIF, WEBP, HEIC) кнопками или перетащите файлы
+   на значок программы. Распознавание начнётся само: прочитается текст, найдутся тип документа, номер, дата,
+   стороны с ИНН/КПП, суммы, НДС и основание.
+2. Документ на нескольких фото (например, ТОРГ-12 на двух листах): выделите фото по порядку (Ctrl+щелчок)
+   и нажмите «Объединить страницы».
 3. Проверьте реквизиты справа (строки «Проверьте» требуют внимания) и при необходимости исправьте.
+   Строки товаров (вкладка «Товары») извлекает распознавание ИИ — включается в настройках.
 4. «Загрузить в 1С» — документы создаются в базе непроведёнными, контрагенты ищутся по ИНН и при отсутствии создаются.
+
+Фото с телефона: снимайте лист целиком и резко. В Telegram отправляйте «файлом», а не «фото» —
+иначе снимок сжимается и мелкий текст не читается.
 
 Для прямой загрузки база 1С должна быть опубликована на веб-сервере с включённым OData,
 а нужные объекты добавлены в состав стандартного интерфейса OData. Подробности — в README."""

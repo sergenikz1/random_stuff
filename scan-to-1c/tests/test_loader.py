@@ -59,3 +59,14 @@ def test_unsupported_format(tmp_path):
     path.write_text("x")
     with pytest.raises(LoaderError):
         load_document(path)
+
+
+@needs_ocr
+@pytest.mark.parametrize("angle", [90, 270])
+def test_phone_photo_sideways_and_small(tmp_path, angle):
+    # Как фото из Telegram: лист боком, 960×1280, сжатый JPEG — текст мелкий, ориентацию Tesseract угадывает плохо.
+    photo = render_scan(INVOICE).rotate(angle, expand=True, fillcolor=255)
+    photo.thumbnail((1280, 1280))
+    path = tmp_path / "photo.jpg"
+    photo.convert("RGB").save(path, quality=85)
+    check_invoice(extract(load_document(path).text))

@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 import requests
 
-from .extract import ExtractedData
+from .extract import ExtractedData, Item
 
 EMPTY_REF = "00000000-0000-0000-0000-000000000000"
 
@@ -49,9 +49,30 @@ DEFAULT_MAPPING = {
             "НомерВходящегоДокумента": "{number}",
             "ДатаВходящегоДокумента": "{date}T00:00:00",
             "СуммаДокумента": "{total}",
-            "Комментарий": "Загружено из скана {file_name}",
+            "Комментарий": "{comment}",
         },
         "duplicate_check": ["НомерВходящегоДокумента", "Контрагент_Key"],
+    },
+    # Строки товаров → табличная часть документа. Если 1С их не примет, документ создаётся без строк.
+    "items": {
+        "enabled": True,
+        "table": "Товары",
+        "header_fields": {"ВидОперации": "Товары", "СуммаВключаетНДС": True},
+        "nomenclature": {
+            "entity": "Catalog_Номенклатура",
+            "code_field": "Артикул",
+            "create_if_missing": True,
+            "fields": {"Description": "{name}", "НаименованиеПолное": "{name}", "Артикул": "{code}"},
+        },
+        "fields": {
+            "LineNumber": "{line_number}",
+            "Номенклатура_Key": "{nomenclature_key}",
+            "Количество": "{quantity}",
+            "Цена": "{price_with_vat}",
+            "Сумма": "{total}",
+            "СтавкаНДС": "{vat_rate_1c}",
+            "СуммаНДС": "{vat}",
+        },
     },
 }
 
@@ -66,11 +87,42 @@ class UploadResult:
     number: str
     created: bool  # False — такой документ уже был в базе
     counterparty_created: bool = False
+    note: str = ""  # например, почему строки товаров не загрузились
+
+
+def _comment(data: ExtractedData, file_name: str) -> str:
+    parts = [f"Загружено из скана {file_name}" if file_name else "Загружено из скана"]
+    if data.basis:
+        parts.append(f"основание: {data.basis}")
+    if data.shipment_doc:
+        parts.append(f"документ об отгрузке {data.shipment_doc}")
+    gtd = sorted({i.gtd for i in data.items if i.gtd})
+    if gtd:
+        parts.append("ГТД: " + ", ".join(gtd))
+    return "; ".join(parts)
+
+
+def item_context(item: Item, index: int, default_rate: str) -> dict:
+    total = item.total if item.total is not None else item.amount
+    rate = item.vat_rate or default_rate
+    quantity = item.quantity or 0
+    return {
+        "line_number": str(index), "name": item.name, "code": item.code, "unit": item.unit,
+        "quantity": quantity, "price": item.price or 0, "amount": item.amount or 0,
+        "total": total or 0, "vat": item.vat or 0, "vat_rate": rate, "vat_rate_1c": vat_rate_enum(rate),
+        "price_with_vat": round((total or 0) / quantity, 2) if quantity else (item.price or 0),
+        "country": item.country, "gtd": item.gtd,
+    }
 
 
 def build_context(data: ExtractedData, file_name: str = "") -> dict:
     seller = data.seller
     return {
+        "comment": _comment(data, file_name),
+        "basis": data.basis,
+        "shipment_doc": data.shipment_doc,
+        "shipper_name": data.shipper.name,
+        "consignee_name": data.consignee.name,
         "doc_type": data.doc_type,
         "number": data.number,
         "date": data.date,
@@ -234,8 +286,37 @@ class OneCClient:
             if existing:
                 return UploadResult(existing[0]["Ref_Key"], existing[0].get("Number", ""), False, cp_created)
 
+        note = ""
+        items = mapping.get("items") or {}
+        if items.get("enabled") and data.items:
+            try:
+                lines = [render_template(items["fields"], {**ctx, "nomenclature_key": self.ensure_nomenclature(items, ctx)})
+                         for ctx in (item_context(item, n, data.vat_rate) for n, item in enumerate(data.items, 1))]
+                with_items = {**payload, **items.get("header_fields", {}), items.get("table", "Товары"): lines}
+                created = self.create(doc["entity"], with_items)
+                return UploadResult(created.get("Ref_Key", ""), created.get("Number", ""), True, cp_created,
+                                    f"строк товаров: {len(lines)}")
+            except OneCError as exc:
+                note = f"строки товаров не загружены ({exc}) — заполните их в 1С"
+
         created = self.create(doc["entity"], payload)
-        return UploadResult(created.get("Ref_Key", ""), created.get("Number", ""), True, cp_created)
+        return UploadResult(created.get("Ref_Key", ""), created.get("Number", ""), True, cp_created, note)
+
+    def ensure_nomenclature(self, items: dict, ctx: dict) -> str:
+        """Номенклатура по артикулу, иначе по наименованию; если нет — создаётся."""
+        nom = items["nomenclature"]
+        rows = []
+        if ctx["code"] and nom.get("code_field"):
+            rows = self.find(nom["entity"], {nom["code_field"]: ctx["code"]})
+        if not rows and ctx["name"]:
+            rows = self.find(nom["entity"], {"Description": ctx["name"][:100]})
+        if rows:
+            return rows[0]["Ref_Key"]
+        if not nom.get("create_if_missing", True):
+            raise OneCError(f"номенклатура «{ctx['name']}» не найдена")
+        payload = _drop_empty(render_template(nom["fields"], ctx))
+        payload["Description"] = str(payload.get("Description", ctx["name"]))[:100]
+        return self.create(nom["entity"], payload)["Ref_Key"]
 
 
 def _drop_empty(payload: dict) -> dict:

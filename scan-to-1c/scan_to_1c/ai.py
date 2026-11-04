@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import requests
 from PIL import Image
 
-from .extract import ExtractedData, Party, inn_is_valid, parse_amount, parse_date, validate
+from .extract import ExtractedData, Item, Party, inn_is_valid, parse_amount, parse_date, validate
 
 DEFAULT_BASE_URL = "http://localhost:20128/v1"
 DEFAULT_MODEL = "auto"
@@ -38,12 +38,24 @@ SYSTEM_PROMPT = """Ты помощник бухгалтера. Тебе дают
   "total": число — итоговая сумма к оплате с НДС,
   "vat": число — сумма НДС, 0 если без НДС, null если не указана,
   "vat_rate": "20%, 10%, 0% или Без НДС",
-  "bik": "БИК банка продавца", "account": "расчётный счёт продавца, 20 цифр", "corr_account": "корр. счёт, 20 цифр"
+  "bik": "БИК банка продавца", "account": "расчётный счёт продавца, 20 цифр", "corr_account": "корр. счёт, 20 цифр",
+  "basis": "основание: договор или заказ с номером и датой, как напечатано",
+  "shipment_doc": "документ об отгрузке, например «№ 1482791257 от 22.10.2026», или пусто",
+  "shipper": {"name": "грузоотправитель", "inn": ""},
+  "consignee": {"name": "грузополучатель", "inn": ""},
+  "items": [
+    {"name": "наименование товара, работы, услуги", "code": "артикул или код товара",
+     "unit": "единица измерения", "quantity": число, "price": число — цена за единицу без НДС,
+     "amount": число — стоимость без НДС, "vat_rate": "20%, 10%, 0% или Без НДС", "vat": число,
+     "total": число — стоимость с НДС, "country": "страна происхождения", "gtd": "номер декларации на товары"}
+  ]
 }
 
 Правила: не выдумывай — если реквизита нет, оставь пустую строку или null. Наименование организации пиши
 с формой собственности и названием в кавычках-ёлочках, например ООО «Ромашка». В счёте на оплату получатель
-платежа — это продавец. Числа без пробелов-разделителей, дробная часть через точку."""
+платежа — это продавец. Числа без пробелов-разделителей, дробная часть через точку. В items перечисли все строки
+таблицы товаров по порядку; строки «Итого» и «Всего» туда не включай. Документ может быть сфотографирован боком
+или занимать несколько страниц — читай все."""
 
 
 class AIError(Exception):
@@ -222,14 +234,32 @@ def _party(value) -> Party:
                  kpp=kpp if len(kpp) == 9 else "")
 
 
+def _vat_rate(value) -> str:
+    value = _text(value)
+    if value.lower().startswith("без"):
+        return "Без НДС"
+    if re.fullmatch(r"\d{1,2}\s*%?", value):
+        return f"{int(re.sub(r'\D', '', value))}%"
+    return ""
+
+
+def _item(value) -> Item | None:
+    if not isinstance(value, dict):
+        return None
+    gtd = _text(value.get("gtd"))
+    item = Item(name=_text(value.get("name")), code=_text(value.get("code")), unit=_text(value.get("unit")),
+                quantity=_amount(value.get("quantity")), price=_amount(value.get("price")),
+                amount=_amount(value.get("amount")), vat_rate=_vat_rate(value.get("vat_rate")),
+                vat=_amount(value.get("vat")), total=_amount(value.get("total")),
+                country=_text(value.get("country")),
+                gtd=gtd if re.fullmatch(r"\d{8}/\d{6}/\d{7}(?:/\d{1,3})?", gtd) else "")
+    if not item.name or re.match(r"(итого|всего)\b", item.name, re.IGNORECASE):
+        return None
+    return item
+
+
 def to_extracted(data: dict) -> ExtractedData:
-    vat_rate = _text(data.get("vat_rate"))
-    if vat_rate and vat_rate.lower().startswith("без"):
-        vat_rate = "Без НДС"
-    elif re.fullmatch(r"\d{1,2}\s*%?", vat_rate):
-        vat_rate = f"{int(re.sub(r'\D', '', vat_rate))}%"
-    elif vat_rate:
-        vat_rate = ""
+    vat_rate = _vat_rate(data.get("vat_rate"))
     account, corr = _digits(data.get("account")), _digits(data.get("corr_account"))
     bik = _digits(data.get("bik"))
     return ExtractedData(
@@ -237,15 +267,23 @@ def to_extracted(data: dict) -> ExtractedData:
         seller=_party(data.get("seller")), buyer=_party(data.get("buyer")),
         total=_amount(data.get("total")), vat=_amount(data.get("vat")), vat_rate=vat_rate,
         bik=bik if len(bik) == 9 else "", account=account if len(account) == 20 else "",
-        corr_account=corr if len(corr) == 20 else "")
+        corr_account=corr if len(corr) == 20 else "",
+        basis=_text(data.get("basis")), shipment_doc=_text(data.get("shipment_doc")),
+        shipper=_party(data.get("shipper")), consignee=_party(data.get("consignee")),
+        items=[i for i in map(_item, data.get("items") or []) if i])
 
 
 def merge(ai: ExtractedData, rules: ExtractedData) -> ExtractedData:
     """ИИ главный; пробелы заполняются результатом шаблонов. ИНН с битой контрольной суммой не принимаем,
     если шаблоны нашли корректный."""
     result = ExtractedData()
-    for name in ("doc_type", "number", "date", "vat_rate", "bik", "account", "corr_account"):
+    for name in ("doc_type", "number", "date", "vat_rate", "bik", "account", "corr_account", "basis",
+                 "shipment_doc"):
         setattr(result, name, getattr(ai, name) or getattr(rules, name))
+    for role in ("shipper", "consignee"):
+        a, r = getattr(ai, role), getattr(rules, role)
+        setattr(result, role, Party(name=a.name or r.name, inn=a.inn or r.inn, kpp=a.kpp or r.kpp))
+    result.items = ai.items or rules.items
     result.total = ai.total if ai.total is not None else rules.total
     result.vat = ai.vat if ai.vat is not None else rules.vat
     for role in ("seller", "buyer"):

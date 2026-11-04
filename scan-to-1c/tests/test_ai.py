@@ -186,3 +186,29 @@ def test_empty_sse_answer_is_an_error():
 
     with pytest.raises(AIError, match="пустой ответ"):
         AIClient(AIConfig(base_url="http://omniroute"), session=Session()).extract("текст")
+
+
+def test_items_and_extra_fields_from_ai():
+    answer = dict(ANSWER, basis="Заказ № 13-FY27 от 14.10.2026", shipment_doc="№ 1482791257 от 22.10.2026",
+                  consignee={"name": "ООО «Бета-Трейд»", "inn": "5027123457"},
+                  items=[{"name": "Датчик BIS с 4 электродами, модель 186-0106", "code": "186-0106", "unit": "кор",
+                          "quantity": "4", "price": "21 835,00", "amount": 87340, "vat_rate": "Без НДС", "vat": 0,
+                          "total": "87340.00", "country": "Сингапур", "gtd": "10620010/180726/5127287"},
+                         {"name": "Итого", "total": 87340},
+                         "мусор"])
+    data = ai.to_extracted(answer)
+    assert data.basis == "Заказ № 13-FY27 от 14.10.2026"
+    assert data.shipment_doc == "№ 1482791257 от 22.10.2026"
+    assert data.consignee.inn == "5027123457"
+    assert len(data.items) == 1  # строка «Итого» и мусор отброшены
+    item = data.items[0]
+    assert (item.code, item.unit, item.quantity, item.price, item.total) == ("186-0106", "кор", 4.0, 21835.0, 87340.0)
+    assert (item.vat_rate, item.country, item.gtd) == ("Без НДС", "Сингапур", "10620010/180726/5127287")
+
+    merged = ai.merge(data, extract(INVOICE))
+    assert merged.items == data.items
+    assert merged.basis == data.basis
+
+
+def test_items_prompt_mentions_table():
+    assert '"items"' in ai.SYSTEM_PROMPT and "gtd" in ai.SYSTEM_PROMPT

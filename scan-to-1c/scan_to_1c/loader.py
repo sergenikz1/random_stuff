@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,9 @@ SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS
 MIN_TEXT_LAYER_CHARS = 40
 PDF_RENDER_DPI = 300
 OCR_LANG = "rus+eng"
+TARGET_LONG_SIDE = 3000
+PROBE_LONG_SIDE = 1600  # размер для быстрой пробы поворота
+OSD_TRUSTED_CONFIDENCE = 5
 # Сколько страниц сохранять картинками для ИИ: счёт или УПД почти всегда умещаются в 1–3 листа.
 MAX_IMAGE_PAGES = 5
 
@@ -89,26 +93,46 @@ def is_supported(path: Path) -> bool:
 
 
 def prepare_image(image: Image.Image) -> Image.Image:
-    """Поворот по EXIF, оттенки серого, растяжение контраста, увеличение мелких сканов."""
+    """Поворот по EXIF, оттенки серого, растяжение контраста, увеличение мелких сканов и фото."""
     image = ImageOps.exif_transpose(image)
     image = image.convert("L")
     image = ImageOps.autocontrast(image)  # без отсечки: она усиливает шум JPEG
-    if image.width < 1600:
-        factor = 1600 / image.width
+    # Лист A4 при 250–300 dpi — около 3000 px по длинной стороне. Фото с телефона (часто 1280 px)
+    # увеличиваем до этого размера: Tesseract плохо читает строки ниже ~20 px.
+    if max(image.size) < TARGET_LONG_SIDE:
+        factor = TARGET_LONG_SIDE / max(image.size)
         image = image.resize((int(image.width * factor), int(image.height * factor)), Image.LANCZOS)
     return image
 
 
+def _readable_words(image: Image.Image) -> int:
+    """Сколько русских слов Tesseract распознал уверенно — мера того, что страница повёрнута правильно."""
+    scale = PROBE_LONG_SIDE / max(image.size)
+    probe = image.resize((int(image.width * scale), int(image.height * scale)), Image.LANCZOS)
+    data = pytesseract.image_to_data(probe, lang=OCR_LANG, config="--psm 3", output_type=pytesseract.Output.DICT)
+    return sum(1 for word, conf in zip(data["text"], data["conf"])
+               if float(conf) >= 70 and re.fullmatch(r"[А-Яа-яЁё]{3,}", word.strip()))
+
+
 def _fix_rotation(image: Image.Image) -> Image.Image:
-    """Разворачивает страницу, отсканированную боком или вверх ногами."""
+    """Разворачивает страницу, сфотографированную боком или вверх ногами.
+
+    Определению ориентации Tesseract верим, только когда оно уверено: на фото таблиц оно путает
+    90° и 270°. В остальных случаях пробуем повороты и берём тот, где читается больше слов.
+    """
+    candidates = {0, 90, 270}
     try:
         osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
-    except Exception:  # noqa: BLE001 — мало текста для определения ориентации
-        return image
-    rotate = int(osd.get("rotate", 0))
-    if rotate and float(osd.get("orientation_conf", 0)) >= 2:
-        return image.rotate(-rotate, expand=True, fillcolor=255)
-    return image
+        angle = -int(osd.get("rotate", 0)) % 360  # PIL поворачивает против часовой стрелки
+        if float(osd.get("orientation_conf", 0)) >= OSD_TRUSTED_CONFIDENCE:
+            return image.rotate(angle, expand=True, fillcolor=255) if angle else image
+        candidates.add(angle)
+    except Exception:  # noqa: BLE001, S110 — мало текста для определения ориентации: пробуем все повороты
+        pass
+    scores = {angle: _readable_words(image.rotate(angle, expand=True, fillcolor=255) if angle else image)
+              for angle in sorted(candidates)}
+    best = max(scores, key=lambda a: (scores[a], a == 0))
+    return image.rotate(best, expand=True, fillcolor=255) if best else image
 
 
 def ocr_image(image: Image.Image) -> str:

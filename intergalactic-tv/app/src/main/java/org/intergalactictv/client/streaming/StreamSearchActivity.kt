@@ -33,7 +33,7 @@ class StreamSearchActivity : FragmentActivity() {
 class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.SearchResultProvider {
     private val rows = ArrayObjectAdapter(ListRowPresenter())
     private val results = ArrayObjectAdapter(StreamCardPresenter())
-    private val webResults = ArrayObjectAdapter(StreamCardPresenter())
+    private val webResults = ArrayObjectAdapter(SearchResultPresenters())
     private var query = ""
     private var page = 0
     private var more = false
@@ -89,12 +89,13 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
 
     private fun searchWeb(text: String, request: Int) {
         status("Ищу видео на сайтах…")
+        webResults.add(SearchLoadingItem)
         webJob = lifecycleScope.launch {
             try {
                 siteSearch(requireActivity()).search(text, found = { video ->
                     if (generation == request && video.streamUrl != null) {
-                        val known = (0 until webResults.size()).any { (webResults[it] as VideoItem).id == video.id }
-                        if (!known) { webResults.add(video); webVideos++ }
+                        val known = (0 until webResults.size()).any { (webResults[it] as? VideoItem)?.id == video.id }
+                        if (!known) { webResults.add(webResults.indexOf(SearchLoadingItem).takeIf { it >= 0 } ?: webResults.size(), video); webVideos++ }
                         updateResultsRow()
                     }
                 }, progress = { checked, total ->
@@ -103,9 +104,13 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
                 if (generation == request) status(if (webVideos == 0)
                     "На сайтах не найдено доступных видео. Попробуйте уточнить название."
                     else "Найдено видео с сайтов: $webVideos")
-            } catch (e: CancellationException) { throw e
+            } catch (e: CancellationException) {
+                if (generation == request) status("Поиск на сайтах остановлен · найдено видео: $webVideos")
+                throw e
             } catch (e: Exception) {
                 if (generation == request) status(e.message ?: "Не удалось проверить сайты. Повторите поиск.")
+            } finally {
+                if (generation == request) { webResults.remove(SearchLoadingItem); updateResultsRow() }
             }
         }
     }
@@ -166,7 +171,7 @@ class StreamSearchFragment : SearchSupportFragment(), SearchSupportFragment.Sear
     private fun updateResultsRow() {
         fun update(adapter: ArrayObjectAdapter, id: Long, name: String) {
             val index = (0 until rows.size()).firstOrNull { (rows[it] as? ListRow)?.adapter === adapter } ?: return
-            rows.replace(index, ListRow(HeaderItem(id, "$name · $query · ${adapter.size()}"), adapter))
+            rows.replace(index, ListRow(HeaderItem(id, "$name · $query · ${(0 until adapter.size()).count { adapter[it] is VideoItem }}"), adapter))
         }
         update(results, 0, "Rutube")
         update(webResults, 1, "Интернет")

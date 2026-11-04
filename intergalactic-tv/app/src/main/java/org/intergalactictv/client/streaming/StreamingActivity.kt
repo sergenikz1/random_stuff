@@ -64,10 +64,12 @@ object StreamActions {
         if (video.isWeb) {
             val context = fragment.requireContext()
             AlertDialog.Builder(context).setTitle(video.title)
-                .setMessage(video.group)
-                .setPositiveButton("Смотреть") { _, _ -> play(context, video, playlist) }
-                .setNeutralButton("Избранное ±") { _, _ ->
-                    StreamStore(context).toggleFavorite(video); onChanged()
+                .setItems(arrayOf("Смотреть", "Найти серии", "Избранное ±")) { _, which ->
+                    when (which) {
+                        0 -> play(context, video, playlist)
+                        1 -> context.startActivity(Intent(context, WebEpisodesActivity::class.java).putExtra("video", video))
+                        2 -> { StreamStore(context).toggleFavorite(video); onChanged() }
+                    }
                 }.setNegativeButton("Закрыть", null).show()
             return
         }

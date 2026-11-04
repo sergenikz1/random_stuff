@@ -41,11 +41,20 @@ internal class BackgroundVideoBrowser(
     private var host: FrameLayout? = null
     private val views = mutableSetOf<WebView>()
 
-    internal data class Discovery(val page: VideoItem, val media: List<BrowserMedia>)
+    internal data class Discovery(val page: VideoItem, val media: List<BrowserMedia>, val episodes: List<WebEpisodeTarget> = emptyList())
 
     @SuppressLint("SetJavaScriptEnabled")
-    suspend fun scan(input: VideoItem): Discovery = withContext(Dispatchers.Main.immediate) {
-        val script = activity.assets.open("background-video-probe.js").bufferedReader().use { it.readText() }
+    suspend fun scan(input: VideoItem, findEpisodes: Boolean = false,
+        onEpisodes: (List<WebEpisodeTarget>) -> Unit = {}): Discovery = withContext(Dispatchers.Main.immediate) {
+        val target = input.webEpisodeTarget
+        val selecting = target != null && target.href == null && target.episode > 0
+        val requestId = java.util.UUID.randomUUID().toString()
+        val episodeScript = if (findEpisodes || target != null) {
+            val config = JSONObject().put("requestId", requestId).put("target", target?.takeIf { selecting || it.isSeason }?.toJson())
+            "window.__intergalacticEpisodeConfig=" + config.toString() + ";" +
+                activity.assets.open("background-episodes.js").bufferedReader().use { it.readText() }
+        } else ""
+        val script = episodeScript + activity.assets.open("background-video-probe.js").bufferedReader().use { it.readText() }
         val stage = host ?: FrameLayout(activity).apply {
             tag = "background-video-extractor"
             alpha = 0f
@@ -62,6 +71,8 @@ internal class BackgroundVideoBrowser(
                 var page = input
                 var done = false
                 val candidates = linkedMapOf<String, BrowserMedia>()
+                val episodes = linkedMapOf<String, WebEpisodeTarget>()
+                var applied = false
                 val protectedFrames = mutableSetOf<String>()
                 val frames = linkedSetOf<String>()
                 var navigatedFrame = false
@@ -90,7 +101,7 @@ internal class BackgroundVideoBrowser(
                     if (done) return
                     done = true
                     if (continuation.isActive) continuation.resume(Discovery(page,
-                        candidates.values.filter { it.referer !in protectedFrames }.toList()))
+                        candidates.values.filter { it.referer !in protectedFrames }.toList(), episodes.values.toList()))
                 }
                 val deadline = Runnable { finish() }
                 var settle: Runnable? = null
@@ -106,7 +117,7 @@ internal class BackgroundVideoBrowser(
                     candidates[media.url] = media
                     settle?.let(handler::removeCallbacks)
                     settle = Runnable { finish() }.also {
-                        handler.postDelayed(it, maxOf(2200L, 3500L - (SystemClock.uptimeMillis() - started)))
+                        handler.postDelayed(it, maxOf(2200L, (if (findEpisodes) 5500L else 3500L) - (SystemClock.uptimeMillis() - started)))
                     }
                 }
                 fun message(raw: String, origin: String, main: Boolean) {
@@ -118,13 +129,26 @@ internal class BackgroundVideoBrowser(
                         val referer = source?.takeIf { trustedOrigin != null && it.scheme == trustedOrigin.scheme &&
                             it.host == trustedOrigin.host && it.port == trustedOrigin.port }?.toString() ?: origin
                         when (json.optString("kind")) {
-                            "metadata" -> if (main) page = page.copy(
+                            "metadata" -> if (main && target == null) page = page.copy(
                                 title = json.optString("title").take(240).ifBlank { page.title },
                                 thumbnail = WebVideoSearch.webUrl(json.optString("poster")) ?: page.thumbnail)
                             "drm" -> protectedFrames.add(referer)
                             "frame" -> WebVideoSearch.webUrl(json.optString("url"))?.let { if (frames.size < 3) frames.add(it) }
-                            "media" -> candidate(BrowserMedia(json.optString("url"), referer,
-                                if (main) json.optString("title").take(240).ifBlank { page.title } else page.title,
+                            "episodes" -> {
+                                val items = json.optJSONArray("items") ?: return@runCatching
+                                val additions = (0 until minOf(items.length(), 160)).mapNotNull { i ->
+                                    val item = items.optJSONObject(i) ?: return@mapNotNull null
+                                    item.put("page", target?.pageUrl ?: input.pageUrl).put("frame", referer)
+                                    WebEpisodeTarget.fromJson(item)
+                                }
+                                additions.forEach { episodes[it.id] = it }
+                                if (additions.isNotEmpty()) onEpisodes(additions)
+                            }
+                            "episodeApplied" -> if (json.optString("requestId") == requestId &&
+                                WebEpisodeTarget.frameKey(referer) == target?.frameKey) applied = true
+                            "media" -> if (!selecting || (applied && json.optString("requestId") == requestId &&
+                                WebEpisodeTarget.frameKey(referer) == target?.frameKey)) candidate(BrowserMedia(json.optString("url"), referer,
+                                if (main && target == null) json.optString("title").take(240).ifBlank { page.title } else page.title,
                                 WebVideoSearch.webUrl(json.optString("poster")) ?: page.thumbnail,
                                 json.optDouble("duration").takeIf { it.isFinite() }?.toInt() ?: 0,
                                 json.optString("mime").take(100)))
@@ -156,22 +180,28 @@ internal class BackgroundVideoBrowser(
                         if (done || WebVideoSearch.webUrl(url) == null) return
                         if (!modern) {
                             // Older providers still expose DOM sources. No native JavaScript bridge is installed.
-                            val wrapper = "(function(){var a=[];window.IntergalacticVideoProbe={postMessage:function(v){a.push(v)}};" +
-                                script + ";return JSON.stringify(a)})()"
-                            view.evaluateJavascript(wrapper) { result ->
-                                runCatching {
-                                    val array = org.json.JSONArray(JSONTokener(result).nextValue() as String)
-                                    for (i in 0 until array.length()) message(array.getString(i), url, !navigatedFrame)
-                                }
-                                if (candidates.isEmpty() && !navigatedFrame && frames.isNotEmpty()) {
-                                    navigatedFrame = true; view.loadUrl(frames.first())
+                            val wrapper = "window.__igMessages=window.__igMessages||[];" +
+                                "window.IntergalacticVideoProbe={postMessage:function(v){window.__igMessages.push(v)}};" + script
+                            view.evaluateJavascript(wrapper, null)
+                            fun poll() {
+                                if (done || browser !in views) return
+                                view.evaluateJavascript("JSON.stringify((window.__igMessages||[]).splice(0,160))") { result ->
+                                    if (done) return@evaluateJavascript
+                                    runCatching {
+                                        val array = org.json.JSONArray(JSONTokener(result).nextValue() as String)
+                                        for (i in 0 until array.length()) message(array.getString(i), url, !navigatedFrame)
+                                    }
+                                    if (candidates.isEmpty() && !navigatedFrame && frames.isNotEmpty()) {
+                                        navigatedFrame = true; view.loadUrl(frames.first())
+                                    } else handler.postDelayed({ poll() }, 650L)
                                 }
                             }
+                            poll()
                         }
                     }
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                         val url = request.url.toString()
-                        if (request.method == "GET" && WebVideoSearch.isMediaUrl(url)) {
+                        if (target == null && request.method == "GET" && WebVideoSearch.isMediaUrl(url)) {
                             val referer = request.requestHeaders.entries.firstOrNull { it.key.equals("Referer", true) }?.value ?: input.pageUrl
                             handler.post { candidate(BrowserMedia(url, referer)) }
                         }
@@ -179,9 +209,9 @@ internal class BackgroundVideoBrowser(
                     }
                 }
                 stage.addView(browser, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                handler.postDelayed(deadline, timeoutMs)
+                handler.postDelayed(deadline, if (findEpisodes || target != null) maxOf(timeoutMs, 20_000L) else timeoutMs)
                 continuation.invokeOnCancellation { handler.post { done = true; if (browser in views) browser.stopLoading() } }
-                browser.loadUrl(input.pageUrl)
+                browser.loadUrl(target?.loadUrl ?: input.pageUrl)
             }
         } finally {
             view?.let(::dispose)

@@ -33,7 +33,8 @@ data class VideoItem(
     /** Original website, also retained when an expiring media URL was discovered. */
     val webPageUrl: String? = null,
     /** Includes manifests whose URLs have no file extension. */
-    val streamMimeType: String? = null
+    val streamMimeType: String? = null,
+    val webEpisodeTarget: WebEpisodeTarget? = null
 ) : Serializable {
 
     /** Видео Rutube: адрес потока узнаём у Rutube в момент запуска. */
@@ -73,6 +74,7 @@ data class VideoItem(
         put("episode", episode)
         put("web_page_url", webPageUrl ?: "")
         put("stream_mime_type", streamMimeType ?: "")
+        webEpisodeTarget?.let { put("web_episode", it.toJson()) }
     }
 
     companion object {
@@ -104,7 +106,8 @@ data class VideoItem(
             season = o.optInt("season"),
             episode = o.optInt("episode"),
             webPageUrl = o.optString("web_page_url").ifBlank { null },
-            streamMimeType = o.optString("stream_mime_type").ifBlank { null }
+            streamMimeType = o.optString("stream_mime_type").ifBlank { null },
+            webEpisodeTarget = o.optJSONObject("web_episode")?.let(WebEpisodeTarget::fromJson)
         )
     }
 }

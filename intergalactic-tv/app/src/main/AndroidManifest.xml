@@ -82,6 +82,8 @@
             android:screenOrientation="landscape" android:theme="@style/Theme.IntergalacticTV.Browse" />
         <activity android:name=".streaming.StreamSearchActivity" android:exported="false"
             android:screenOrientation="landscape" />
+        <activity android:name=".streaming.WebEpisodesActivity" android:exported="false"
+            android:screenOrientation="landscape" />
         <activity android:name=".streaming.StreamPlayerActivity" android:exported="false"
             android:screenOrientation="landscape" />
         <activity android:name=".streaming.SourcesActivity" android:exported="false"

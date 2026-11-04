@@ -15,13 +15,14 @@
         var node = document.querySelector('meta[property="' + key + '"],meta[name="' + key + '"]');
         return node ? node.content : '';
     }
-    function media(raw, mime, video) {
+    function media(raw, mime, video, requestEpoch, network) {
         var url = absolute(raw);
         if (!url || seen.has(url) || seen.size >= 40) return;
-        seen.add(url);
-        send({kind: 'media', url: url, mime: mime || '', title: meta('og:title') || document.title,
+        var value = {kind: 'media', url: url, mime: mime || '', title: meta('og:title') || document.title,
             poster: absolute((video && video.poster) || meta('og:image')) || '',
-            duration: video && isFinite(video.duration) ? video.duration : 0});
+            duration: video && isFinite(video.duration) ? video.duration : 0};
+        if (window.__intergalacticEpisodes && !window.__intergalacticEpisodes.media(value, requestEpoch, network)) return;
+        seen.add(url); send(value);
     }
     // Installed at document start in every frame, before site player code. Never play background audio.
     try {
@@ -72,26 +73,36 @@
             'button[aria-label="Воспроизвести"]').forEach(function (button) {
             if (!clicked.has(button)) { clicked.add(button); button.click(); }
         });
+        document.querySelectorAll('iframe[data-src][allowfullscreen]').forEach(function(frame) {
+            if (!frame.getAttribute('src')) { var lazy = absolute(frame.getAttribute('data-src')); if (lazy) frame.src = lazy; }
+        });
         document.querySelectorAll('iframe[src]').forEach(function (frame) {
             var url = absolute(frame.src);
             if (url && (frame.hasAttribute('allowfullscreen') || /(?:player|embed|video)/i.test(url)))
                 send({kind: 'frame', url: url});
         });
     }
-    function observeResponse(url, type) {
+    function observeResponse(url, type, requestEpoch) {
         if (/mpegurl|dash\+xml|^video\//i.test(type || '') || /\.(m3u8|mpd|mp4|webm)(?:[?#]|$)/i.test(url))
-            media(url, type);
+            media(url, type, null, requestEpoch, true);
     }
     var fetchOriginal = window.fetch;
     if (fetchOriginal) window.fetch = function () {
+        var requestEpoch = window.__intergalacticEpisodes && window.__intergalacticEpisodes.epoch();
         return fetchOriginal.apply(this, arguments).then(function (response) {
-            observeResponse(response.url, response.headers.get('content-type')); return response;
+            observeResponse(response.url, response.headers.get('content-type'), requestEpoch); return response;
         });
     };
     var openOriginal = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function () {
-        this.addEventListener('load', function () { observeResponse(this.responseURL, this.getResponseHeader('content-type')); });
+        this.__igEpoch = null;
+        this.addEventListener('load', function () { observeResponse(this.responseURL, this.getResponseHeader('content-type'), this.__igEpoch); });
         return openOriginal.apply(this, arguments);
+    };
+    var sendOriginal = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function () {
+        this.__igEpoch = window.__intergalacticEpisodes && window.__intergalacticEpisodes.epoch();
+        return sendOriginal.apply(this, arguments);
     };
     function silence(node) {
         if (node instanceof HTMLMediaElement) { node.muted = true; node.volume = 0; }

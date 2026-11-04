@@ -68,9 +68,38 @@ class NativeSearchInterfaceTest {
             assertEquals(1, bottom.adapter.size()); assertEquals(extracted, bottom.adapter[0])
             assertFalse((rows[0] as ListRow).headerItem.name.contains("смотреть онлайн"))
             StreamActions.show(fragment, extracted)
-            ShadowAlertDialog.getLatestAlertDialog().getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+            ShadowAlertDialog.getLatestAlertDialog().listView.performItemClick(null, 0, 0)
             shadowOf(Looper.getMainLooper()).idle()
             assertEquals(StreamPlayerActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun lowerRowShowsSpinnerUntilSearchCompletesAndKeepsFoundVideos() {
+        val app = RuntimeEnvironment.getApplication()
+        shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        val done = CompletableDeferred<Unit>()
+        StreamSearchFragment.rutubeSearch = { _, _ -> Page(emptyList(), false, 1) }
+        val video = WebVideoSearch.page("https://example.org/show", "Show").copy(streamUrl = "https://cdn.example.org/show.mp4")
+        StreamSearchFragment.siteSearch = { object : SiteVideoSearch {
+            override suspend fun search(query: String, found: (VideoItem) -> Unit, progress: (Int, Int) -> Unit) {
+                found(video); done.await()
+            }
+        } }
+        val controller = Robolectric.buildActivity(StreamSearchActivity::class.java).setup().visible()
+        try {
+            shadowOf(Looper.getMainLooper()).idle()
+            val activity = controller.get()
+            val fragment = activity.supportFragmentManager.findFragmentById(R.id.fragment_container) as StreamSearchFragment
+            fragment.onQueryTextSubmit("Show"); shadowOf(Looper.getMainLooper()).idle()
+            val row = fragment.resultsAdapter[1] as ListRow
+            assertEquals(2, row.adapter.size())
+            assertEquals(video, row.adapter[0]); assertSame(SearchLoadingItem, row.adapter[1])
+            assertTrue(row.headerItem.name.endsWith(" · 1"))
+            StreamActions.show(fragment, video)
+            ShadowAlertDialog.getLatestAlertDialog().listView.performItemClick(null, 1, 1)
+            assertEquals(WebEpisodesActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
+            done.complete(Unit); shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(1, row.adapter.size()); assertEquals(video, row.adapter[0])
         } finally { controller.pause().stop().destroy() }
     }
 

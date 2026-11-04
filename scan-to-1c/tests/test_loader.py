@@ -59,3 +59,19 @@ def test_unsupported_format(tmp_path):
     path.write_text("x")
     with pytest.raises(LoaderError):
         load_document(path)
+
+
+@needs_ocr
+@pytest.mark.parametrize("angle", [90, 270])
+def test_phone_photo_sideways_and_small(tmp_path, angle):
+    # Как фото из Telegram: лист боком, 960×1280, сжатый JPEG — текст мелкий, ориентацию Tesseract угадывает плохо.
+    photo = render_scan(INVOICE).rotate(angle, expand=True, fillcolor=255)
+    photo.thumbnail((1280, 1280))
+    path = tmp_path / "photo.jpg"
+    photo.convert("RGB").save(path, quality=85)
+    text = load_document(path).text
+    data = extract(text)
+    # Проверяем то, что зависит от поворота: при неверной ориентации не читается ничего из этого.
+    # Отдельные цифры ИНН покупателя на шрифте ~11 px разные сборки Tesseract читают по-разному.
+    got = (data.number, data.date, data.seller.inn, data.total)
+    assert got == ("154", "2025-03-12", "7701234560", 4500.0), text[:1500]

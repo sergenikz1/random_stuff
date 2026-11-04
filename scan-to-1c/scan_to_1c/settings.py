@@ -23,6 +23,12 @@ class Settings:
     verify_ssl: bool = True
     exchange_dir: str = ""
     mapping: dict = field(default_factory=dict)  # переопределения шаблона выгрузки
+    auto_update: bool = True  # при запуске скачивать и ставить новую версию с GitHub
+    ai_enabled: bool = False  # распознавать реквизиты ИИ-моделью через OmniRoute
+    ai_base_url: str = "http://localhost:20128/v1"
+    ai_api_key: str = ""
+    ai_model: str = "auto"
+    ai_send_images: bool = True  # отдавать модели картинки страниц, а не только текст OCR
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:
@@ -32,6 +38,7 @@ class Settings:
         except (OSError, ValueError):
             return cls()
         data["password"] = _unprotect(data.pop("password_protected", ""))
+        data["ai_api_key"] = _unprotect(data.pop("ai_api_key_protected", ""))
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**known)
 
@@ -40,6 +47,7 @@ class Settings:
         path.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
         data["password_protected"] = _protect(data.pop("password"))
+        data["ai_api_key_protected"] = _protect(data.pop("ai_api_key"))
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 

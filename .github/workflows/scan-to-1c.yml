@@ -72,14 +72,19 @@ jobs:
           $r = Get-Content smoke.json -Raw -Encoding utf8 | ConvertFrom-Json
           if ($r[0].number -ne 'УТ-2041' -or $r[0].seller.inn -ne '7707083893') { throw "exe распознал скан неверно" }
 
+      - name: Проверить автообновление на собранном exe
+        run: python tests\windows_update_smoke.py dist\Scan2-1C.exe
+
       - name: Подготовить файлы
         id: files
         run: |
           $version = (Select-String -Path scan_to_1c\__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
           $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "scan2onec-v$version" }
           New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item dist\Scan2-1C.exe "release\Scan2-1C-$version.exe"
-          Copy-Item "1c\ЗагрузкаСканов.bsl" release\
+          # Имя exe без версии: его скачивает автообновление, а у пользователя не плодятся ярлыки.
+          # Кириллицу GitHub вырезает из имён файлов релиза, поэтому обработка 1С — латиницей.
+          Copy-Item dist\Scan2-1C.exe release\Scan2-1C.exe
+          Copy-Item "1c\ЗагрузкаСканов.bsl" release\Zagruzka-skanov.bsl
           "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4

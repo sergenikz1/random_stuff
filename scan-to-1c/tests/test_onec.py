@@ -11,6 +11,7 @@ from scan_to_1c.onec import OneCClient, OneCError, merged_mapping, render_templa
 ORG_KEY = "11111111-1111-1111-1111-111111111111"
 CP_KEY = "22222222-2222-2222-2222-222222222222"
 DOC_KEY = "33333333-3333-3333-3333-333333333333"
+NOM_KEY = "44444444-4444-4444-4444-444444444444"
 
 
 class FakeResponse:
@@ -27,7 +28,9 @@ class FakeResponse:
 class FakeSession:
     """Имитирует OData 1С: справочники и документы в памяти."""
 
-    def __init__(self, counterparties=None, documents=None):
+    def __init__(self, counterparties=None, documents=None, reject_items=False):
+        self.nomenclature = []
+        self.reject_items = reject_items
         self.headers = {}
         self.verify = True
         self.calls = []
@@ -46,8 +49,17 @@ class FakeSession:
                 return FakeResponse(201, {"Ref_Key": CP_KEY, **json})
             rows = [{"Ref_Key": CP_KEY} for c in self.counterparties if c["ИНН"] in flt]
             return FakeResponse(200, {"value": rows})
+        if entity == "Catalog_Номенклатура":
+            if method == "POST":
+                self.nomenclature.append(json)
+                return FakeResponse(201, {"Ref_Key": NOM_KEY, **json})
+            rows = [{"Ref_Key": NOM_KEY} for n in self.nomenclature
+                    if f"'{n.get('Артикул')}'" in flt or f"'{n['Description']}'" in flt]
+            return FakeResponse(200, {"value": rows})
         if entity == "Document_ПоступлениеТоваровУслуг":
             if method == "POST":
+                if self.reject_items and "Товары" in json:
+                    return FakeResponse(400, {"odata.error": {"message": {"value": "Неизвестное поле Товары"}}})
                 self.documents.append(json)
                 return FakeResponse(201, {"Ref_Key": DOC_KEY, "Number": "0000-000001", **json})
             rows = [{"Ref_Key": DOC_KEY, "Number": "0000-000001"}
@@ -100,3 +112,38 @@ def test_missing_entity_gives_readable_error():
     client = OneCClient("http://srv/base", session=FakeSession())
     with pytest.raises(OneCError, match="состав OData"):
         client.check_connection(merged_mapping({"document": {"entity": "Document_Нет"}}))
+
+
+def invoice_with_items():
+    from scan_to_1c.extract import Item
+
+    data = extract(INVOICE)
+    data.basis = "Заказ № 7 от 01.03.2025"
+    data.items = [Item(name="Бумага офисная А4", code="A4-500", unit="пач", quantity=10, price=350,
+                       amount=3500, vat_rate="20%", vat=583.33, total=3500),
+                  Item(name="Доставка", quantity=1, price=1000, amount=1000, total=1000, gtd="")]
+    return data
+
+
+def test_upload_with_items_creates_nomenclature_and_table():
+    session = FakeSession()
+    result = OneCClient("http://srv/base", session=session).upload(invoice_with_items(), "scan.jpg")
+    assert result.created and result.note == "строк товаров: 2"
+    assert [n["Description"] for n in session.nomenclature] == ["Бумага офисная А4", "Доставка"]
+    assert session.nomenclature[0]["Артикул"] == "A4-500"
+    doc = session.documents[0]
+    assert doc["ВидОперации"] == "Товары" and doc["СуммаВключаетНДС"] is True
+    assert "основание: Заказ № 7 от 01.03.2025" in doc["Комментарий"]
+    first = doc["Товары"][0]
+    assert first == {"LineNumber": "1", "Номенклатура_Key": NOM_KEY, "Количество": 10.0, "Цена": 350.0,
+                     "Сумма": 3500, "СтавкаНДС": "НДС20", "СуммаНДС": 583.33}
+
+
+def test_upload_falls_back_to_header_when_1c_rejects_items():
+    session = FakeSession(reject_items=True)
+    result = OneCClient("http://srv/base", session=session).upload(invoice_with_items(), "scan.jpg")
+    assert result.created
+    assert "строки товаров не загружены" in result.note and "Неизвестное поле Товары" in result.note
+    doc = session.documents[0]
+    assert "Товары" not in doc and "ВидОперации" not in doc
+    assert doc["СуммаДокумента"] == 4500.0

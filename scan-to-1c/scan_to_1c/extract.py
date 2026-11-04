@@ -14,17 +14,22 @@ MONTHS = {
 DOC_TYPES = [
     # (тип, шаблон) — порядок важен: УПД содержит слова «счет-фактура».
     ("УПД", r"универсальн\w*\s+передаточн\w*\s+документ|\bУПД\b"),
-    ("Счет-фактура", r"сч[её]т[\s-]*фактур"),
+    ("Счет-фактура", r"сч[её]т\w{0,3}[\s-]*фактур"),
     ("Товарная накладная", r"товарн\w*\s+накладн|ТОРГ[\s-]*12"),
     ("Акт", r"\bакт\b[^\n]{0,60}(?:выполненн|оказанн|сдачи|при[её]мк)|\bакт\s*№"),
     ("Платежное поручение", r"платежн\w*\s+поручени"),
     ("Счет на оплату", r"сч[её]т\s+на\s+оплату|\bсч[её]т\s*№"),
 ]
 
-SELLER_WORDS = r"поставщик|продав[её]ц|исполнитель|получатель|грузоотправитель|подрядчик|арендодатель"
-BUYER_WORDS = r"покупател|заказчик|плательщик|грузополучатель|арендатор"
+# Корни с учётом частых ошибок OCR: «Поставшик», «Плателышик».
+SELLER_WORDS = r"постав[шщ]ик|продав[её]ц|исполнитель|получатель|грузоотправитель|подрядчик|арендодатель"
+BUYER_WORDS = r"покупател|заказчик|плател\w{0,3}[шщ]ик|грузополучатель|арендатор"
 
 NUMBER_RE = r"\d{1,3}(?:[   ]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?"
+# Денежная сумма: всегда с копейками. Разделители тысяч — пробел, точка или запятая («87.340,00», «21,835.00»),
+# поэтому количество вроде «4,000» и масса «2.120,000» за сумму не принимаются.
+MONEY_RE = r"(?<![\d.,])(?:\d{1,3}(?:[ \u00a0\u202f.,]\d{3})+|\d+)[.,]\d{2}(?![\d])"
+GTD_RE = r"\b\d{8}/\d{6}/\d{7}(?:/\d{1,3})?\b"
 DATE_NUM_RE = r"(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})"
 DATE_TEXT_RE = r"[«\"']?(\d{1,2})[»\"']?\s+([а-яё]+)[^\d\n]{0,3}?\s*(\d{4})"
 
@@ -34,6 +39,23 @@ class Party:
     name: str = ""
     inn: str = ""
     kpp: str = ""
+
+
+@dataclass
+class Item:
+    """Строка товаров (работ, услуг)."""
+
+    name: str = ""
+    code: str = ""  # артикул или код товара
+    unit: str = ""
+    quantity: float | None = None
+    price: float | None = None
+    amount: float | None = None  # стоимость без НДС
+    vat_rate: str = ""
+    vat: float | None = None
+    total: float | None = None  # стоимость с НДС
+    country: str = ""
+    gtd: str = ""  # регистрационный номер декларации на товары
 
 
 @dataclass
@@ -49,6 +71,11 @@ class ExtractedData:
     bik: str = ""
     account: str = ""  # расчётный счёт продавца
     corr_account: str = ""
+    basis: str = ""  # основание: договор, заказ
+    shipment_doc: str = ""  # документ об отгрузке, например «№ 1482791257 от 22.10.2026»
+    shipper: Party = field(default_factory=Party)  # грузоотправитель
+    consignee: Party = field(default_factory=Party)  # грузополучатель
+    items: list[Item] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -57,10 +84,11 @@ class ExtractedData:
     @classmethod
     def from_dict(cls, data: dict) -> ExtractedData:
         data = dict(data)
-        seller = Party(**data.pop("seller", {}) or {})
-        buyer = Party(**data.pop("buyer", {}) or {})
+        parties = {role: Party(**(data.pop(role, None) or {})) for role in ("seller", "buyer", "shipper", "consignee")}
+        items = [Item(**{k: v for k, v in item.items() if k in Item.__dataclass_fields__})
+                 for item in data.pop("items", None) or []]
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-        return cls(seller=seller, buyer=buyer, **known)
+        return cls(items=items, **parties, **known)
 
 
 # Латинские буквы, которые OCR путает с кириллицей.
@@ -87,17 +115,21 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"\b(?:WHH|UHH|MHH|NHH|ИHH|ИНH|ИHН|MНН)\b", "ИНН", text)
     text = re.sub(r"(?<!\w)[0OО]{3}(?=\s*[«\"“'])", "ООО", text)
     text = re.sub(r"(?i)сч[её]тна(?=\s*оплату)", "Счет на", text)
+    text = re.sub(r"\$(?=\d)", "8", text)  # «$7340,00» — так OCR читает восьмёрку
+    text = re.sub(r"\b[HН][AА][CС]\b", "НДС", text)  # «Без HAC»
     # «М» или «Ne»/«N°» вместо «№» — частая ошибка распознавания.
     text = re.sub(r"(?<=\s)(?:N[eо°o]|No|N)(?=\s*\d)", "№", text)
     return text
 
 
 def parse_amount(raw: str) -> float | None:
-    raw = re.sub(r"[   ]", "", raw).replace(",", ".")
-    try:
-        return round(float(raw), 2)
-    except ValueError:
+    """«4 500,00», «87.340,00», «21,835.00», «118800» → число. Последний разделитель — дробная часть."""
+    raw = re.sub(r"[ \u00a0\u202f]", "", raw.strip())
+    match = re.fullmatch(r"(\d[\d.,]*?)(?:[.,](\d{1,2}))?", raw)
+    if not match:
         return None
+    whole = re.sub(r"[.,]", "", match.group(1))
+    return round(float(f"{whole}.{match.group(2) or 0}"), 2)
 
 
 def parse_date(raw: str) -> str:
@@ -142,8 +174,19 @@ def detect_doc_type(text: str) -> str:
     return ""
 
 
+DATE_ANY = rf"(?:{DATE_NUM_RE}|{DATE_TEXT_RE})"
+# Строки, даты и номера из которых к самому документу не относятся.
+FOREIGN_LINE = re.compile(r"о[сc][нв]ование|утвержден|постановлени|госкомстат|доверенност|годен\s+до|"
+                          r"документ\w*\s+об\s+отгрузке|дата\s+и\s+время\s+печати|исправлени", re.IGNORECASE)
+
+
+def _own_text(text: str) -> str:
+    return "\n".join(line for line in text.splitlines() if not FOREIGN_LINE.search(line))
+
+
 def find_number_and_date(text: str) -> tuple[str, str]:
-    date_any = rf"(?:{DATE_NUM_RE}|{DATE_TEXT_RE})"
+    full_text, text = text, _own_text(text)
+    date_any = DATE_ANY
     title = (r"(?:сч[её]т(?:[\s-]*фактура)?(?:\s+на\s+оплату)?|накладная|акт[а-я]*|УПД|документ|"
              r"поручение|торг[\s-]*12)")
     pattern = rf"{title}[^\n№]{{0,40}}№\s*([A-Za-zА-Яа-я0-9][\w\-/.]*)\s*(?:от|от:|,)?\s*({date_any}[^\n]{{0,6}})?"
@@ -151,10 +194,28 @@ def find_number_and_date(text: str) -> tuple[str, str]:
         number = m.group(1).rstrip(".")
         if number.lower() in {"п", "пп", "п/п"}:
             continue  # «№ п/п» — заголовок колонки таблицы
-        return number, parse_date(m.group(2) or "")
-    # Номер не найден — ищем хотя бы дату документа.
-    m = re.search(rf"\bот\s+({date_any})", text, re.IGNORECASE)
-    return "", parse_date(m.group(1)) if m else ""
+        return number, parse_date(m.group(2) or "") or _main_date(text)
+    # ТОРГ-12: номер и дата стоят в рамке под заголовками «Номер документа» и «Дата составления».
+    m = re.search(rf"номер\s+документа[\s\S]{{0,120}}?дата\s+составлени\w*[^\d]{{0,40}}(\d{{3,}})\s+({DATE_NUM_RE})",
+                  text, re.IGNORECASE)
+    if m:
+        return m.group(1), parse_date(m.group(2))
+    # Колонтитул учётной системы: «НАКЛАДНАЯ # 1482791257 (Дата и время печати …)».
+    m = re.search(r"накладная\s*[#№]\s*(\d{3,})", full_text, re.IGNORECASE)
+    return (m.group(1) if m else ""), _main_date(text)
+
+
+def _main_date(text: str) -> str:
+    """Дата документа без явной подписи: «Дата составления …», иначе самая частая дата в документе."""
+    m = re.search(rf"дата\s+составлени\w*[^\d]{{0,60}}({DATE_NUM_RE})", text, re.IGNORECASE)
+    if m:
+        return parse_date(m.group(1))
+    dates = [parse_date(m.group(0)) for m in re.finditer(DATE_NUM_RE, text)]
+    dates = [d for d in dates if d]
+    if not dates:
+        m = re.search(rf"\bот\s+({DATE_ANY})", text, re.IGNORECASE)
+        return parse_date(m.group(1)) if m else ""
+    return max(dates, key=lambda d: (dates.count(d), -dates.index(d)))
 
 
 def _role_before(text: str, pos: int) -> str:
@@ -169,8 +230,12 @@ def _role_before(text: str, pos: int) -> str:
 
 
 ORG_FORMS = r"(?:ООО|ОАО|ЗАО|ПАО|АО|НАО|ИП|ФГУП|МУП|ГУП|НКО|АНО|Общество\s+с\s+ограниченной\s+ответственностью|Индивидуальный\s+предприниматель)"
+# Форма собственности — отдельным словом: иначе «ИП» находится внутри «муниципальный».
+# Название в кавычках заканчивается закрывающей кавычкой (после неё бывает мусор OCR),
+# без кавычек — запятой, концом строки, скобкой или «ИНН».
 ORG_NAME_RE = re.compile(
-    rf"{ORG_FORMS}\s*[«\"“']?[^,\n«»\"“”(]{{2,80}}?[»\"”']?(?=\s*(?:,|\n|\(|ИНН|$))",
+    rf"(?<![А-Яа-яЁёA-Za-z]){ORG_FORMS}(?![А-Яа-яЁёA-Za-z])\s*"
+    rf"(?:[«\"“'][^,\n«»\"“”(]{{2,80}}?[»\"”']|[^,\n«»\"“”(]{{2,80}}?(?=\s*[.;]?\s*(?:,|\n|\(|ИНН|$)))",
     re.IGNORECASE,
 )
 
@@ -182,11 +247,15 @@ def _name_near(text: str, start: int, end: int) -> str:
         return ""
     name = m.group(0).strip(" ,.:;")
     name = re.sub(r"\s+", " ", name)
-    name = name.replace("“", "«").replace("”", "»")
-    name = re.sub(r'"([^"]+)"', r"«\1»", name)
-    if "«" in name and "»" not in name:
-        name += "»"
-    return name
+    # Мусор OCR вместо названия: цифры (реквизиты банка) или нет ни одного нормального слова.
+    if len(re.findall(r"\d", name)) > 2 or not re.search(r"[А-Яа-яЁёA-Za-z]{3,}", name[3:]):
+        return ""
+    # Кавычки любые («ООО "СМ-Альянс”») — приводим к ёлочкам: ООО «СМ-Альянс».
+    form = re.match(ORG_FORMS, name, re.IGNORECASE)
+    body = name[form.end():].strip() if form else name
+    if re.search(r"[«»\"“”']", body):
+        body = "«" + re.sub(r"[«»\"“”']", "", body).strip() + "»"
+    return f"{form.group(0)} {body}".strip() if form else body
 
 
 def _line_bounds(text: str, pos: int) -> tuple[int, int]:
@@ -203,10 +272,15 @@ def _name_for_inn(text: str, start: int, end: int) -> str:
     line_start, line_end = _line_bounds(text, start)
     candidates = [(line_start, start), (end, line_end)]
     neighbours = []
-    if line_start > 0:
-        neighbours.append(_line_bounds(text, line_start - 1))
-    if line_end < len(text):
-        neighbours.append(_line_bounds(text, line_end + 1))
+    above, taken = line_start, 0
+    while above > 0 and taken < 4:  # в УПД название стоит на несколько строк выше ИНН, через адрес
+        above, _end = _line_bounds(text, above - 1)
+        if not text[above:_end].strip():
+            continue
+        taken += 1
+        neighbours.append((above, _end))
+        if taken == 1 and line_end < len(text):
+            neighbours.append(_line_bounds(text, line_end + 1))
     roles = re.compile(rf"{SELLER_WORDS}|{BUYER_WORDS}", re.IGNORECASE)
     candidates += [(a, b) for a, b in neighbours if not roles.search(text[a:b])]
     for a, b in candidates:
@@ -221,8 +295,14 @@ def find_parties(text: str, result: ExtractedData) -> None:
         r"ИНН\s*(?:/\s*КПП)?\s*(?:продавца|покупателя|получателя|плательщика|поставщика|исполнителя|заказчика)?"
         r"\s*[:№]?\s*(\d{12}|\d{10})(?!\d)(?:\s*(?:/|\\|,?\s*КПП\s*:?)\s*(\d{9})(?!\d))?",
         re.IGNORECASE)
+    matches = list(pattern.finditer(text))
+    labeled = {m.group(1) for m in matches}
+    # ИНН/КПП без подписи «ИНН» (в УПД OCR часто теряет подписи): «7703655356 / 770301001».
+    matches += [m for m in re.finditer(r"(?<!\d)(\d{10})\s*/\s*(\d{9})(?!\d)", text)
+                if m.group(1) not in labeled and inn_is_valid(m.group(1))]
+    matches.sort(key=lambda m: m.start())
     found: list[tuple[str, Party]] = []
-    for m in pattern.finditer(text):
+    for m in matches:
         inn, kpp = m.group(1), m.group(2) or ""
         name = _name_for_inn(text, m.start(), m.end())
         known = next((party for _, party in found if party.inn == inn), None)
@@ -231,8 +311,6 @@ def find_parties(text: str, result: ExtractedData) -> None:
             known.kpp = known.kpp or kpp
             known.name = known.name or name
             continue
-        if not inn_is_valid(inn):
-            result.warnings.append(f"ИНН {inn} не прошёл проверку контрольной суммы — проверьте распознавание")
         found.append((_role_before(text, m.end()), Party(name=name, inn=inn, kpp=kpp)))
 
     for role, party in found:
@@ -257,20 +335,36 @@ def find_parties(text: str, result: ExtractedData) -> None:
                 break
 
 
+TOTAL_KEYWORDS = [
+    r"к\s+оплате",
+    r"всего\s+по\s+(?:накладной|документу|сч[её]ту)|всего\s+отпущено|с\s+(?:уч[её]том\s+)?ндс|на\s+сумму",
+    r"итого|всего",
+]
+
+
+def _money(text: str) -> list[float]:
+    values = [parse_amount(m.group(0)) for m in re.finditer(MONEY_RE, text)]
+    return [v for v in values if v]
+
+
 def find_amounts(text: str, result: ExtractedData) -> None:
-    total_patterns = [
-        rf"(?:всего|итого)\s+к\s+оплате\s*(?:\(?[а-я.\s]*\)?)?\s*:?\s*({NUMBER_RE})",
-        rf"(?:всего|итого)\s+с\s+(?:уч[её]том\s+)?ндс\s*:?\s*({NUMBER_RE})",
-        rf"сумма\s+к\s+оплате\s*:?\s*({NUMBER_RE})",
-        rf"всего\s+(?:оказано\s+услуг|наименований)[^\n]*?на\s+сумму\s*({NUMBER_RE})",
-        rf"(?:всего|итого)\s*(?:по\s+(?:документу|накладной|сч[её]ту))?\s*:?\s*({NUMBER_RE})(?![\d.,])(?!\s*%)",
-    ]
-    for pattern in total_patterns:
-        values = [parse_amount(m.group(1)) for m in re.finditer(pattern, text, re.IGNORECASE)]
-        values = [v for v in values if v]
+    lines = text.splitlines()
+    for keywords in TOTAL_KEYWORDS:
+        values = []
+        for index, line in enumerate(lines):
+            m = re.search(keywords, line, re.IGNORECASE)
+            if m:
+                # Сумма бывает на той же строке после подписи или перенесена на следующую.
+                values += _money(line[m.end():]) or _money(" ".join(lines[index + 1:index + 2]))
         if values:
             result.total = max(values)
             break
+    if result.total is None:
+        # Подпись «Итого» не распозналась — итог обычно повторяется в документе несколько раз.
+        values = _money(text)
+        repeated = [v for v in set(values) if values.count(v) >= 2]
+        if repeated:
+            result.total = max(repeated)
 
     if re.search(r"без\s+(?:налога\s+)?\(?ндс\)?|ндс\s+не\s+облагается", text, re.IGNORECASE):
         result.vat_rate = "Без НДС"
@@ -283,20 +377,36 @@ def find_amounts(text: str, result: ExtractedData) -> None:
             parse_amount(m.group(1))
             for m in re.finditer(
                 rf"(?:(?:в\s+том\s+числе\s+|в\s+т\.\s*ч\.\s*|сумма\s+|итого\s+)?ндс|сумма\s+налога)"
-                rf"\s*(?:\(?\s*\d{{1,2}}\s*%\s*\)?)?\s*:?\s*({NUMBER_RE})(?![\d.,])(?!\s*%)",
+                rf"\s*(?:\(?\s*\d{{1,2}}\s*%\s*\)?)?\s*:?\s*({MONEY_RE})",
                 text, re.IGNORECASE)
         ]
         vat_values = [v for v in vat_values if v and (result.total is None or v < result.total)]
         if vat_values:
             result.vat = max(vat_values)
 
-    if result.total and result.vat and result.vat_rate.endswith("%"):
-        rate = int(result.vat_rate[:-1])
-        expected = round(result.total * rate / (100 + rate), 2)
-        if abs(expected - result.vat) > 1:
-            result.warnings.append(
-                f"НДС {result.vat:.2f} не сходится со ставкой {result.vat_rate} от суммы {result.total:.2f}")
 
+def find_extras(text: str, result: ExtractedData) -> None:
+    """Основание, документ об отгрузке, грузоотправитель и грузополучатель."""
+    m = re.search(r"\bо[сc][нв]ование\b(?:\s*(?:передачи|сдачи|получения)[^:\n]*)?\s*:?\s*([^\n]{3,160})",
+                  text, re.IGNORECASE)
+    if m:
+        basis = re.sub(r"\s*\(.*?(?:наличии|договор|доверенн).*?\)\s*", " ", m.group(1))
+        result.basis = re.sub(r"\s+", " ", basis).strip(" ,.;:|_—-")
+    # «Документ об отгрузке № п/п 1 № 1482791257 от 22.10.2026»: нужен номер, за которым идёт «от дата».
+    m = (re.search(rf"документ\w*\s+об\s+отгрузке[^\n]*?№\s*([\w\-/]+)\s*от\s*({DATE_NUM_RE})", text, re.IGNORECASE)
+         or re.search(r"документ\w*\s+об\s+отгрузке[^\n№]*№\s*(?:п/п\s*)?(\d[\w\-/]*)()", text, re.IGNORECASE))
+    if m:
+        date_text = parse_date(m.group(2) or "")
+        result.shipment_doc = f"№ {m.group(1)}" + (f" от {date_text[8:10]}.{date_text[5:7]}.{date_text[:4]}"
+                                                     if date_text else "")
+    for role, word in (("shipper", r"грузоотправител"), ("consignee", r"грузополучател")):
+        for m in re.finditer(rf"{word}\w*\s*(?:и\s+его\s+адрес)?\s*:?\s*([^\n]+)", text, re.IGNORECASE):
+            line = m.group(1)
+            name = _name_near(line, 0, len(line))
+            inn = re.search(r"ИНН\s*:?\s*(\d{12}|\d{10})(?!\d)", line, re.IGNORECASE)
+            if name or inn:
+                setattr(result, role, Party(name=name, inn=inn.group(1) if inn else ""))
+                break
 
 def find_bank(text: str, result: ExtractedData) -> None:
     m = re.search(r"БИК\s*:?\s*(0\d{8})", text, re.IGNORECASE)
@@ -322,15 +432,35 @@ def extract(text: str) -> ExtractedData:
     find_parties(text, result)
     find_amounts(text, result)
     find_bank(text, result)
-
-    if not result.doc_type:
-        result.warnings.append("Не удалось определить тип документа")
-    if not result.number:
-        result.warnings.append("Не найден номер документа")
-    if not result.date:
-        result.warnings.append("Не найдена дата документа")
-    if not result.seller.inn:
-        result.warnings.append("Не найден ИНН контрагента")
-    if result.total is None:
-        result.warnings.append("Не найдена сумма документа")
+    find_extras(text, result)
+    result.warnings = validate(result)
     return result
+
+
+def validate(result: ExtractedData) -> list[str]:
+    """Что в реквизитах стоит проверить глазами — одинаково для разбора шаблонами и ИИ."""
+    warnings = []
+    for party in (result.seller, result.buyer):
+        if party.inn and not inn_is_valid(party.inn):
+            warnings.append(f"ИНН {party.inn} не прошёл проверку контрольной суммы — проверьте распознавание")
+    if result.total and result.vat and result.vat_rate.endswith("%"):
+        rate = int(result.vat_rate[:-1])
+        expected = round(result.total * rate / (100 + rate), 2)
+        if abs(expected - result.vat) > 1:
+            warnings.append(
+                f"НДС {result.vat:.2f} не сходится со ставкой {result.vat_rate} от суммы {result.total:.2f}")
+    line_totals = [i.total if i.total is not None else i.amount for i in result.items]
+    if result.total and line_totals and all(v is not None for v in line_totals) \
+            and abs(sum(line_totals) - result.total) > 1:
+        warnings.append(f"Сумма строк товаров {sum(line_totals):.2f} не сходится с итогом {result.total:.2f}")
+    if not result.doc_type:
+        warnings.append("Не удалось определить тип документа")
+    if not result.number:
+        warnings.append("Не найден номер документа")
+    if not result.date:
+        warnings.append("Не найдена дата документа")
+    if not result.seller.inn:
+        warnings.append("Не найден ИНН контрагента")
+    if result.total is None:
+        warnings.append("Не найдена сумма документа")
+    return warnings

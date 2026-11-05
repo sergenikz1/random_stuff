@@ -22,10 +22,16 @@ on:
 permissions:
   contents: write
 
+# Новый пуш в ту же ветку отменяет недоделанную сборку.
+concurrency:
+  group: scan-to-1c-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build (${{ matrix.variant }})
     runs-on: windows-latest
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -58,22 +64,26 @@ jobs:
           }
 
       - name: Установить Tesseract OCR и русский язык
+        timeout-minutes: 15
         run: |
+          $ProgressPreference = "SilentlyContinue"  # иначе Invoke-WebRequest качает в разы медленнее
           choco install tesseract --no-progress -y
+          $choco = "C:\Program Files\Tesseract-OCR"
           $rus = "$env:RUNNER_TEMP\rus.traineddata"
-          Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata" -OutFile $rus
+          Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata" -OutFile $rus -TimeoutSec 300
 
           function Collect($from, $to) {
             # В exe берём только движок, его DLL и нужные языки — без обучающих утилит.
+            # Языки — из установки choco: файлы tessdata подходят и Tesseract 4, и 5.
             Remove-Item -Recurse -Force $to -ErrorAction SilentlyContinue
             New-Item -ItemType Directory -Force "$to\tessdata" | Out-Null
             Copy-Item "$from\tesseract.exe", "$from\*.dll" $to
-            Copy-Item "$from\tessdata\eng.traineddata", "$from\tessdata\osd.traineddata", $rus "$to\tessdata\"
-            Copy-Item -Recurse "$from\tessdata\configs" "$to\tessdata\"
+            Copy-Item "$choco\tessdata\eng.traineddata", "$choco\tessdata\osd.traineddata", $rus "$to\tessdata\"
+            Copy-Item -Recurse "$choco\tessdata\configs" "$to\tessdata\"
           }
 
           if ("${{ matrix.variant }}" -ne "win7") {
-            Collect "C:\Program Files\Tesseract-OCR" "tesseract"
+            Collect $choco "tesseract"
             exit 0
           }
 
@@ -86,26 +96,31 @@ jobs:
           Copy-Item "$($ucrt.DirectoryName)\*.dll" ucrt\
           "Universal CRT: $($ucrt.DirectoryName), файлов: $((Get-ChildItem ucrt).Count)"
 
-          # Свежие сборки Tesseract могут требовать функций Windows 8+. Берём первую сборку, которую
-          # проверка tools/win7_check.py признаёт совместимой с Windows 7.
+          # Свежие сборки Tesseract могут требовать функций Windows 8+. Берём первую, которую
+          # tools/win7_check.py признаёт совместимой с Windows 7. Установщики не запускаем (они могут
+          # ждать ответа в окне), а распаковываем 7-Zip.
           $candidates = @(
-            @{ name = "choco (последняя)"; dir = "C:\Program Files\Tesseract-OCR" },
+            @{ name = "choco (последняя)"; dir = $choco },
             @{ name = "5.3.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.3.0.20221222.exe" },
             @{ name = "5.0.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0.20211201.exe" },
             @{ name = "4.1.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v4.1.0.20190314.exe" }
           )
           foreach ($c in $candidates) {
+            "== Tesseract $($c.name) =="
             $dir = $c.dir
             if ($c.url) {
               $dir = "$env:RUNNER_TEMP\tess-$($c.name)"
-              $setup = "$env:RUNNER_TEMP\tess-$($c.name).exe"
-              try { Invoke-WebRequest $c.url -OutFile $setup } catch { "Tesseract $($c.name): не скачался ($_)"; continue }
-              Start-Process $setup -ArgumentList "/S", "/D=$dir" -Wait
+              $setup = "$dir.exe"
+              try { Invoke-WebRequest $c.url -OutFile $setup -TimeoutSec 300 }
+              catch { "не скачался: $_"; continue }
+              7z x -y "-o$dir" $setup | Out-Null
+              $exe = Get-ChildItem $dir -Recurse -Filter tesseract.exe | Select-Object -First 1
+              if (-not $exe) { "в установщике не найден tesseract.exe"; continue }
+              $dir = $exe.DirectoryName
             }
-            if (-not (Test-Path "$dir\tesseract.exe")) { "Tesseract $($c.name): не установился"; continue }
             Collect $dir "tesseract"
             Copy-Item ucrt\*.dll tesseract\
-            "== Tesseract $($c.name) =="
+            & tesseract\tesseract.exe --version 2>&1 | Select-Object -First 1
             python tools\win7_check.py tesseract
             if ($LASTEXITCODE -eq 0) { "Выбран Tesseract $($c.name)"; exit 0 }
           }

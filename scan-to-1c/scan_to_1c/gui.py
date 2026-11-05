@@ -13,17 +13,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__, ai, updater
+from . import __version__, ai, pipeline, updater
 from .exporter import export_to_folder
 from .extract import ExtractedData, extract, parse_amount, parse_date
-from .loader import (
-    MAX_IMAGE_PAGES,
-    SUPPORTED_EXTENSIONS,
-    configure_tesseract,
-    is_supported,
-    load_document,
-    tesseract_available,
-)
+from .loader import SUPPORTED_EXTENSIONS, configure_tesseract, is_supported, tesseract_available
 from .onec import OneCClient, OneCError, merged_mapping
 from .settings import Settings
 
@@ -38,6 +31,7 @@ ST_NEW, ST_WORK, ST_READY, ST_WARN, ST_SENT, ST_ERROR = (
 class DocItem:
     path: Path
     extra_pages: list[Path] = field(default_factory=list)  # остальные фото того же документа
+    page_numbers: list[int] | None = None  # страницы файла, если в одном PDF несколько документов
     status: str = ST_NEW
     data: ExtractedData | None = None
     text: str = ""
@@ -51,6 +45,9 @@ class DocItem:
 
     @property
     def title(self) -> str:
+        if self.page_numbers:
+            first, last = self.page_numbers[0] + 1, self.page_numbers[-1] + 1
+            return f"{self.path.name}, стр. {first}" + (f"–{last}" if last != first else "")
         return self.path.name + (f" (+{len(self.extra_pages)} стр.)" if self.extra_pages else "")
 
 
@@ -156,6 +153,8 @@ class App:
         text_tab = ttk.Frame(right, padding=4)
         right.add(text_tab, text="Распознанный текст")
         paned.add(right, weight=2)
+        # Список шире по умолчанию, чтобы были видны тип, номер и дата документа.
+        self.root.after(100, lambda: paned.sashpos(0, 560))
 
         self.vars: dict[str, tk.StringVar] = {}
 
@@ -271,7 +270,22 @@ class App:
             added += 1
         if added:
             self._set_status(f"Добавлено файлов: {added}, распознаю…")
+            if not self.tree.selection():
+                # Реквизиты показываются для выделенного документа — выделяем сразу, чтобы поля заполнялись сами.
+                first_new = self.items[-added]
+                self.tree.selection_set(first_new.iid)
+                self._on_select()
             self.recognize_new()
+
+    def _insert_parts(self, item: DocItem, parts: list[DocItem]):
+        """Остальные документы из того же файла — отдельными строками сразу после первого."""
+        position = self.items.index(item) + 1
+        for offset, part in enumerate(parts):
+            part.iid = self.tree.insert("", self.tree.index(item.iid) + 1 + offset, values=(part.title,))
+            self.items.insert(position + offset, part)
+            self._refresh_row(part)
+        self._refresh_row(item)
+        self._set_status(f"{item.path.name}: в файле документов — {len(parts) + 1}, каждый в своей строке")
 
     def recognize_new(self):
         """Распознаёт новые файлы сразу после добавления; если занято — сразу после текущей работы."""
@@ -297,6 +311,7 @@ class App:
             self.items.remove(other)
             self.tree.delete(other.iid)
         main.status, main.data, main.message, main.text = ST_NEW, None, "", ""
+        main.page_numbers = None
         self._refresh_row(main)
         self.tree.selection_set(main.iid)
         self._set_status(f"Объединено страниц: {len(main.paths)}, распознаю…")
@@ -454,6 +469,8 @@ class App:
                     self.progress.configure(value=index)
                 elif event[0] == "status":
                     self._set_status(event[1])
+                elif event[0] == "split":
+                    self._insert_parts(event[1], event[2])
                 elif event[0] == "update_ready":
                     self._on_update_ready(event[1])
                 elif event[0] == "update_none":
@@ -468,7 +485,9 @@ class App:
                 elif event[0] == "done":
                     self.busy = False
                     errors = sum(1 for i in self.items if i.status == ST_ERROR)
-                    self._set_status(f"Готово. Документов: {event[2]}" + (f", с ошибками: {errors}" if errors else ""))
+                    # После распознавания в списке могло стать больше документов: PDF делится на части.
+                    count = len(self.items) if event[1].startswith("Распознав") else event[2]
+                    self._set_status(f"Готово. Документов: {count}" + (f", с ошибками: {errors}" if errors else ""))
                     if self.auto_pending:
                         self.auto_pending = False
                         self.recognize(only_new=True)
@@ -499,22 +518,22 @@ class App:
             item.status, item.message = ST_WORK, ""
             self.events.put(("row", item, 0))
 
-            texts, images = [], []
-            for number, path in enumerate(item.paths, 1):
-                label = f"{item.title}: файл {number} из {len(item.paths)}" if len(item.paths) > 1 else item.title
+            label = item.title
 
-                def progress(page, total, label=label):
-                    self.events.put(("status", f"{label}, страница {page} из {total} — распознаю текст"))
+            def progress(page, total):
+                self.events.put(("status", f"{label}: страница {page} из {total} — распознаю текст"))
 
-                self.events.put(("status", f"{label} — распознаю текст…"))
-                doc = load_document(path, progress=progress, keep_images=bool(client and s.ai_send_images))
-                texts.append(doc.text)
-                images += doc.images
-            item.text = "\n\n".join(texts)
-            if client:
-                self.events.put(("status", f"{item.title}: распознаёт ИИ…"))
-            item.data, item.message = ai.recognize(client, item.text, images[:MAX_IMAGE_PAGES], extract(item.text))
-            item.status = ST_WARN if item.data.warnings else ST_READY
+            self.events.put(("status", f"{label} — распознаю текст…"))
+            found = pipeline.recognize(item.paths, client, keep_images=bool(client and s.ai_send_images),
+                                       page_numbers=item.page_numbers, progress=progress,
+                                       status=lambda text: self.events.put(("status", f"{label}: {text}")))
+            parts = [item] + [DocItem(path=item.path, page_numbers=p.page_numbers) for p in found[1:]]
+            for part, result in zip(parts, found, strict=True):
+                part.page_numbers = result.page_numbers if (len(found) > 1 or part.page_numbers) else None
+                part.text, part.data, part.message = result.text, result.data, result.message
+                part.status = ST_WARN if part.data.warnings else ST_READY
+            if len(parts) > 1:
+                self.events.put(("split", item, parts[1:]))
 
         self._run_background("Распознавание…", items, work)
 

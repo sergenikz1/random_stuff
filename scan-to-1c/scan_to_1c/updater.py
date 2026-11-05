@@ -24,7 +24,17 @@ from . import __version__
 REPO = "sergenikz1/random_stuff"
 TAG_PREFIX = "scan2onec-v"
 RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases"
-ASSET_RE = re.compile(r"^Scan2-1C.*\.exe$", re.IGNORECASE)
+# Два варианта программы: обычный (Python 3.12, Windows 8.1–11) и для Windows 7 (Python 3.8 — последний,
+# что там работает). Каждый обновляется только своим файлом, иначе Windows 7 получила бы несовместимый exe.
+WIN7_BUILD = sys.version_info < (3, 9)
+WIN7_ASSET = "scan2-1c-win7.exe"
+MODERN_ASSET_RE = re.compile(r"^Scan2-1C(?:-\d[\d.]*)?\.exe$", re.IGNORECASE)
+
+
+def asset_matches(name: str) -> bool:
+    if WIN7_BUILD:
+        return name.lower() == WIN7_ASSET
+    return bool(MODERN_ASSET_RE.match(name))
 SELF_CHECK_TIMEOUT = 120
 
 
@@ -84,7 +94,7 @@ def find_update(current: str = __version__, session: requests.Session | None = N
         version = tag[len(TAG_PREFIX):]
         if not is_newer(version, best.version if best else current):
             continue
-        asset = next((a for a in release.get("assets", []) if ASSET_RE.match(a.get("name", ""))), None)
+        asset = next((a for a in release.get("assets", []) if asset_matches(a.get("name", ""))), None)
         if not asset:
             continue
         digest = asset.get("digest") or ""

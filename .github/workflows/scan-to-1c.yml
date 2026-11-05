@@ -1,6 +1,8 @@
 name: Сканы → 1С — сборка exe
 
-# Собирает Scan2-1C.exe (один файл, Tesseract OCR с русским языком внутри).
+# Собирает два варианта программы (один файл, Tesseract OCR с русским языком внутри):
+# - Scan2-1C.exe       — Python 3.12, Windows 8.1, 10, 11;
+# - Scan2-1C-win7.exe  — Python 3.8 (последний, что работает на Windows 7), Windows 7 SP1 и новее.
 # Каждая сборка лежит в артефактах запуска; пуш в main с изменениями в scan-to-1c/ или тег scan2onec-v* публикует релиз.
 on:
   push:
@@ -22,7 +24,18 @@ permissions:
 
 jobs:
   build:
+    name: build (${{ matrix.variant }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: modern
+            python: '3.12'
+            exe: Scan2-1C
+          - variant: win7
+            python: '3.8'
+            exe: Scan2-1C-win7
     defaults:
       run:
         shell: pwsh
@@ -32,76 +45,142 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
 
       - name: Установить зависимости
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller pytest
+          if ("${{ matrix.variant }}" -eq "win7") {
+            # Без pillow-heif: его библиотеки не рассчитаны на Windows 7. pip сам берёт версии, совместимые с Python 3.8.
+            pip install pillow pypdfium2 pytesseract requests pyinstaller pytest pefile
+          } else {
+            pip install -r requirements.txt pyinstaller pytest pefile
+          }
 
       - name: Установить Tesseract OCR и русский язык
         run: |
           choco install tesseract --no-progress -y
-          $tess = "C:\Program Files\Tesseract-OCR"
-          Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata" `
-            -OutFile "$tess\tessdata\rus.traineddata"
-          # В exe берём только движок, его DLL и нужные языки — без обучающих утилит.
-          New-Item -ItemType Directory -Force bundle\tesseract\tessdata | Out-Null
-          Copy-Item "$tess\tesseract.exe", "$tess\*.dll" bundle\tesseract\
-          Copy-Item "$tess\tessdata\eng.traineddata", "$tess\tessdata\osd.traineddata", `
-            "$tess\tessdata\rus.traineddata" bundle\tesseract\tessdata\
-          Copy-Item -Recurse "$tess\tessdata\configs" bundle\tesseract\tessdata\
-          Get-ChildItem -Recurse bundle | Measure-Object -Sum Length | Select-Object Count, Sum
+          $rus = "$env:RUNNER_TEMP\rus.traineddata"
+          Invoke-WebRequest "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata" -OutFile $rus
+
+          function Collect($from, $to) {
+            # В exe берём только движок, его DLL и нужные языки — без обучающих утилит.
+            Remove-Item -Recurse -Force $to -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Force "$to\tessdata" | Out-Null
+            Copy-Item "$from\tesseract.exe", "$from\*.dll" $to
+            Copy-Item "$from\tessdata\eng.traineddata", "$from\tessdata\osd.traineddata", $rus "$to\tessdata\"
+            Copy-Item -Recurse "$from\tessdata\configs" "$to\tessdata\"
+          }
+
+          if ("${{ matrix.variant }}" -ne "win7") {
+            Collect "C:\Program Files\Tesseract-OCR" "tesseract"
+            exit 0
+          }
+
+          # Для Windows 7: Universal CRT кладём рядом с программой (так Microsoft разрешает его поставлять),
+          # тогда не нужно обновление KB2999226 и не будет ошибки «отсутствует api-ms-win-crt-…».
+          $ucrt = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Redist" -Recurse -Filter ucrtbase.dll |
+            Where-Object { $_.DirectoryName -like "*ucrt\DLLs\x64" } | Sort-Object FullName | Select-Object -Last 1
+          if (-not $ucrt) { throw "Не найден Universal CRT в Windows SDK" }
+          New-Item -ItemType Directory -Force ucrt | Out-Null
+          Copy-Item "$($ucrt.DirectoryName)\*.dll" ucrt\
+          "Universal CRT: $($ucrt.DirectoryName), файлов: $((Get-ChildItem ucrt).Count)"
+
+          # Свежие сборки Tesseract могут требовать функций Windows 8+. Берём первую сборку, которую
+          # проверка tools/win7_check.py признаёт совместимой с Windows 7.
+          $candidates = @(
+            @{ name = "choco (последняя)"; dir = "C:\Program Files\Tesseract-OCR" },
+            @{ name = "5.3.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.3.0.20221222.exe" },
+            @{ name = "5.0.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0.20211201.exe" },
+            @{ name = "4.1.0"; url = "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v4.1.0.20190314.exe" }
+          )
+          foreach ($c in $candidates) {
+            $dir = $c.dir
+            if ($c.url) {
+              $dir = "$env:RUNNER_TEMP\tess-$($c.name)"
+              $setup = "$env:RUNNER_TEMP\tess-$($c.name).exe"
+              try { Invoke-WebRequest $c.url -OutFile $setup } catch { "Tesseract $($c.name): не скачался ($_)"; continue }
+              Start-Process $setup -ArgumentList "/S", "/D=$dir" -Wait
+            }
+            if (-not (Test-Path "$dir\tesseract.exe")) { "Tesseract $($c.name): не установился"; continue }
+            Collect $dir "tesseract"
+            Copy-Item ucrt\*.dll tesseract\
+            "== Tesseract $($c.name) =="
+            python tools\win7_check.py tesseract
+            if ($LASTEXITCODE -eq 0) { "Выбран Tesseract $($c.name)"; exit 0 }
+          }
+          throw "Ни одна сборка Tesseract не прошла проверку совместимости с Windows 7"
 
       - name: Тесты
         run: python -m pytest -q tests
 
       - name: Собрать exe
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name Scan2-1C `
-            --add-data "bundle\tesseract;tesseract" `
-            --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all pillow_heif `
-            main.py
+          $pyiArgs = @("--noconfirm", "--windowed", "--name", "${{ matrix.exe }}", "--add-data", "tesseract;tesseract",
+                    "--collect-all", "pypdfium2", "--collect-all", "pypdfium2_raw")
+          if ("${{ matrix.variant }}" -eq "win7") {
+            $pyiArgs += @("--add-binary", "ucrt\*.dll;.", "--exclude-module", "pillow_heif")
+            # Сначала папкой — чтобы проверить каждую DLL сборки на совместимость с Windows 7.
+            pyinstaller @pyiArgs --onedir --distpath dist-dir main.py
+            if ($LASTEXITCODE -ne 0) { throw "pyinstaller (папка) завершился с ошибкой" }
+            python tools\win7_check.py "dist-dir\${{ matrix.exe }}"
+            if ($LASTEXITCODE -ne 0) { throw "Сборка требует функций Windows 8+ — на Windows 7 не запустится" }
+          } else {
+            $pyiArgs += @("--collect-all", "pillow_heif")
+          }
+          pyinstaller @pyiArgs --onefile main.py
+          if ($LASTEXITCODE -ne 0) { throw "pyinstaller завершился с ошибкой" }
 
       - name: Проверить собранный exe
         run: |
           python -c "import sys; sys.path.insert(0, 'tests'); from test_loader import render_scan; from samples import UPD; render_scan(UPD).save('smoke.jpg', quality=90)"
-          $p = Start-Process dist\Scan2-1C.exe -ArgumentList '--extract', 'smoke.jpg', '--out', 'smoke.json' -Wait -PassThru
+          $p = Start-Process "dist\${{ matrix.exe }}.exe" -ArgumentList '--extract', 'smoke.jpg', '--out', 'smoke.json' -Wait -PassThru
           Get-Content smoke.json -Encoding utf8
           if ($p.ExitCode -ne 0) { throw "exe завершился с кодом $($p.ExitCode)" }
           $r = Get-Content smoke.json -Raw -Encoding utf8 | ConvertFrom-Json
           if ($r[0].number -ne 'УТ-2041' -or $r[0].seller.inn -ne '7707083893') { throw "exe распознал скан неверно" }
 
       - name: Проверить автообновление на собранном exe
-        run: python tests\windows_update_smoke.py dist\Scan2-1C.exe
+        run: python tests\windows_update_smoke.py "dist\${{ matrix.exe }}.exe"
 
       - name: Подготовить файлы
-        id: files
         run: |
-          $version = (Select-String -Path scan_to_1c\__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
-          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "scan2onec-v$version" }
           New-Item -ItemType Directory -Force release | Out-Null
           # Имя exe без версии: его скачивает автообновление, а у пользователя не плодятся ярлыки.
-          # Кириллицу GitHub вырезает из имён файлов релиза, поэтому обработка 1С — латиницей.
-          Copy-Item dist\Scan2-1C.exe release\Scan2-1C.exe
-          Copy-Item "1c\ЗагрузкаСканов.bsl" release\Zagruzka-skanov.bsl
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Copy-Item "dist\${{ matrix.exe }}.exe" release\
+          if ("${{ matrix.variant }}" -eq "modern") {
+            # Кириллицу GitHub вырезает из имён файлов релиза, поэтому обработка 1С — латиницей.
+            Copy-Item "1c\ЗагрузкаСканов.bsl" release\Zagruzka-skanov.bsl
+          }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Scan2-1C
+          name: ${{ matrix.exe }}
           path: scan-to-1c/release/*
 
+  publish:
+    needs: build
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
       - name: Опубликовать релиз
-        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = "${{ steps.files.outputs.tag }}"
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag (Get-ChildItem release\*).FullName --clobber
-          } else {
-            gh release create $tag (Get-ChildItem release\*).FullName --target $env:GITHUB_SHA `
-              --title "Сканы → 1С $tag" --notes-file RELEASE_NOTES.md
-          }
+          version=$(grep -oP '__version__ = "\K[^"]+' scan-to-1c/scan_to_1c/__init__.py)
+          tag="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          tag="${tag:-scan2onec-v$version}"
+          ls -la release
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --clobber
+          else
+            gh release create "$tag" release/* --target "$GITHUB_SHA" \
+              --title "Сканы → 1С $tag" --notes-file scan-to-1c/RELEASE_NOTES.md
+          fi

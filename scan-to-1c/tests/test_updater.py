@@ -153,3 +153,16 @@ def test_install_without_write_access_explains(tmp_path, monkeypatch):
 
 def test_not_frozen_means_no_exe():
     assert updater.current_exe() is None
+
+
+def test_each_build_updates_only_from_its_own_file(monkeypatch):
+    releases = [release("scan2onec-v1.3.0", assets=("Scan2-1C.exe", "Scan2-1C-win7.exe", "Zagruzka-skanov.bsl")),
+                release("scan2onec-v1.4.0", assets=("Scan2-1C.exe",))]  # вышла только обычная версия
+
+    monkeypatch.setattr(updater, "WIN7_BUILD", False)
+    modern = updater.find_update("1.2.0", session=FakeSession(releases))
+    assert (modern.version, modern.url.rsplit("/", 1)[1]) == ("1.4.0", "Scan2-1C.exe")
+
+    monkeypatch.setattr(updater, "WIN7_BUILD", True)
+    win7 = updater.find_update("1.2.0", session=FakeSession(releases))
+    assert (win7.version, win7.url.rsplit("/", 1)[1]) == ("1.3.0", "Scan2-1C-win7.exe")

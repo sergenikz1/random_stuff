@@ -528,7 +528,7 @@ class App:
                                        page_numbers=item.page_numbers, progress=progress,
                                        status=lambda text: self.events.put(("status", f"{label}: {text}")))
             parts = [item] + [DocItem(path=item.path, page_numbers=p.page_numbers) for p in found[1:]]
-            for part, result in zip(parts, found, strict=True):
+            for part, result in zip(parts, found):  # parts построены по found — длины равны
                 part.page_numbers = result.page_numbers if (len(found) > 1 or part.page_numbers) else None
                 part.text, part.data, part.message = result.text, result.data, result.message
                 part.status = ST_WARN if part.data.warnings else ST_READY

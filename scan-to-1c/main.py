@@ -6,6 +6,8 @@
     Scan2-1C.exe --self-check                        — проверить, что сборка рабочая (код 0); нужно автообновлению
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys

@@ -239,7 +239,7 @@ def _vat_rate(value) -> str:
     if value.lower().startswith("без"):
         return "Без НДС"
     if re.fullmatch(r"\d{1,2}\s*%?", value):
-        return f"{int(re.sub(r'\D', '', value))}%"
+        return f"{int(re.sub(r'[^0-9]', '', value))}%"
     return ""
 
 

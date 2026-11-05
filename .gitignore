@@ -22,5 +22,8 @@ limit-pulse/**/build/
 scan-to-1c/build/
 scan-to-1c/dist/
 scan-to-1c/bundle/
+scan-to-1c/tesseract/
+scan-to-1c/ucrt/
+scan-to-1c/dist-dir/
 scan-to-1c/release/
 scan-to-1c/*.spec

@@ -9,6 +9,12 @@ from scan_to_1c.updater import Update, UpdateError
 NEW_EXE = b"MZ" + b"\x00" * 5000
 
 
+@pytest.fixture(autouse=True)
+def modern_build(monkeypatch):
+    """Тесты ниже — про обычную сборку; при запуске на Python 3.8 программа считала бы себя сборкой для Windows 7."""
+    monkeypatch.setattr(updater, "WIN7_BUILD", False)
+
+
 class FakeResponse:
     def __init__(self, body=None, content=b"", status=200):
         self._body = body

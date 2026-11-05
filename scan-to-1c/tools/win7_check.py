@@ -56,6 +56,8 @@ WIN7_SYSTEM_DLLS = {
     "urlmon.dll", "odbc32.dll", "normaliz.dll", "dbghelp.dll", "winspool.drv", "comctl32", "winhttp.dll",
     "usp10.dll", "mswsock.dll", "wtsapi32.dll", "msacm32.dll", "avrt.dll", "dxgi.dll", "d3d9.dll", "d3d11.dll",
     "dwrite.dll", "d2d1.dll", "windowscodecs.dll", "hid.dll", "winusb.dll", "msi.dll", "apphelp.dll",
+    "wldap32.dll", "kernelbase.dll", "sspicli.dll", "cryptbase.dll", "cryptui.dll", "imagehlp.dll", "shfolder.dll",
+    "winscard.dll", "rasapi32.dll", "tapi32.dll", "msvfw32.dll", "avicap32.dll", "avifil32.dll", "ksuser.dll",
 }
 # Есть в Windows 7 только с обновлением KB2533623 (2011 г.) — предупреждаем, но не считаем ошибкой.
 NEEDS_KB2533623 = {"SetDefaultDllDirectories", "AddDllDirectory", "RemoveDllDirectory"}

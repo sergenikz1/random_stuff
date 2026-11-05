@@ -106,4 +106,5 @@ def check(folder: Path, ucrt_bundled: bool) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # консоль Windows — cp1252, а вывод русский
     sys.exit(check(Path(sys.argv[1]), "--ucrt-bundled" in sys.argv[2:]))

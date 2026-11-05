@@ -32,6 +32,8 @@ jobs:
     name: build (${{ matrix.variant }})
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'  # русский вывод в консоль Windows и чтение UTF-8 файлов на Python 3.8
     strategy:
       fail-fast: false
       matrix:

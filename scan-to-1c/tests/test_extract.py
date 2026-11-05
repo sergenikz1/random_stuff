@@ -106,3 +106,46 @@ def test_items_sum_is_checked():
     from scan_to_1c.extract import validate
 
     assert any("Сумма строк товаров 80000.00" in w for w in validate(d))
+
+
+def test_invoice_items_and_total_from_lines():
+    from samples import INVOICE_TWO_ITEMS
+
+    d = extract(INVOICE_TWO_ITEMS)
+    assert (d.number, d.date) == ("1056357861", "2026-10-17")  # «17.10. 2026» — пробел внутри даты
+    assert d.total == 307480.0  # «Всего к оплате» не прочиталось — итог по сумме строк
+    assert [(i.code, i.unit, i.quantity, i.price, i.total) for i in d.items] == [
+        ("5093600", "кор", 5.0, 41900.0, 209500.0), ("5093500", "кор", 2.0, 48990.0, 97980.0)]
+    first = d.items[0]
+    assert first.name == "Изделия медицинские для анестезиологии и вентиляции легких. Контуры дыхательные"
+    assert (first.vat_rate, first.country, first.gtd) == ("Без НДС", "Италия", "10511010/101026/5177319")
+    assert d.warnings == []
+
+
+def test_simple_invoice_table_lines():
+    d = extract(INVOICE)
+    assert [(i.name, i.quantity, i.unit, i.total) for i in d.items] == [
+        ("Бумага офисная А4", 10.0, "пач", 3500.0), ("Доставка", 1.0, "усл", 1000.0)]
+
+
+def test_torg12_frames_and_form_dates():
+    from samples import TORG12_FRAMES, TORG12_PAGE2
+
+    d = extract(TORG12_FRAMES + "\n\n" + TORG12_PAGE2)
+    # Не дата транспортной накладной (16.10) и не «25.12.98» из реквизитов формы.
+    assert (d.number, d.date) == ("1482304542", "2026-10-17")
+    assert (d.seller.inn, d.buyer.inn) == ("7705123452", "5027123457")
+    assert d.total == 307480.0
+    assert d.items == []  # строки из перемешанной таблицы ТОРГ-12 не сходятся с итогом — не берём
+    assert d.warnings == []
+
+
+def test_split_documents_in_one_file():
+    from samples import INVOICE_TWO_ITEMS, TORG12_FRAMES, TORG12_PAGE2
+
+    from scan_to_1c.extract import split_documents
+
+    assert split_documents([TORG12_FRAMES, TORG12_PAGE2, INVOICE_TWO_ITEMS]) == [[0, 1], [2]]
+    assert split_documents([UPD, "Всего к оплате 118 800,00", INVOICE_PHOTO]) == [[0, 1, 2]]  # УПД ~ счёт-фактура
+    assert split_documents(["подписи", INVOICE]) == [[0, 1]]
+    assert split_documents([]) == []

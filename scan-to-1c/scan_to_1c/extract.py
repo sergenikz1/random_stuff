@@ -115,6 +115,7 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"\b(?:WHH|UHH|MHH|NHH|ИHH|ИНH|ИHН|MНН)\b", "ИНН", text)
     text = re.sub(r"(?<!\w)[0OО]{3}(?=\s*[«\"“'])", "ООО", text)
     text = re.sub(r"(?i)сч[её]тна(?=\s*оплату)", "Счет на", text)
+    text = re.sub(r"\b(\d{1,2})\.\s?(\d{1,2})\.\s(\d{4})\b", r"\1.\2.\3", text)  # «17.10. 2026»
     text = re.sub(r"\$(?=\d)", "8", text)  # «$7340,00» — так OCR читает восьмёрку
     text = re.sub(r"\b[HН][AА][CС]\b", "НДС", text)  # «Без HAC»
     # «М» или «Ne»/«N°» вместо «№» — частая ошибка распознавания.
@@ -176,7 +177,7 @@ def detect_doc_type(text: str) -> str:
 
 DATE_ANY = rf"(?:{DATE_NUM_RE}|{DATE_TEXT_RE})"
 # Строки, даты и номера из которых к самому документу не относятся.
-FOREIGN_LINE = re.compile(r"о[сc][нв]ование|утвержден|постановлени|госкомстат|доверенност|годен\s+до|"
+FOREIGN_LINE = re.compile(r"о[сc][нв]ование|утвержден|постановлени|госкомстат|росси\w*\s+от|доверенност|годен\s+до|"
                           r"документ\w*\s+об\s+отгрузке|дата\s+и\s+время\s+печати|исправлени", re.IGNORECASE)
 
 
@@ -196,8 +197,10 @@ def find_number_and_date(text: str) -> tuple[str, str]:
             continue  # «№ п/п» — заголовок колонки таблицы
         return number, parse_date(m.group(2) or "") or _main_date(text)
     # ТОРГ-12: номер и дата стоят в рамке под заголовками «Номер документа» и «Дата составления».
-    m = re.search(rf"номер\s+документа[\s\S]{{0,120}}?дата\s+составлени\w*[^\d]{{0,40}}(\d{{3,}})\s+({DATE_NUM_RE})",
-                  text, re.IGNORECASE)
+    # OCR читает рамку по-разному: «Номер документа | Дата составления» или «Номер Дата / документа составления».
+    # Номер и дата стоят рядом, в одной строке, сразу под подписями — дальше идут рамки других документов
+    # (номер транспортной накладной), их не берём.
+    m = re.search(rf"составлени\w*[^\d]{{0,40}}?(\d{{4,}})[ \t]+({DATE_NUM_RE})", text, re.IGNORECASE)
     if m:
         return m.group(1), parse_date(m.group(2))
     # Колонтитул учётной системы: «НАКЛАДНАЯ # 1482791257 (Дата и время печати …)».
@@ -207,11 +210,13 @@ def find_number_and_date(text: str) -> tuple[str, str]:
 
 def _main_date(text: str) -> str:
     """Дата документа без явной подписи: «Дата составления …», иначе самая частая дата в документе."""
-    m = re.search(rf"дата\s+составлени\w*[^\d]{{0,60}}({DATE_NUM_RE})", text, re.IGNORECASE)
+    m = re.search(rf"составлени\w*[^\d]{{0,40}}?(?:\d{{4,}}[ \t]+)?({DATE_NUM_RE})", text, re.IGNORECASE)
     if m:
         return parse_date(m.group(1))
+    # Даты из будущего — это не дата документа: «25.12.98» из реквизитов формы читается как 2098 год.
+    latest = date.today().replace(year=date.today().year + 1).isoformat()
     dates = [parse_date(m.group(0)) for m in re.finditer(DATE_NUM_RE, text)]
-    dates = [d for d in dates if d]
+    dates = [d for d in dates if d and d <= latest]
     if not dates:
         m = re.search(rf"\bот\s+({DATE_ANY})", text, re.IGNORECASE)
         return parse_date(m.group(1)) if m else ""
@@ -385,6 +390,75 @@ def find_amounts(text: str, result: ExtractedData) -> None:
             result.vat = max(vat_values)
 
 
+QTY_RE = r"\d+(?:[.,]\d{1,3})?"
+# Строка счёта-фактуры / УПД: [№] код [код ОКЕИ] ед. кол-во цена стоимость … (наименование — строками ниже).
+INVOICE_LINE_RE = re.compile(
+    rf"^\s*(?:[^\w\s]{{1,2}}\s+|[а-яa-z]\s+)?(?:(\d{{1,3}})\s+)?([\w\-/.]{{3,}})\s+(?:\d{{3,4}}\s+)?"
+    rf"([А-Яа-яЁё.]{{1,8}})\s+({QTY_RE})\s+({MONEY_RE})\s+({MONEY_RE})", re.IGNORECASE)
+# Строка счёта на оплату или акта: № наименование кол-во ед. цена сумма.
+SIMPLE_LINE_RE = re.compile(
+    rf"^\s*(\d{{1,3}})\s+(.+?)\s+({QTY_RE})\s+([А-Яа-яЁё.]{{1,8}})\s+({MONEY_RE})\s+({MONEY_RE})\s*$")
+NAME_NOISE = re.compile(r"\b(?:акциза|без|ндс)\b", re.IGNORECASE)
+PACKAGING = re.compile(r"\d\s*\w{1,5}\s*=\s*\d|годен\s+до|^\s*\(", re.IGNORECASE)
+
+
+def _qty(raw: str) -> float | None:
+    try:
+        return float(raw.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def find_items(text: str, result: ExtractedData) -> None:
+    """Строки товаров, если таблица прочиталась построчно (счёт-фактура, УПД, счёт на оплату, акт).
+
+    ТОРГ-12 OCR обычно разбивает по колонкам — её строки извлекает ИИ.
+    """
+    lines = text.splitlines()
+    items: list[Item] = []
+    for index, line in enumerate(lines):
+        m = INVOICE_LINE_RE.match(line)
+        if m:
+            moneys = [parse_amount(x.group(0)) for x in re.finditer(MONEY_RE, line)]
+            rate = "Без НДС" if re.search(r"без\s+ндс", line, re.IGNORECASE) else ""
+            pct = re.search(r"\b(\d{1,2})\s*%", line)
+            if pct:
+                rate = f"{int(pct.group(1))}%"
+            country = re.search(r"\b\d{3}\s+([А-ЯЁ][А-ЯЁ -]{2,})", line)
+            gtd = re.search(GTD_RE, line)
+            # Наименование — следующие строки до упаковки («1 кор = 10 ШТ», «Годен до») или новой строки таблицы.
+            name_parts = []
+            for follow in lines[index + 1:index + 5]:
+                if not follow.strip() or INVOICE_LINE_RE.match(follow) or PACKAGING.search(follow) \
+                        or re.match(r"\s*(всего|итого)", follow, re.IGNORECASE):
+                    break
+                name_parts.append(NAME_NOISE.sub("", follow).strip(" ,"))
+            items.append(Item(
+                name=re.sub(r"\s+", " ", " ".join(name_parts)).strip() or m.group(2), code=m.group(2),
+                unit=m.group(3).strip("."), quantity=_qty(m.group(4)), price=parse_amount(m.group(5)),
+                amount=parse_amount(m.group(6)), vat_rate=rate, vat=0.0 if rate == "Без НДС" else None,
+                total=moneys[-1] if len(moneys) > 2 else parse_amount(m.group(6)),
+                country=country.group(1).strip().capitalize() if country else "",
+                gtd=gtd.group(0) if gtd else ""))
+            continue
+        m = SIMPLE_LINE_RE.match(line)
+        if m and not re.match(r"\s*\d", m.group(2)):
+            items.append(Item(name=m.group(2).strip(), unit=m.group(4).strip("."), quantity=_qty(m.group(3)),
+                              price=parse_amount(m.group(5)), amount=parse_amount(m.group(6)),
+                              total=parse_amount(m.group(6))))
+    totals = [i.total for i in items]
+    if not items or not all(totals):
+        return
+    line_sum = round(sum(totals), 2)
+    if result.total is None or abs(result.total - line_sum) <= 1:
+        result.items = items
+        result.total = line_sum if result.total is None else result.total
+    elif len(items) > 1 and result.total in totals:
+        # Итог прочитался неверно — вместо него взялась сумма одной строки; верный итог — сумма строк.
+        result.items, result.total = items, line_sum
+    # Иначе строки собраны из таблицы, которую OCR перемешал (как в ТОРГ-12), — им не доверяем.
+
+
 def find_extras(text: str, result: ExtractedData) -> None:
     """Основание, документ об отгрузке, грузоотправитель и грузополучатель."""
     m = re.search(r"\bо[сc][нв]ование\b(?:\s*(?:передачи|сдачи|получения)[^:\n]*)?\s*:?\s*([^\n]{3,160})",
@@ -433,6 +507,7 @@ def extract(text: str) -> ExtractedData:
     find_amounts(text, result)
     find_bank(text, result)
     find_extras(text, result)
+    find_items(text, result)
     result.warnings = validate(result)
     return result
 
@@ -464,3 +539,27 @@ def validate(result: ExtractedData) -> list[str]:
     if result.total is None:
         warnings.append("Не найдена сумма документа")
     return warnings
+
+
+# Типы, которые бывают одним документом на нескольких листах с разными заголовками.
+_DOC_FAMILY = {"УПД": "счет-фактура", "Счет-фактура": "счет-фактура"}
+
+
+def split_documents(pages: list[str]) -> list[list[int]]:
+    """Делит страницы файла на документы: например, PDF «ТОРГ-12 на двух листах + счёт-фактура» → [[0, 1], [2]].
+
+    Новый документ начинается со страницы другого типа; страница без явного типа (продолжение таблицы,
+    подписи) относится к предыдущему документу.
+    """
+    groups: list[list[int]] = []
+    family = ""
+    for index, page in enumerate(pages):
+        doc_type = detect_doc_type(normalize_text(page))
+        page_family = _DOC_FAMILY.get(doc_type, doc_type)
+        if not groups or (page_family and family and page_family != family):
+            groups.append([index])
+            family = page_family
+        else:
+            groups[-1].append(index)
+            family = family or page_family
+    return groups

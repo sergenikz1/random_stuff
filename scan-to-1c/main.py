@@ -12,9 +12,10 @@ import sys
 
 
 def run_extract(argv: list[str]) -> int:
-    from scan_to_1c import ai
-    from scan_to_1c.extract import extract
-    from scan_to_1c.loader import configure_tesseract, load_document
+    from pathlib import Path
+
+    from scan_to_1c import ai, pipeline
+    from scan_to_1c.loader import configure_tesseract
     from scan_to_1c.settings import Settings
 
     parser = argparse.ArgumentParser(prog="Scan2-1C")
@@ -29,9 +30,14 @@ def run_extract(argv: list[str]) -> int:
     results, failed = [], 0
     for path in args.extract:
         try:
-            doc = load_document(path, keep_images=bool(client and settings.ai_send_images))
-            data, note = ai.recognize(client, doc.text, doc.images, extract(doc.text))
-            results.append({"file": path, **data.to_dict(), **({"note": note} if note else {})})
+            parts = pipeline.recognize([Path(path)], client, keep_images=bool(client and settings.ai_send_images))
+            for part in parts:
+                entry = {"file": path, **part.data.to_dict()}
+                if part.page_numbers is not None:
+                    entry["pages"] = [n + 1 for n in part.page_numbers]
+                if part.message:
+                    entry["note"] = part.message
+                results.append(entry)
         except Exception as exc:  # noqa: BLE001
             failed += 1
             results.append({"file": path, "error": str(exc)})

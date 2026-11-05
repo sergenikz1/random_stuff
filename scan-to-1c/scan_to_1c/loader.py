@@ -92,15 +92,16 @@ def is_supported(path: Path) -> bool:
     return path.suffix.lower() in SUPPORTED_EXTENSIONS
 
 
-def prepare_image(image: Image.Image) -> Image.Image:
+def prepare_image(image: Image.Image, target: int = 0) -> Image.Image:
     """Поворот по EXIF, оттенки серого, растяжение контраста, увеличение мелких сканов и фото."""
+    target = target or TARGET_LONG_SIDE
     image = ImageOps.exif_transpose(image)
     image = image.convert("L")
     image = ImageOps.autocontrast(image)  # без отсечки: она усиливает шум JPEG
     # Лист A4 при 250–300 dpi — около 3000 px по длинной стороне. Фото с телефона (часто 1280 px)
     # увеличиваем до этого размера: Tesseract плохо читает строки ниже ~20 px.
-    if max(image.size) < TARGET_LONG_SIDE:
-        factor = TARGET_LONG_SIDE / max(image.size)
+    if max(image.size) < target:
+        factor = target / max(image.size)
         image = image.resize((int(image.width * factor), int(image.height * factor)), Image.LANCZOS)
     return image
 
@@ -155,10 +156,13 @@ def _image_pages(path: Path) -> list[Image.Image]:
     return pages
 
 
-def load_document(path: str | Path, progress=None, keep_images: bool = False) -> LoadedDocument:
+def load_document(path: str | Path, progress=None, keep_images: bool = False, pages: list[int] | None = None,
+                  scale: float = 1.0) -> LoadedDocument:
     """Возвращает текст документа постранично. progress(page, total) вызывается по ходу.
 
     keep_images=True дополнительно сохраняет первые страницы картинками — их смотрит ИИ.
+    pages — номера страниц файла (с нуля), если нужны не все. scale > 1 — распознать крупнее:
+    медленнее, но читается мелкий шрифт (например, шапка ТОРГ-12).
     """
     path = Path(path)
     suffix = path.suffix.lower()
@@ -174,13 +178,15 @@ def load_document(path: str | Path, progress=None, keep_images: bool = False) ->
         except Exception as exc:
             raise LoaderError(f"Не удалось открыть PDF: {exc}") from exc
         try:
-            total = len(pdf)
-            for index in range(total):
-                page = pdf[index]
+            selected = [n for n in (pages if pages is not None else range(len(pdf))) if 0 <= n < len(pdf)]
+            total = len(selected)
+            for index, number in enumerate(selected):
+                page = pdf[number]
                 text = page.get_textpage().get_text_bounded() or ""
                 need_image = keep_images and index < MAX_IMAGE_PAGES
                 if len(text.strip()) < MIN_TEXT_LAYER_CHARS or need_image:
-                    image = _fix_rotation(prepare_image(page.render(scale=PDF_RENDER_DPI / 72).to_pil()))
+                    bitmap = page.render(scale=PDF_RENDER_DPI * scale / 72).to_pil()
+                    image = _fix_rotation(prepare_image(bitmap, int(TARGET_LONG_SIDE * scale)))
                     if need_image:
                         doc.images.append(image)
                     if len(text.strip()) < MIN_TEXT_LAYER_CHARS:
@@ -194,8 +200,10 @@ def load_document(path: str | Path, progress=None, keep_images: bool = False) ->
         return doc
 
     images = _image_pages(path)
+    if pages is not None:
+        images = [images[n] for n in pages if 0 <= n < len(images)]
     for index, image in enumerate(images):
-        image = _fix_rotation(prepare_image(image))
+        image = _fix_rotation(prepare_image(image, int(TARGET_LONG_SIDE * scale)))
         if keep_images and index < MAX_IMAGE_PAGES:
             doc.images.append(image)
         doc.pages.append(_ocr_prepared(image))

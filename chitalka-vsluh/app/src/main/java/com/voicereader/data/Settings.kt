@@ -6,6 +6,7 @@ import androidx.annotation.StringRes
 import com.voicereader.R
 import com.voicereader.tts.VoiceKind
 import com.voicereader.tts.VoiceProfile
+import com.voicereader.tts.VoiceVolume
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -34,6 +35,8 @@ data class SettingsState(
     val keepScreenOn: Boolean = true,
     val autoScroll: Boolean = true,
     val musicMode: MusicMode = MusicMode.MIX,
+    /** Только голос читалки; системная громкость и сторонние плееры не меняются. */
+    val voiceVolume: Float = VoiceVolume.DEFAULT,
     /** Режим «только текст»: без панелей и системных полос. */
     val focusMode: Boolean = false,
     /** Быстрое чтение: слов в минуту и плавный разгон до этой скорости. */
@@ -80,6 +83,7 @@ object Settings {
                 .getOrDefault(TextWindow.NORMAL),
             keepScreenOn = prefs.getBoolean("keep_screen_on", true),
             autoScroll = prefs.getBoolean("auto_scroll", true),
+            voiceVolume = VoiceVolume.clamp(prefs.getFloat("voice_volume", VoiceVolume.DEFAULT)),
             musicMode = runCatching { MusicMode.valueOf(prefs.getString("music_mode", "MIX")!!) }
                 .getOrDefault(MusicMode.MIX),
             focusMode = prefs.getBoolean("focus_mode", false),
@@ -105,6 +109,7 @@ object Settings {
             putBoolean("keep_screen_on", state.keepScreenOn)
             putBoolean("auto_scroll", state.autoScroll)
             putString("music_mode", state.musicMode.name)
+            putFloat("voice_volume", state.voiceVolume)
             putBoolean("focus_mode", state.focusMode)
             putInt("speed_wpm", state.speedWpm)
             putBoolean("speed_ramp", state.speedRamp)
@@ -112,7 +117,8 @@ object Settings {
     }
 
     fun update(transform: (SettingsState) -> SettingsState) {
-        val next = transform(_state.value)
+        val changed = transform(_state.value)
+        val next = changed.copy(voiceVolume = VoiceVolume.clamp(changed.voiceVolume))
         _state.value = next
         write(next)
     }

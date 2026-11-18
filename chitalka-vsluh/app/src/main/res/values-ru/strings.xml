@@ -513,8 +513,6 @@
         <item>сб</item>
         <item>вс</item>
     </string-array>
-    <string name="music_volume">Громкость музыки: %1$d%%</string>
-    <string name="music_volume_hint">Общая громкость мультимедиа Android, включая голос читалки. Система не разрешает отдельно менять громкость чужого плеера.</string>
     <string name="update_title">Обновление приложения</string>
     <string name="update_version">Установлена версия: %1$s</string>
     <string name="update_button">Обновить</string>
@@ -531,4 +529,7 @@
     <string name="update_install_error">Не удалось открыть установщик. Проверьте разрешение на установку и повторите.</string>
     <string name="close">Закрыть</string>
     <string name="rank_continue">Далее</string>
+    <string name="voice_volume">Громкость голоса: %1$d%%</string>
+    <string name="voice_volume_hint_neural">Меняет только голос читалки. Выше 100% усиливает тихую речь. Если музыка всё ещё перекрывает голос, выберите «Приглушать».</string>
+    <string name="voice_volume_hint_system">Меняет только голос читалки, начиная со следующего предложения. Системные голоса поддерживают громкость до 100%. Если музыка перекрывает речь, выберите «Приглушать».</string>
 </resources>

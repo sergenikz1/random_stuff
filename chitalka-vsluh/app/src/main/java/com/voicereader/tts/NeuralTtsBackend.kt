@@ -50,6 +50,13 @@ class NeuralTtsBackend(
     private var job: Job? = null
     private var tts: OfflineTts? = null
     @Volatile private var activeTrack: AudioTrack? = null
+    @Volatile private var volume = VoiceVolume.DEFAULT
+
+    override fun setVolume(volume: Float) {
+        this.volume = VoiceVolume.clamp(volume)
+        // Включая уже буферизованный звук: приглушение и отключение голоса срабатывают сразу.
+        runCatching { activeTrack?.setVolume(VoiceVolume.playbackGain(this.volume)) }
+    }
 
     private class Piece(val index: Int, val samples: FloatArray)
 
@@ -68,6 +75,7 @@ class NeuralTtsBackend(
                 val sampleRate = engine.sampleRate()
                 track = createTrack(sampleRate)
                 activeTrack = track
+                track.setVolume(VoiceVolume.playbackGain(volume))
 
                 val channel = Channel<Piece>(capacity = 1)
                 val producer = launch {
@@ -184,10 +192,18 @@ class NeuralTtsBackend(
         if (total == 0) return
         var offset = 0
         val chunk = 2048
+        val boosted = FloatArray(chunk)
         while (offset < total) {
             coroutineContext.ensureActive()
             val count = minOf(chunk, total - offset)
-            val written = track.write(piece.samples, offset, count, AudioTrack.WRITE_BLOCKING)
+            val gain = volume
+            val written = if (gain > 1f) {
+                // Исходные сэмплы остаются неизменными, в том числе при частичной записи трека.
+                for (i in 0 until count) boosted[i] = VoiceVolume.boostSample(piece.samples[offset + i], gain)
+                track.write(boosted, 0, count, AudioTrack.WRITE_BLOCKING)
+            } else {
+                track.write(piece.samples, offset, count, AudioTrack.WRITE_BLOCKING)
+            }
             if (written <= 0) break
             offset += written
             emitWord(track, piece.index, words, text.length, startFrame, total)

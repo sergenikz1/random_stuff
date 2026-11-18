@@ -29,6 +29,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -83,6 +85,12 @@ object PlayerEngine {
         app = context.applicationContext
         audioManager = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         SystemTts.init(app)
+        scope.launch {
+            Settings.state.map { it.voiceVolume }.distinctUntilChanged().collect { volume ->
+                backend?.setVolume(volume)
+                preview?.setVolume(volume)
+            }
+        }
     }
 
     fun openBook(book: Book) {
@@ -224,6 +232,7 @@ object PlayerEngine {
             SystemTtsBackend(speechListener, profile, language)
         }
         backend = created
+        created.setVolume(Settings.state.value.voiceVolume)
         backendKey = key
         return created
     }
@@ -361,6 +370,7 @@ object PlayerEngine {
             }
             val rate = Settings.state.value.activeProfile.rate
             preview = NeuralTtsBackend(app, voice, silent, rate).also {
+                it.setVolume(Settings.state.value.voiceVolume)
                 it.start(listOf(AppText.get(R.string.preview_phrase), AppText.get(R.string.preview_phrase2)), 0)
             }
         }

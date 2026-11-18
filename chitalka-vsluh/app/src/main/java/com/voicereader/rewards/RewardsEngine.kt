@@ -36,12 +36,15 @@ data class RewardsState(
     // Переключатели
     val ribbonEnabled: Boolean = true,
     val dailyEnabled: Boolean = true,
-    val celebrations: Boolean = true
+    val celebrations: Boolean = true,
+    /** Последнее звание, которое пользователь уже увидел при открытии приложения. */
+    val shownRank: Int = 0
 ) {
     val rank: Int get() = RanksCatalog.rankFor(points)
     val medal: Int get() = FocusCatalog.medalFor(sessionSeconds)
     val bestMedal: Int get() = FocusCatalog.medalFor(bestSessionSeconds)
     val stage: Int get() = DailyCatalog.stageFor(growthDays)
+    val pendingRanks: List<Int> get() = ((shownRank + 1)..rank).toList()
     fun unlocked(reward: Reward) = rank >= reward.rank
     fun unlocked(kind: GrowKind) = kind == GrowKind.TREE ||
         RanksCatalog.REWARDS.any { it.grow == kind && unlocked(it) }
@@ -107,7 +110,7 @@ object RewardsEngine {
     fun addPoints(state: RewardsState, amount: Long, events: MutableList<RewardEvent>): RewardsState {
         val before = state.rank
         val next = state.copy(points = state.points + amount)
-        if (next.rank > before) events += RewardEvent.RankUp(next.rank)
+        for (rank in (before + 1)..next.rank) events += RewardEvent.RankUp(rank)
         return next
     }
 

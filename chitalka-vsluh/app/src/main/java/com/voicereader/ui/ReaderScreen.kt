@@ -184,12 +184,6 @@ fun ReaderScreen(
             }
 
             if (ribbon) {
-                // Плавный переход от текста к ленте, в цвет выбранного фона.
-                Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(170.dp).background(
-                        Brush.verticalGradient(listOf(Color.Transparent, (look.backgroundColor ?: MaterialTheme.colorScheme.background).copy(alpha = 0.85f), (look.backgroundColor ?: MaterialTheme.colorScheme.background)))
-                    )
-                )
                 MedalRibbon(rewards, Modifier.align(Alignment.BottomCenter).navigationBarsPadding(), ringFx = look.ring) { onAwards(0) }
             }
             if (!focusMode && state.sentences.isNotEmpty()) {
@@ -232,7 +226,7 @@ fun ReaderScreen(
         }
     }
 
-    RewardCelebrations(onApply = ::applyReward, celebrate = look.celebrate)
+    RewardCelebrations()
 
     if (showChapters) {
         ModalBottomSheet(onDismissRequest = { showChapters = false }) {
@@ -462,6 +456,10 @@ private fun ReaderSettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
+
+        MusicVolumeSlider()
+        Spacer(Modifier.height(18.dp))
+        AppUpdateSection()
 
         Spacer(Modifier.height(18.dp))
         DisplaySettings()

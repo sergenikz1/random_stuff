@@ -46,6 +46,11 @@ class MainActivity : ComponentActivity() {
         if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    override fun onStart() {
+        super.onStart()
+        Rewards.appOpened()
+    }
+
     override fun onStop() {
         super.onStop()
         // Позиция чтения не должна теряться при сворачивании.
@@ -53,5 +58,6 @@ class MainActivity : ComponentActivity() {
             s.bookId?.let { LibraryStore.savePosition(it, s.index) }
         }
         Rewards.save()
+        Rewards.appClosed()
     }
 }

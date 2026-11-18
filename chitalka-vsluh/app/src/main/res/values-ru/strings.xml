@@ -23,7 +23,7 @@
     <string name="delete_book_text">«%1$s» будет удалена из библиотеки вместе с прогрессом чтения.</string>
     <string name="book_progress">%1$s · %2$d%% · предложение %3$d из %4$d</string>
     <string name="library_empty">Библиотека пуста</string>
-    <string name="library_empty_hint">Нажмите «Добавить книгу» и выберите файл на устройстве.\n\nПоддерживаются EPUB, FB2, FB2.ZIP, PDF с текстовым слоем, TXT, HTML и Markdown.\n\nПриложение работает полностью офлайн: доступ в интернет ему не выдан.</string>
+    <string name="library_empty_hint">Нажмите «Добавить книгу» и выберите файл на устройстве.\n\nПоддерживаются EPUB, FB2, FB2.ZIP, PDF с текстовым слоем, TXT, HTML и Markdown.\n\nЧтение работает полностью офлайн. Интернет используется только для обновления приложения по кнопке.</string>
     <string name="contents">Оглавление</string>
     <string name="contents_count">Оглавление · %1$d</string>
     <string name="from_sentence">с предложения %1$d</string>
@@ -513,4 +513,22 @@
         <item>сб</item>
         <item>вс</item>
     </string-array>
+    <string name="music_volume">Громкость музыки: %1$d%%</string>
+    <string name="music_volume_hint">Общая громкость мультимедиа Android, включая голос читалки. Система не разрешает отдельно менять громкость чужого плеера.</string>
+    <string name="update_title">Обновление приложения</string>
+    <string name="update_version">Установлена версия: %1$s</string>
+    <string name="update_button">Обновить</string>
+    <string name="update_checking">Проверяем релизы на GitHub…</string>
+    <string name="update_downloading">Загружаем обновление: %1$d%%</string>
+    <string name="update_current">У вас последняя версия.</string>
+    <string name="update_ready">Версия %1$s готова к установке.</string>
+    <string name="update_install">Установить обновление</string>
+    <string name="update_hint">Проверяет релизы sergenikz1/random_stuff и скачивает APK для вашего телефона. Android попросит разрешить установку и подтвердить обновление. Книги и прогресс сохранятся.</string>
+    <string name="update_network_error">Не удалось проверить или скачать обновление. Проверьте интернет и повторите позже.</string>
+    <string name="update_no_apk">Новый релиз есть, но APK для вашего телефона пока не опубликован.</string>
+    <string name="update_invalid_apk">Загрузка неполная или APK не является новой версией читалки. Повторите позже.</string>
+    <string name="update_signature_error">У обновления другая подпись: установить его поверх приложения нельзя. Релиз должен быть подписан тем же ключом, что и установленная версия.</string>
+    <string name="update_install_error">Не удалось открыть установщик. Проверьте разрешение на установку и повторите.</string>
+    <string name="close">Закрыть</string>
+    <string name="rank_continue">Далее</string>
 </resources>

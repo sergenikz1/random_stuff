@@ -48,6 +48,9 @@ import com.voicereader.rewards.RewardEvent
 import com.voicereader.rewards.RewardKind
 import com.voicereader.rewards.Rewards
 import com.voicereader.player.PlayerEngine
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
@@ -61,62 +64,51 @@ private fun out3(k: Float) = 1 - (1 - k).pow(3)
 private fun inOut3(k: Float) = if (k < .5f) 4 * k * k * k else 1 - (-2 * k + 2).pow(3) / 2
 private fun back(k: Float): Float { val c = 1.7f; return 1 + (c + 1) * (k - 1).pow(3) + c * (k - 1).pow(2) }
 
-/**
- * Праздники во время чтения: новый ранг — окно на весь экран, рекорд и засчитанный день — плашкой сверху.
- * На время окна чтение ставится на паузу ([pauseReading] возвращает, шло ли оно), «Читать дальше» его продолжает.
- */
+/** Рекорд и засчитанный день показываются плашкой, пока приложение видно. */
 @Composable
-fun RewardCelebrations(
-    onApply: (Reward) -> Unit,
-    celebrate: String? = null,
-    pauseReading: () -> Boolean = { val was = PlayerEngine.state.value.isPlaying; PlayerEngine.pause(); was },
-    resumeReading: () -> Unit = { PlayerEngine.play() }
-) {
-    var rankUp by remember { mutableStateOf<Int?>(null) }
-    var wasReading by remember { mutableStateOf(false) }
+fun RewardCelebrations() {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     var toast by remember { mutableStateOf<String?>(null) }
     val recordText = stringResource(R.string.toast_record)
     val dayText = stringResource(R.string.toast_day)
-    LaunchedEffect(Unit) {
-        Rewards.events.collect { e ->
-            if (!Rewards.state.value.celebrations) return@collect
-            when (e) {
-                is RewardEvent.RankUp -> {
-                    if (rankUp == null) wasReading = pauseReading()
-                    rankUp = maxOf(rankUp ?: -1, e.rank)
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            Rewards.events.collect { event ->
+                if (!Rewards.state.value.celebrations) return@collect
+                when (event) {
+                    is RewardEvent.Record -> toast = recordText.format(event.seconds / 60)
+                    is RewardEvent.DayCounted -> toast = dayText.format(event.growthDays)
+                    is RewardEvent.RankUp, is RewardEvent.MedalUp -> Unit
                 }
-                is RewardEvent.Record -> toast = recordText.format(e.seconds / 60)
-                is RewardEvent.DayCounted -> toast = dayText.format(e.growthDays)
-                is RewardEvent.MedalUp -> Unit
             }
         }
     }
     LaunchedEffect(toast) { if (toast != null) { delay(3500); toast = null } }
-
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(
-            visible = toast != null && rankUp == null,
+            visible = toast != null,
             enter = slideInVertically { -it } + fadeIn(),
             exit = slideOutVertically { -it } + fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 64.dp)
         ) {
             Text(
-                toast.orEmpty(),
-                color = Color(0xFFDFF7E5), fontSize = 14.sp,
-                modifier = Modifier
-                    .background(Color(0xF5162C1E), RoundedCornerShape(16.dp))
+                toast.orEmpty(), color = Color(0xFFDFF7E5), fontSize = 14.sp,
+                modifier = Modifier.background(Color(0xF5162C1E), RoundedCornerShape(16.dp))
                     .border(1.dp, Color(0xFF4F8A5E), RoundedCornerShape(16.dp))
                     .padding(horizontal = 16.dp, vertical = 10.dp)
             )
         }
-        rankUp?.let { rank ->
-            key(rank) {
-                RankUpOverlay(rank, celebrate, onApply) {
-                    rankUp = null
-                    if (wasReading) resumeReading()
-                }
-            }
-        }
+    }
+}
+
+/** Снимок непросмотренных рангов при открытии, без остановки голоса или быстрого чтения. */
+@Composable
+fun PendingRankCelebrations(onApply: (Reward) -> Unit) {
+    val queue by Rewards.rankPresentations.collectAsState()
+    val state by Rewards.state.collectAsState()
+    val rank = queue.firstOrNull() ?: return
+    key(rank) {
+        RankUpOverlay(rank, lookOf(state).celebrate, onApply) { Rewards.rankShown(rank) }
     }
 }
 
@@ -133,7 +125,6 @@ private fun RankUpOverlay(rank: Int, celebrate: String?, onApply: (Reward) -> Un
     var cardCenter by remember { mutableStateOf(Offset.Zero) }
     var rootOffset by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(closeAt) { if (closeAt != null) { delay(650); onClose() } }
-    DisposableEffect(Unit) { Rewards.celebrating = true; onDispose { Rewards.celebrating = false } }
     BackHandler { if (closeAt == null) closeAt = clock.value }
 
     val tau = clock.value
@@ -222,13 +213,7 @@ private fun RankUpOverlay(rank: Int, celebrate: String?, onApply: (Reward) -> Un
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val pz = sg(tau, .3f, .8f) * a
-            Text(
-                stringResource(R.string.reading_paused), fontSize = 12.sp, color = Color(0xFFC9D1DE),
-                modifier = Modifier.padding(top = 12.dp).graphicsLayer { alpha = pz; translationY = (1 - pz) * -8 * density }
-                    .background(Color(0xEB1E222B), RoundedCornerShape(14.dp)).border(1.dp, Color(0xFF3A4150), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+            Spacer(Modifier.height(12.dp))
             Spacer(Modifier.weight(.6f))
             // Значок: старый появляется, заряжается и на вспышке переворачивается в новый.
             val app = back(sg(tau, .2f, .75f))
@@ -301,7 +286,7 @@ private fun RankUpOverlay(rank: Int, celebrate: String?, onApply: (Reward) -> Un
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(onClick = { if (closeAt == null) closeAt = tau }, modifier = Modifier.weight(1f).height(50.dp)) {
-                    Text(stringResource(R.string.read_on), fontSize = 15.sp, color = Color(0xFFE6EAF2))
+                    Text(stringResource(R.string.rank_continue), fontSize = 15.sp, color = Color(0xFFE6EAF2))
                 }
                 if (reward != null) Button(
                     onClick = { if (!applied) { onApply(reward); applied = true } },

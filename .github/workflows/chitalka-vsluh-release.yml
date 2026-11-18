@@ -19,6 +19,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      CHITALKA_KEYSTORE_BASE64: ${{ secrets.CHITALKA_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,9 +43,28 @@ jobs:
             chitalka-vsluh/app/src/main/assets/tts
           key: tts-assets-${{ hashFiles('chitalka-vsluh/app/build.gradle.kts') }}
 
-      - name: Build APKs
+      - name: Verify release tag matches app version
+        if: github.ref_type == 'tag'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' chitalka-vsluh/app/build.gradle.kts | head -1)
+          test "$RELEASE_TAG" = "chitalka-v$VERSION"
+
+      - name: Restore permanent signing key
+        if: env.CHITALKA_KEYSTORE_BASE64 != ''
+        run: |
+          mkdir -p "$HOME/.android"
+          printf '%s' "$CHITALKA_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+
+      - name: Test and build APKs
         working-directory: chitalka-vsluh
-        run: ./gradlew :app:assembleDebug
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Explain manual publication when signing secret is missing
+        if: env.CHITALKA_KEYSTORE_BASE64 == ''
+        run: echo '::notice::Automatic publication requires CHITALKA_KEYSTORE_BASE64. Test APKs use a temporary key. Publish locally signed APKs manually until the permanent secret is configured.'
 
       - name: Собрать файлы релиза
         id: files
@@ -63,15 +84,16 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Опубликовать релиз
+        if: env.CHITALKA_KEYSTORE_BASE64 != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.files.outputs.tag }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/*.apk --clobber
+            echo "Release $TAG already exists; published APKs are immutable."
           else
             gh release create "$TAG" release/*.apk \
-              --target "$GITHUB_SHA" \
+              --target "$GITHUB_SHA" --latest=false \
               --title "Читалка вслух $TAG" \
               --notes-file chitalka-vsluh/RELEASE_NOTES.md
           fi

@@ -23,7 +23,7 @@
     <string name="delete_book_text">“%1$s” will be removed from the library together with your reading progress.</string>
     <string name="book_progress">%1$s · %2$d%% · sentence %3$d of %4$d</string>
     <string name="library_empty">Your library is empty</string>
-    <string name="library_empty_hint">Tap “Add book” and choose a file on your device.\n\nSupported: EPUB, FB2, FB2.ZIP, PDF with a text layer, TXT, HTML and Markdown.\n\nThe app works fully offline: it has no internet access.</string>
+    <string name="library_empty_hint">Tap “Add book” and choose a file on your device.\n\nSupported: EPUB, FB2, FB2.ZIP, PDF with a text layer, TXT, HTML and Markdown.\n\nReading works fully offline. Internet is used only when you check for app updates.</string>
     <string name="contents">Contents</string>
     <string name="contents_count">Contents · %1$d</string>
     <string name="from_sentence">from sentence %1$d</string>
@@ -513,4 +513,22 @@
         <item>Sat</item>
         <item>Sun</item>
     </string-array>
+    <string name="music_volume">Music volume: %1$d%%</string>
+    <string name="music_volume_hint">Controls Android media volume, including the reading voice. Android does not allow separate volume control for another player.</string>
+    <string name="update_title">App updates</string>
+    <string name="update_version">Installed version: %1$s</string>
+    <string name="update_button">Update</string>
+    <string name="update_checking">Checking GitHub releases…</string>
+    <string name="update_downloading">Downloading update: %1$d%%</string>
+    <string name="update_current">You have the latest version.</string>
+    <string name="update_ready">Version %1$s is ready to install.</string>
+    <string name="update_install">Install update</string>
+    <string name="update_hint">Checks sergenikz1/random_stuff releases and downloads the APK for your phone. Android will ask you to allow installation and confirm the update. Books and progress are kept.</string>
+    <string name="update_network_error">Could not check or download the update. Check your connection and try again later.</string>
+    <string name="update_no_apk">A newer release exists, but its APK for your phone is not available yet.</string>
+    <string name="update_invalid_apk">The download is incomplete or is not a newer version of this app. Try again later.</string>
+    <string name="update_signature_error">The update has a different signing key and cannot be installed over this app. The release must be signed with the same key as the installed version.</string>
+    <string name="update_install_error">Could not open the installer. Check installation permissions and try again.</string>
+    <string name="close">Close</string>
+    <string name="rank_continue">Continue</string>
 </resources>

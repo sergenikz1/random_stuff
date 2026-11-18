@@ -1,6 +1,10 @@
 package com.voicereader.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import com.voicereader.ui.rewards.PendingRankCelebrations
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +29,14 @@ private sealed interface Screen {
 
 @Composable
 fun App() {
+    Box(Modifier.fillMaxSize()) {
+        AppContent()
+        PendingRankCelebrations(onApply = ::applyReward)
+    }
+}
+
+@Composable
+private fun AppContent() {
     var screen by remember { mutableStateOf<Screen>(Screen.Library) }
     val books by LibraryStore.books.collectAsState()
     val rewards by Rewards.state.collectAsState()

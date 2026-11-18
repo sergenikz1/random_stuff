@@ -30,6 +30,29 @@ class RewardsEngineTest {
     }
 
     @Test
+    fun allRanksReachedAtOnceAreQueuedWithoutChangingTheReadingSession() {
+        val events = ArrayList<RewardEvent>()
+        val base = RewardsState(sessionSeconds = 3600, shownRank = 0)
+        val next = RewardsEngine.addPoints(base, RanksCatalog.POINTS[5], events)
+        assertEquals((1..5).toList(), events.filterIsInstance<RewardEvent.RankUp>().map { it.rank })
+        assertEquals((1..5).toList(), next.pendingRanks)
+        assertEquals(base.sessionSeconds, next.sessionSeconds)
+        assertNull(next.pauseLeft)
+        // Закрыли два окна; остальные переживают сохранение показанного звания.
+        val acknowledged = next.copy(shownRank = 2)
+        assertEquals(listOf(3, 4, 5), acknowledged.pendingRanks)
+        assertTrue(acknowledged.copy(shownRank = 5).pendingRanks.isEmpty())
+    }
+
+    @Test
+    fun ranksEarnedWhileEarlierOnesAreShownRemainPending() {
+        val state = RewardsState(points = RanksCatalog.POINTS[3], shownRank = 1)
+        val after = RewardsEngine.addPoints(state, RanksCatalog.POINTS[5] - state.points, ArrayList())
+        assertEquals(listOf(2, 3, 4, 5), after.pendingRanks)
+        assertEquals(listOf(4, 5), after.copy(shownRank = 3).pendingRanks)
+    }
+
+    @Test
     fun focusMedalsFollowTiersOf5Ranks() {
         assertEquals(55, FocusCatalog.COUNT)
         assertEquals(-1, FocusCatalog.medalFor(59))

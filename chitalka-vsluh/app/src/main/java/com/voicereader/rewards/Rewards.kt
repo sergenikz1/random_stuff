@@ -32,6 +32,29 @@ object Rewards {
     private val _events = MutableSharedFlow<RewardEvent>(extraBufferCapacity = 16)
     val events: SharedFlow<RewardEvent> = _events
 
+    private val _rankPresentations = MutableStateFlow<List<Int>>(emptyList())
+    val rankPresentations: StateFlow<List<Int>> = _rankPresentations
+
+    /** Снимок очереди при возвращении: новые звания не прерывают текущее чтение. */
+    fun appOpened() {
+        val s = _state.value
+        if (s.celebrations) _rankPresentations.value = s.pendingRanks
+        else {
+            _state.value = s.copy(shownRank = s.rank)
+            _rankPresentations.value = emptyList()
+            save()
+        }
+    }
+
+    fun appClosed() { _rankPresentations.value = emptyList() }
+
+    fun rankShown(rank: Int) {
+        if (_rankPresentations.value.firstOrNull() != rank) return
+        _state.value = _state.value.copy(shownRank = rank)
+        _rankPresentations.value = _rankPresentations.value.drop(1)
+        save()
+    }
+
     /** Кто сейчас читает: голос и быстрое чтение учитываются независимо. */
     private val readers = HashSet<String>()
     private var ticker: Job? = null
@@ -39,9 +62,6 @@ object Rewards {
     private var dirtyTicks = 0
 
     var today: () -> LocalDate = { LocalDate.now() }
-
-    /** Пока открыто окно нового ранга, отсчёт перерыва стоит: серия не сгорит, пока смотрите награду. */
-    @Volatile var celebrating = false
 
     fun init(context: Context) {
         if (::prefs.isInitialized) return
@@ -80,7 +100,7 @@ object Rewards {
         pauseJob = scope.launch {
             while (isActive && _state.value.pauseLeft != null) {
                 delay(1000)
-                if (!celebrating) _state.value = RewardsEngine.pauseTick(_state.value)
+                _state.value = RewardsEngine.pauseTick(_state.value)
             }
             save()
         }
@@ -144,7 +164,9 @@ object Rewards {
                 } ?: emptyMap(),
                 ribbonEnabled = o.optBoolean("ribbon", true),
                 dailyEnabled = o.optBoolean("daily", true),
-                celebrations = o.optBoolean("celebrations", true)
+                celebrations = o.optBoolean("celebrations", true),
+                shownRank = o.optInt("shownRank", RanksCatalog.rankFor(o.optLong("points")))
+                    .coerceIn(0, RanksCatalog.rankFor(o.optLong("points")))
             )
         }.getOrDefault(RewardsState())
     }
@@ -163,6 +185,7 @@ object Rewards {
             .put("grow", s.growKind.name).put("bg", s.backgroundId ?: "").put("text", s.textId ?: "")
             .put("font", s.font.name)
             .put("anims", JSONObject(s.anims.mapKeys { it.key.name } as Map<*, *>))
+            .put("shownRank", s.shownRank)
             .put("ribbon", s.ribbonEnabled).put("daily", s.dailyEnabled).put("celebrations", s.celebrations)
         prefs.edit().putString("state", o.toString()).apply()
     }

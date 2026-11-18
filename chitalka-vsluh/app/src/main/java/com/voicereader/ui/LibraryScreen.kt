@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Settings as GearIcon
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ fun LibraryScreen(
     val snackbar = remember { SnackbarHostState() }
     var importing by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Book?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
 
     val addFailed = stringResource(R.string.err_add_book)
     val picker = rememberLauncherForActivityResult(
@@ -60,6 +62,9 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
                 actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Filled.GearIcon, contentDescription = stringResource(R.string.settings))
+                    }
                     IconButton(onClick = onAwards) {
                         Icon(Icons.Filled.EmojiEvents, contentDescription = stringResource(R.string.my_rewards))
                     }
@@ -97,6 +102,17 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text(stringResource(R.string.settings)) },
+            text = { AppUpdateSection() },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) { Text(stringResource(R.string.close)) }
+            }
+        )
     }
 
     pendingDelete?.let { book ->

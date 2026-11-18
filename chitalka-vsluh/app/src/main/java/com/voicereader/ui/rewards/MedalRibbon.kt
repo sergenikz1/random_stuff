@@ -5,16 +5,15 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -75,8 +74,7 @@ private const val EARN_S = 1.35f
 private const val TIER_UP_S = 2.2f
 
 /**
- * Лента медалей в режиме чтения — карточка внизу экрана. Слева полученная медаль, по центру цель в кольце
- * прогресса, справа следующая. Медаль вручается со вспышкой и переворотом, после чего лента сдвигается;
+ * Прозрачная лента: последняя полученная медаль и текущая цель в кольце прогресса. Медаль вручается со вспышкой и переворотом, после чего лента сдвигается;
  * на паузе всё сереет, а кольцо превращается в минутный отсчёт. Нажатие открывает «Мои награды».
  */
 @Composable
@@ -88,6 +86,18 @@ fun MedalRibbon(
     onClick: (() -> Unit)? = null
 ) {
     val clock = rememberClock()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var resumed by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    var resumeId by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) { resumed = true; resumeId++ }
+            if (event == Lifecycle.Event.ON_PAUSE) resumed = false
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    var handledResume by remember { mutableIntStateOf(-1) }
     var shown by remember { mutableIntStateOf(state.medal) }
     var earnIdx by remember { mutableStateOf<Int?>(null) }
     val earnT = remember { Animatable(0f) }
@@ -97,13 +107,20 @@ fun MedalRibbon(
     val enter = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) { enter.animateTo(1f, tween(1300, easing = LinearEasing)) }
-    LaunchedEffect(state.medal) {
+    LaunchedEffect(state.medal, resumed, resumeId) {
         val target = state.medal
         earnIdx = null; shift.snapTo(1f); ringA.snapTo(1f); drop.snapTo(0f)
+        val returning = handledResume != resumeId
+        handledResume = resumeId
+        if (!resumed || returning || target > shown + 1) {
+            // После фона сразу показываем актуальную пару, без очереди вручений.
+            shown = target
+            enter.snapTo(1f)
+            return@LaunchedEffect
+        }
         if (target > shown) {
-            // Вручаем по одной, даже если за раз набралось несколько медалей.
-            while (shown < target) {
-                val idx = shown + 1
+            run {
+                val idx = target
                 val dur = if (idx % FocusCatalog.RANKS_PER_TIER == 0) TIER_UP_S else EARN_S
                 earnIdx = idx
                 earnT.snapTo(0f)
@@ -136,7 +153,6 @@ fun MedalRibbon(
     val brokenText = stringResource(R.string.ribbon_broken)
     val measurer = rememberTextMeasurer(cacheSize = 16)
 
-    val cardShape = RoundedCornerShape(28.dp)
     val dockAlpha = if (dim) 0.8f else 1f
     Box(
         modifier
@@ -146,16 +162,6 @@ fun MedalRibbon(
             .alpha(dockAlpha)
             .then(if (onClick != null) Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick) else Modifier)
     ) {
-        // Карточка: тень, градиент и рамка, которая на паузе становится оранжевой.
-        val borderColor = lerp(Color(0xFF2A303B), Color(0xFF5A3B1C), pause)
-        Box(
-            Modifier
-                .matchParentSize()
-                .graphicsLayer { val e = eOut(enter.value); alpha = clamp01(e * 1.3f); translationY = (1 - e) * 40 * density }
-                .shadow(14.dp, cardShape)
-                .background(Brush.verticalGradient(listOf(Color(0xF71F232D), Color(0xFA16191F))), cardShape)
-                .border(1.dp, borderColor, cardShape)
-        )
         Canvas(Modifier.matchParentSize().graphicsLayer { clip = false }) {
             drawRibbon(
                 RibbonFrame(
@@ -227,15 +233,15 @@ private fun DrawScope.drawRibbon(
     val cy = 48 * d
     val ringR = 37 * d
     // Слоты: −1 — уходит влево, 0 — полученная, 1 — цель, 2 — следующая, 3 — появляется справа.
-    val slotX = floatArrayOf(.06f, .182f, .5f, .818f, .945f)
+    val slotX = floatArrayOf(-.1f, .25f, .7f, 1.12f, 1.3f)
     val slotSize = floatArrayOf(26f, 42f, 60f, 34f, 26f)
-    val slotOp = floatArrayOf(0f, 1f, 1f, .9f, 0f)
+    val slotOp = floatArrayOf(0f, 1f, 1f, 0f, 0f)
     fun slot(p: Float): Triple<Float, Float, Float> {
         val q = p.coerceIn(-1f, 3f) + 1
         val a = q.toInt().coerceAtMost(3); val b = min(4, a + 1); val k = q - a
         return Triple(mix(slotX[a], slotX[b], k) * w, mix(slotSize[a], slotSize[b], k) * d, mix(slotOp[a], slotOp[b], k))
     }
-    val cx = w * .5f
+    val cx = w * .7f
     val target = min(f.cur + 1, FocusCatalog.COUNT - 1)
     val earn = f.earnIdx
     var acc = if (f.u < 1f) lerp(accentOf(f.cur), accentOf(target), eInOut(f.u)) else accentOf(target)
@@ -266,14 +272,12 @@ private fun DrawScope.drawRibbon(
         }
     }
 
-    // Дорожка: прошлое — сплошная в цвет ступени, будущее — пунктир. Во время сдвига гаснет.
+    // Дорожка соединяет последнюю медаль с текущей целью. Во время сдвига гаснет.
     val trackA = (1 - drop) * ent * (if (f.u < 1f) (1 - 2 * f.u).pow(2) else 1f)
     if (trackA > .01f) {
-        val lx = slotX[1] * w + 24 * d; val rx = slotX[3] * w - 21 * d
+        val lx = slotX[1] * w + 24 * d
         drawLine(Brush.horizontalGradient(listOf(lerp(acc, TRACK, .55f), ringCol), lx, cx - ringR - 6 * d),
             Offset(lx, cy), Offset(cx - ringR - 6 * d, cy), 3 * d, StrokeCap.Round, alpha = trackA * (1 - .4f * f.pause))
-        var x = cx + ringR + 6 * d
-        while (x < rx) { drawCircle(Color(0xFF3A4150).copy(alpha = trackA), 1.5f * d, Offset(x, cy)); x += 9 * d }
         // Раз в 9 секунд по дорожке к цели летят три искры.
         val ph = (t - 3.2f) % 9f
         if (f.pause < .01f && earn == null && ph in 0f..1.6f) for (j in 0 until 3) {
@@ -313,7 +317,7 @@ private fun DrawScope.drawRibbon(
 
     // Медали.
     val curShown = f.cur
-    for (i in curShown - 1..curShown + 2) {
+    for (i in curShown - 1..min(curShown + 1, FocusCatalog.COUNT - 1)) {
         if (i < -1 || i >= FocusCatalog.COUNT || (i == -1 && curShown > 0)) continue
         val p = i - curShown + 1 - f.u
         val (sx, sz, sop) = slot(p)

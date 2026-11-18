@@ -184,13 +184,8 @@ fun SpeedReaderScreen(onBack: () -> Unit) {
         }
     }
 
-    // Новый ранг и в быстром чтении: показ останавливается, «Читать дальше» его продолжает.
-    RewardCelebrations(
-        onApply = ::applyReward,
-        celebrate = lookOf(rewards).celebrate,
-        pauseReading = { val was = playing; playing = false; was },
-        resumeReading = { shownSinceStart = 0; playing = true }
-    )
+    RewardCelebrations()
+
 }
 
 /** Название новой главы: плавно проявляется, держится и так же плавно гаснет. */

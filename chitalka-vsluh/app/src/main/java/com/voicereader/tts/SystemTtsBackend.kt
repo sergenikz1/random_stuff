@@ -4,6 +4,8 @@ import com.voicereader.AppText
 import com.voicereader.R
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
@@ -24,10 +26,23 @@ class SystemTtsBackend(
     /** Номер «поколения» очереди: колбэки от прошлых запусков игнорируются. */
     private var generation = 0
     private var enqueuedUpTo = -1
+    private val main = Handler(Looper.getMainLooper())
+    private var volume = VoiceVolume.DEFAULT
+    private var volumeChanged = false
+
+    override fun setVolume(volume: Float) {
+        val gain = VoiceVolume.playbackGain(volume)
+        if (this.volume != gain) {
+            this.volume = gain
+            volumeChanged = true
+        }
+    }
 
     override fun start(sentences: List<String>, fromIndex: Int) {
         this.sentences = sentences
         generation++
+        val startingGeneration = generation
+        volumeChanged = false
         enqueuedUpTo = fromIndex - 1
         val engine = SystemTts.engine()
         if (engine == null) {
@@ -36,10 +51,12 @@ class SystemTtsBackend(
         }
         listener.onPreparing(true)
         SystemTts.whenReady {
+            if (generation != startingGeneration) return@whenReady
             SystemTts.applyLanguage(language)
             engine.setOnUtteranceProgressListener(progress)
             applyVoice(engine)
             listener.onPreparing(false)
+            volumeChanged = false
             pump(2, flushFirst = true)
         }
     }
@@ -69,7 +86,7 @@ class SystemTtsBackend(
             val id = "$generation:$next"
             val params = Bundle().apply {
                 putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, id)
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
             }
             val mode = if (flushFirst && i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             engine.speak(sentences[next], mode, params, id)
@@ -79,30 +96,41 @@ class SystemTtsBackend(
 
     private val progress = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) {
-            val (gen, idx) = parse(utteranceId) ?: return
-            if (gen != generation) return
-            listener.onSentenceStart(idx)
+            withCurrent(utteranceId) { listener.onSentenceStart(it) }
         }
 
         override fun onDone(utteranceId: String?) {
-            val (gen, idx) = parse(utteranceId) ?: return
-            if (gen != generation) return
-            if (idx >= sentences.size - 1) listener.onFinished() else pump(1)
+            withCurrent(utteranceId) { idx ->
+                if (idx >= sentences.size - 1) listener.onFinished()
+                else if (volumeChanged) {
+                    // В очереди уже есть фраза со старой громкостью. Заменяем её на границе
+                    // предложений, не перечитывая текущую фразу и не меняя аудиофокус.
+                    volumeChanged = false
+                    generation++
+                    enqueuedUpTo = idx
+                    pump(2, flushFirst = true)
+                } else pump(1)
+            }
         }
 
         @Deprecated("Требуется базовым классом")
         override fun onError(utteranceId: String?) = onError(utteranceId, -1)
 
         override fun onError(utteranceId: String?, errorCode: Int) {
-            val (gen, _) = parse(utteranceId) ?: return
-            if (gen != generation) return
-            listener.onError(AppText.get(R.string.err_system_tts_synthesis))
+            withCurrent(utteranceId) { listener.onError(AppText.get(R.string.err_system_tts_synthesis)) }
         }
 
         override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
-            val (gen, idx) = parse(utteranceId) ?: return
-            if (gen != generation) return
-            listener.onWordRange(idx, start until end)
+            withCurrent(utteranceId) { listener.onWordRange(it, start until end) }
+        }
+
+        // Параметры очереди и громкость меняются на одном потоке; поздние колбэки
+        // очищенной очереди не могут передвинуть позицию или снова включить чтение.
+        private fun withCurrent(id: String?, action: (Int) -> Unit) {
+            main.post {
+                val (gen, index) = parse(id) ?: return@post
+                if (gen == generation) action(index)
+            }
         }
 
         private fun parse(id: String?): Pair<Int, Int>? {

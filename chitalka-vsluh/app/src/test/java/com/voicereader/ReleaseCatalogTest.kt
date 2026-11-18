@@ -16,6 +16,7 @@ class ReleaseCatalogTest {
     fun comparesVersionComponentsNumericallyAndAcceptsTrailingZeros() {
         assertTrue(ReleaseVersion.parse("1.10")!! > ReleaseVersion.parse("1.9")!!)
         assertEquals(0, installed.compareTo(ReleaseVersion.parse("1.4.0")!!))
+        assertTrue(ReleaseVersion.parse("1.5.1")!! > ReleaseVersion.parse("1.5")!!)
         listOf("1.5-beta", "v1.5", "", "1..5", "99999999999999").forEach { assertNull(ReleaseVersion.parse(it)) }
         assertNull(ReleaseVersion.fromTag("another-app-v9.0"))
     }

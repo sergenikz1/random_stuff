@@ -513,8 +513,6 @@
         <item>Sat</item>
         <item>Sun</item>
     </string-array>
-    <string name="music_volume">Music volume: %1$d%%</string>
-    <string name="music_volume_hint">Controls Android media volume, including the reading voice. Android does not allow separate volume control for another player.</string>
     <string name="update_title">App updates</string>
     <string name="update_version">Installed version: %1$s</string>
     <string name="update_button">Update</string>
@@ -531,4 +529,7 @@
     <string name="update_install_error">Could not open the installer. Check installation permissions and try again.</string>
     <string name="close">Close</string>
     <string name="rank_continue">Continue</string>
+    <string name="voice_volume">Voice volume: %1$d%%</string>
+    <string name="voice_volume_hint_neural">Changes only the reading voice. Above 100% boosts quieter speech. If music still masks the voice, choose “Lower it”.</string>
+    <string name="voice_volume_hint_system">Changes only the reading voice, starting with the next sentence. System voices support up to 100%. If music masks the voice, choose “Lower it”.</string>
 </resources>

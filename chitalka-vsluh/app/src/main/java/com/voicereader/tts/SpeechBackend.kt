@@ -21,6 +21,9 @@ interface SpeechBackend {
     /** Поддерживает ли настройку высоты тона (нейросетевые модели — нет). */
     val supportsPitch: Boolean
 
+    /** Меняет только речевой сигнал, без захвата аудиофокуса и перезапуска чтения. */
+    fun setVolume(volume: Float)
+
     fun start(sentences: List<String>, fromIndex: Int)
     fun stop()
     fun release()

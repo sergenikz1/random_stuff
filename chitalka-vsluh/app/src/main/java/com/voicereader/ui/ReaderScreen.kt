@@ -457,7 +457,7 @@ private fun ReaderSettings(
             modifier = Modifier.padding(top = 4.dp)
         )
 
-        MusicVolumeSlider()
+        VoiceVolumeSlider(state.language)
         Spacer(Modifier.height(18.dp))
         AppUpdateSection()
 

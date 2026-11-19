@@ -5,7 +5,7 @@ import kotlin.math.abs
 /** Независимая от системной громкости регулировка речи: 1 — исходный сигнал. */
 object VoiceVolume {
     const val DEFAULT = 1f
-    const val MAX = 2f
+    const val MAX = 10f
     const val SYSTEM_MAX = 1f
 
     fun clamp(value: Float): Float = if (value.isFinite()) value.coerceIn(0f, MAX) else DEFAULT

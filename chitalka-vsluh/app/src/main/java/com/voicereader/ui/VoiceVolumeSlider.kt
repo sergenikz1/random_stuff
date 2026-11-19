@@ -1,6 +1,9 @@
 package com.voicereader.ui
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -37,6 +40,10 @@ fun VoiceVolumeSlider(language: String) {
         valueRange = 0f..max,
         modifier = Modifier.semantics { contentDescription = label }
     )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("0%", style = MaterialTheme.typography.bodySmall)
+        Text("${(max * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall)
+    }
     Text(
         stringResource(if (neural) R.string.voice_volume_hint_neural else R.string.voice_volume_hint_system),
         style = MaterialTheme.typography.bodySmall,

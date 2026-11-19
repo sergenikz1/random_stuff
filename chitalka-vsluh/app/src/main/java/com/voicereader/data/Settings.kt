@@ -19,13 +19,6 @@ enum class TextWindow(@StringRes val label: Int, val before: Int, val after: Int
     ALL(R.string.window_all, Int.MAX_VALUE, Int.MAX_VALUE)
 }
 
-/** Как вести себя со сторонней музыкой, пока читает голос. */
-enum class MusicMode(@StringRes val label: Int, @StringRes val hint: Int) {
-    PAUSE(R.string.music_pause, R.string.music_pause_hint),
-    DUCK(R.string.music_duck, R.string.music_duck_hint),
-    MIX(R.string.music_mix, R.string.music_mix_hint)
-}
-
 data class SettingsState(
     val profiles: List<VoiceProfile> = VoiceProfile.DEFAULTS,
     val activeVoice: Int = 0,
@@ -34,7 +27,6 @@ data class SettingsState(
     val textWindow: TextWindow = TextWindow.NORMAL,
     val keepScreenOn: Boolean = true,
     val autoScroll: Boolean = true,
-    val musicMode: MusicMode = MusicMode.MIX,
     /** Только голос читалки; системная громкость и сторонние плееры не меняются. */
     val voiceVolume: Float = VoiceVolume.DEFAULT,
     /** Режим «только текст»: без панелей и системных полос. */
@@ -60,6 +52,7 @@ object Settings {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
         _state.value = read()
+        prefs.edit().remove("music_mode").apply()
     }
 
     private fun read(): SettingsState {
@@ -84,8 +77,6 @@ object Settings {
             keepScreenOn = prefs.getBoolean("keep_screen_on", true),
             autoScroll = prefs.getBoolean("auto_scroll", true),
             voiceVolume = VoiceVolume.clamp(prefs.getFloat("voice_volume", VoiceVolume.DEFAULT)),
-            musicMode = runCatching { MusicMode.valueOf(prefs.getString("music_mode", "MIX")!!) }
-                .getOrDefault(MusicMode.MIX),
             focusMode = prefs.getBoolean("focus_mode", false),
             speedWpm = prefs.getInt("speed_wpm", 300).coerceIn(SPEED_MIN, SPEED_MAX),
             speedRamp = prefs.getBoolean("speed_ramp", true)
@@ -108,7 +99,7 @@ object Settings {
             putString("text_window", state.textWindow.name)
             putBoolean("keep_screen_on", state.keepScreenOn)
             putBoolean("auto_scroll", state.autoScroll)
-            putString("music_mode", state.musicMode.name)
+            remove("music_mode")
             putFloat("voice_volume", state.voiceVolume)
             putBoolean("focus_mode", state.focusMode)
             putInt("speed_wpm", state.speedWpm)

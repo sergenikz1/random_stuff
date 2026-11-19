@@ -5,13 +5,9 @@ import com.voicereader.R
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import com.voicereader.data.Book
 import com.voicereader.data.Chapter
 import com.voicereader.data.LibraryStore
-import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
 import com.voicereader.rewards.Rewards
 import com.voicereader.tts.NeuralTtsBackend
@@ -72,9 +68,6 @@ object PlayerEngine {
     val systemTtsStatus: StateFlow<TtsStatus> get() = SystemTts.status
 
     private lateinit var app: Context
-    private var audioManager: AudioManager? = null
-    private var focusRequest: AudioFocusRequest? = null
-    private var pausedByFocusLoss = false
 
     private var backend: SpeechBackend? = null
     /** Подпись текущего движка: если параметры голоса изменились, движок пересоздаётся. */
@@ -83,7 +76,6 @@ object PlayerEngine {
     fun attach(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
-        audioManager = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         SystemTts.init(app)
         scope.launch {
             Settings.state.map { it.voiceVolume }.distinctUntilChanged().collect { volume ->
@@ -150,7 +142,6 @@ object PlayerEngine {
                 }
             }
 
-            if (!requestFocus()) return@launch
             stopPreview()
             val engine = ensureBackend(profile, neural, snapshot.language)
             _state.value = _state.value.copy(isPlaying = true, message = null)
@@ -165,7 +156,6 @@ object PlayerEngine {
         if (_state.value.isPlaying) Rewards.readingStopped("voice")
         _state.value = _state.value.copy(isPlaying = false, wordRange = null, preparing = false)
         savePosition()
-        abandonFocus()
     }
 
     fun seekTo(index: Int) {
@@ -266,7 +256,6 @@ object PlayerEngine {
         override fun onFinished() = post {
             Rewards.sentenceRead(); Rewards.chapterFinished(); Rewards.readingStopped("voice")
             _state.value = _state.value.copy(isPlaying = false, wordRange = null, message = AppText.get(R.string.msg_book_finished))
-            abandonFocus()
         }
 
         override fun onPreparing(preparing: Boolean) = post {
@@ -276,7 +265,6 @@ object PlayerEngine {
         override fun onError(message: String) = post {
             if (_state.value.isPlaying) Rewards.readingStopped("voice")
             _state.value = _state.value.copy(isPlaying = false, preparing = false, message = message)
-            abandonFocus()
         }
 
         private fun post(action: () -> Unit) {
@@ -293,55 +281,8 @@ object PlayerEngine {
         _state.value = _state.value.copy(message = null)
     }
 
-    // --- Аудиофокус: пауза на время звонка или чужого воспроизведения ---
-    // В режиме «Не трогать» фокус не берётся вовсе, поэтому музыка в другом плеере не встаёт на паузу.
-    // «Приглушать» берёт временный фокус с разрешением приглушения: система делает музыку тише.
-
-    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
-        when (change) {
-            AudioManager.AUDIOFOCUS_LOSS ->
-                // Пользователь сам включил музыку — в режиме приглушения читаем дальше вместе с ней.
-                if (Settings.state.value.musicMode == MusicMode.DUCK) focusRequest = null else pause()
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                if (_state.value.isPlaying) { pausedByFocusLoss = true; pause() }
-            }
-            AudioManager.AUDIOFOCUS_GAIN -> if (pausedByFocusLoss) { pausedByFocusLoss = false; play() }
-        }
-    }
-
-    private fun requestFocus(): Boolean {
-        val am = audioManager ?: return true
-        val mode = Settings.state.value.musicMode
-        if (mode == MusicMode.MIX) return true
-        // Фокус уже удержан (перемотка во время чтения) — повторный запрос не нужен.
-        if (focusRequest != null) return true
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
-        val gain = if (mode == MusicMode.DUCK) AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-        else AudioManager.AUDIOFOCUS_GAIN
-        val request = AudioFocusRequest.Builder(gain)
-            .setAudioAttributes(attrs)
-            .setOnAudioFocusChangeListener(focusListener)
-            .build()
-        focusRequest = request
-        return am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-    }
-
-    private fun abandonFocus() {
-        val am = audioManager ?: return
-        focusRequest?.let { am.abandonAudioFocusRequest(it) }
-        focusRequest = null
-    }
-
-    /** Режим музыки сменили во время чтения — перезахватываем фокус в новом виде. */
-    fun applyMusicMode() {
-        if (!_state.value.isPlaying) return
-        abandonFocus()
-        requestFocus()
-    }
+    // Музыка играет независимо: аудиофокус не запрашивается, смена трека
+    // стороннего плеера не меняет громкость голоса и не останавливает чтение.
 
     // --- Прослушивание голоса на экране оформления ---
 

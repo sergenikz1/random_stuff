@@ -35,13 +35,6 @@
     <string name="focus_mode_off">Показать панели</string>
     <string name="focus_mode_hint">«Только текст» прячет панели: нажмите на текст, чтобы на время показать кнопки, «Назад» — выйти из режима.</string>
     <string name="voice">Голос</string>
-    <string name="music_title">Музыка во время чтения</string>
-    <string name="music_pause">Ставить на паузу</string>
-    <string name="music_pause_hint">Другие плееры замолкают, пока звучит книга</string>
-    <string name="music_duck">Приглушать</string>
-    <string name="music_duck_hint">Музыка играет тише, голос слышно лучше</string>
-    <string name="music_mix">Не трогать</string>
-    <string name="music_mix_hint">Музыка играет как обычно, вместе с голосом</string>
     <string name="prev_chapter">Предыдущая глава</string>
     <string name="next_chapter">Следующая глава</string>
     <string name="prev_sentence">Предложение назад</string>
@@ -530,6 +523,6 @@
     <string name="close">Закрыть</string>
     <string name="rank_continue">Далее</string>
     <string name="voice_volume">Громкость голоса: %1$d%%</string>
-    <string name="voice_volume_hint_neural">Меняет только голос читалки. Выше 100% усиливает тихую речь. Если музыка всё ещё перекрывает голос, выберите «Приглушать».</string>
-    <string name="voice_volume_hint_system">Меняет только голос читалки, начиная со следующего предложения. Системные голоса поддерживают громкость до 100%. Если музыка перекрывает речь, выберите «Приглушать».</string>
+    <string name="voice_volume_hint_neural" formatted="false">Меняет только голос читалки: 0–1000%. 100% — исходная громкость; выше усиливается тихая речь. Музыка играет независимо, в том числе при смене треков.</string>
+    <string name="voice_volume_hint_system" formatted="false">Меняет только голос читалки, начиная со следующего предложения. Системные голоса Android поддерживают громкость до 100%. Музыка играет независимо, в том числе при смене треков.</string>
 </resources>

@@ -18,18 +18,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.voicereader.R
 import com.voicereader.data.Settings
-import com.voicereader.tts.VoiceCatalog
-import com.voicereader.tts.VoiceKind
 import com.voicereader.tts.VoiceVolume
 import kotlin.math.roundToInt
 
 @Composable
-fun VoiceVolumeSlider(language: String) {
+fun VoiceVolumeSlider() {
     val settings by Settings.state.collectAsState()
-    val profile = settings.activeProfile
-    val voice = VoiceCatalog.byId(profile.neuralVoiceId)
-    val neural = profile.kind == VoiceKind.NEURAL && voice != null && VoiceCatalog.matchesLanguage(voice, language)
-    val max = if (neural) VoiceVolume.MAX else VoiceVolume.SYSTEM_MAX
+    val max = VoiceVolume.MAX
     val volume = settings.voiceVolume.coerceAtMost(max)
     val label = stringResource(R.string.voice_volume, (100 * volume).roundToInt())
     Spacer(Modifier.height(12.dp))
@@ -45,7 +40,7 @@ fun VoiceVolumeSlider(language: String) {
         Text("${(max * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall)
     }
     Text(
-        stringResource(if (neural) R.string.voice_volume_hint_neural else R.string.voice_volume_hint_system),
+        stringResource(R.string.voice_volume_hint),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

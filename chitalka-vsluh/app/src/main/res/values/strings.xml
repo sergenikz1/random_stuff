@@ -523,6 +523,12 @@
     <string name="close">Close</string>
     <string name="rank_continue">Continue</string>
     <string name="voice_volume">Voice volume: %1$d%%</string>
-    <string name="voice_volume_hint_neural" formatted="false">Changes only the reading voice: 0–1000%. 100% is the original volume; higher values boost quiet speech. Music plays independently, including when tracks change.</string>
-    <string name="voice_volume_hint_system" formatted="false">Changes only the reading voice, starting with the next sentence. Android system voices support up to 100%. Music plays independently, including when tracks change.</string>
+    <string name="music_title">Music while reading</string>
+    <string name="music_pause">Pause it</string>
+    <string name="music_pause_hint">Other players go quiet while the book is read</string>
+    <string name="music_duck">Lower it</string>
+    <string name="music_duck_hint">Music stays quieter while reading, including after track changes</string>
+    <string name="music_mix">Leave it</string>
+    <string name="music_mix_hint">Music plays as usual, together with the voice</string>
+    <string name="voice_volume_hint" formatted="false">Changes only the reading voice, from 0 to 100%, without extra amplification. Choose “Lower it” to keep music quieter while reading. System voices apply volume changes starting with the next sentence.</string>
 </resources>

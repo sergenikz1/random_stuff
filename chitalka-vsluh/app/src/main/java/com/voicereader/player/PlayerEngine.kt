@@ -42,6 +42,7 @@ data class PlayerState(
     /** Диапазон произносимого сейчас слова внутри текущего предложения. */
     val wordRange: IntRange? = null,
     val isPlaying: Boolean = false,
+    val focusInterrupted: Boolean = false,
     val loading: Boolean = false,
     /** Идёт загрузка модели или синтез первой фразы. */
     val preparing: Boolean = false,
@@ -68,6 +69,7 @@ object PlayerEngine {
     val systemTtsStatus: StateFlow<TtsStatus> get() = SystemTts.status
 
     private lateinit var app: Context
+    private lateinit var musicFocus: MusicAudioFocus
 
     private var backend: SpeechBackend? = null
     /** Подпись текущего движка: если параметры голоса изменились, движок пересоздаётся. */
@@ -76,7 +78,13 @@ object PlayerEngine {
     fun attach(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        musicFocus = MusicAudioFocus(app, pause = ::pauseForFocus, resume = ::play)
         SystemTts.init(app)
+        scope.launch {
+            Settings.state.map { it.musicMode }.distinctUntilChanged().collect { mode ->
+                musicFocus.update(_state.value.isPlaying, mode)
+            }
+        }
         scope.launch {
             Settings.state.map { it.voiceVolume }.distinctUntilChanged().collect { volume ->
                 backend?.setVolume(volume)
@@ -87,6 +95,7 @@ object PlayerEngine {
 
     fun openBook(book: Book) {
         if (_state.value.bookId == book.id && _state.value.sentences.isNotEmpty()) return
+        if (_state.value.isPlaying || _state.value.focusInterrupted) pause()
         stopBackend()
         _state.value = PlayerState(bookId = book.id, title = book.title, author = book.author, loading = true)
         scope.launch {
@@ -135,6 +144,7 @@ object PlayerEngine {
                 }
                 _state.value = _state.value.copy(installProgress = null)
                 if (installed.isFailure) {
+                    pause()
                     _state.value = _state.value.copy(
                         message = AppText.get(R.string.err_prepare_voice, AppText.get(neural.titleRes))
                     )
@@ -144,18 +154,29 @@ object PlayerEngine {
 
             stopPreview()
             val engine = ensureBackend(profile, neural, snapshot.language)
-            _state.value = _state.value.copy(isPlaying = true, message = null)
+            _state.value = _state.value.copy(isPlaying = true, focusInterrupted = false, message = null)
             Rewards.readingStarted("voice")
             PlaybackService.start(app)
-            engine.start(_state.value.sentences, _state.value.index)
+            musicFocus.update(true, Settings.state.value.musicMode)
+            if (_state.value.isPlaying) engine.start(_state.value.sentences, _state.value.index)
         }
     }
 
-    fun pause() {
+    fun pause() = pauseForFocus(false)
+
+    private fun pauseForFocus(interrupted: Boolean) {
+        if (::musicFocus.isInitialized) {
+            if (interrupted) musicFocus.update(false, Settings.state.value.musicMode)
+            else musicFocus.stop()
+        }
         stopBackend()
         if (_state.value.isPlaying) Rewards.readingStopped("voice")
-        _state.value = _state.value.copy(isPlaying = false, wordRange = null, preparing = false)
+        _state.value = _state.value.copy(isPlaying = false, focusInterrupted = interrupted, wordRange = null, preparing = false)
         savePosition()
+    }
+
+    fun playbackForegroundChanged(ready: Boolean) {
+        if (::musicFocus.isInitialized) musicFocus.foregroundChanged(ready)
     }
 
     fun seekTo(index: Int) {
@@ -240,6 +261,7 @@ object PlayerEngine {
     private val speechListener = object : SpeechListener {
         override fun onSentenceStart(index: Int) = post {
             val before = _state.value
+            if (!before.isPlaying) return@post
             // Очки — за дочитанное предложение и за пройденную главу, перемотка не считается.
             if (before.isPlaying && index == before.index + 1) {
                 Rewards.sentenceRead()
@@ -254,8 +276,10 @@ object PlayerEngine {
         }
 
         override fun onFinished() = post {
+            if (!_state.value.isPlaying) return@post
+            musicFocus.stop()
             Rewards.sentenceRead(); Rewards.chapterFinished(); Rewards.readingStopped("voice")
-            _state.value = _state.value.copy(isPlaying = false, wordRange = null, message = AppText.get(R.string.msg_book_finished))
+            _state.value = _state.value.copy(isPlaying = false, focusInterrupted = false, wordRange = null, message = AppText.get(R.string.msg_book_finished))
         }
 
         override fun onPreparing(preparing: Boolean) = post {
@@ -263,8 +287,9 @@ object PlayerEngine {
         }
 
         override fun onError(message: String) = post {
+            musicFocus.stop()
             if (_state.value.isPlaying) Rewards.readingStopped("voice")
-            _state.value = _state.value.copy(isPlaying = false, preparing = false, message = message)
+            _state.value = _state.value.copy(isPlaying = false, focusInterrupted = false, preparing = false, message = message)
         }
 
         private fun post(action: () -> Unit) {
@@ -281,9 +306,6 @@ object PlayerEngine {
         _state.value = _state.value.copy(message = null)
     }
 
-    // Музыка играет независимо: аудиофокус не запрашивается, смена трека
-    // стороннего плеера не меняет громкость голоса и не останавливает чтение.
-
     // --- Прослушивание голоса на экране оформления ---
 
     private var preview: NeuralTtsBackend? = null
@@ -291,7 +313,7 @@ object PlayerEngine {
     /** Читает короткую фразу выбранным голосом, не трогая позицию в книге. */
     fun previewVoice(voiceId: String?) {
         val voice = com.voicereader.tts.VoiceCatalog.byId(voiceId) ?: return
-        if (_state.value.isPlaying) pause()
+        if (_state.value.isPlaying || _state.value.focusInterrupted) pause()
         stopPreview()
         scope.launch {
             if (!VoiceInstaller.isVoiceReady(app, voice)) {

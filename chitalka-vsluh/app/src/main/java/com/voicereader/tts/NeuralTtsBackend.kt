@@ -192,18 +192,10 @@ class NeuralTtsBackend(
         if (total == 0) return
         var offset = 0
         val chunk = 2048
-        val boosted = FloatArray(chunk)
         while (offset < total) {
             coroutineContext.ensureActive()
             val count = minOf(chunk, total - offset)
-            val gain = volume
-            val written = if (gain > 1f) {
-                // Исходные сэмплы остаются неизменными, в том числе при частичной записи трека.
-                for (i in 0 until count) boosted[i] = VoiceVolume.boostSample(piece.samples[offset + i], gain)
-                track.write(boosted, 0, count, AudioTrack.WRITE_BLOCKING)
-            } else {
-                track.write(piece.samples, offset, count, AudioTrack.WRITE_BLOCKING)
-            }
+            val written = track.write(piece.samples, offset, count, AudioTrack.WRITE_BLOCKING)
             if (written <= 0) break
             offset += written
             emitWord(track, piece.index, words, text.length, startFrame, total)

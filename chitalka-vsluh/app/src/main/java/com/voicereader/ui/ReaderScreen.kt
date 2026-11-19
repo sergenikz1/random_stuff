@@ -60,6 +60,7 @@ import com.voicereader.ui.rewards.ReaderLook
 import com.voicereader.ui.rewards.RewardCelebrations
 import com.voicereader.ui.rewards.lookOf
 import androidx.compose.ui.unit.sp
+import com.voicereader.data.MusicMode
 import com.voicereader.data.Settings
 import com.voicereader.data.TextWindow
 import com.voicereader.player.PlayerEngine
@@ -437,7 +438,26 @@ private fun ReaderSettings(
             }
         }
 
-        VoiceVolumeSlider(state.language)
+        Spacer(Modifier.height(18.dp))
+        Text(stringResource(R.string.music_title), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MusicMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = settings.musicMode == mode,
+                    onClick = { Settings.update { it.copy(musicMode = mode) } },
+                    label = { Text(stringResource(mode.label), maxLines = 1) }
+                )
+            }
+        }
+        Text(
+            stringResource(settings.musicMode.hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        VoiceVolumeSlider()
         Spacer(Modifier.height(18.dp))
         AppUpdateSection()
 

@@ -44,6 +44,7 @@ class PlaybackService : Service() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
         )
         isForeground = true
+        PlayerEngine.playbackForegroundChanged(true)
         collector = scope.launch {
             PlayerEngine.state.collectLatest { state ->
                 if (state.bookId == null) {
@@ -51,7 +52,7 @@ class PlaybackService : Service() {
                     return@collectLatest
                 }
                 val notification = buildNotification(state)
-                if (state.isPlaying) {
+                if (state.isPlaying || state.focusInterrupted) {
                     if (!isForeground) {
                         ServiceCompat.startForeground(
                             this@PlaybackService, NOTIFICATION_ID, notification,
@@ -59,6 +60,7 @@ class PlaybackService : Service() {
                                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
                         )
                         isForeground = true
+                        PlayerEngine.playbackForegroundChanged(true)
                     } else {
                         notificationManager().notify(NOTIFICATION_ID, notification)
                     }
@@ -66,6 +68,7 @@ class PlaybackService : Service() {
                     if (isForeground) {
                         ServiceCompat.stopForeground(this@PlaybackService, ServiceCompat.STOP_FOREGROUND_DETACH)
                         isForeground = false
+                        PlayerEngine.playbackForegroundChanged(false)
                     }
                     notificationManager().notify(NOTIFICATION_ID, notification)
                 }
@@ -90,6 +93,8 @@ class PlaybackService : Service() {
     override fun onDestroy() {
         collector?.cancel()
         scope.cancel()
+        PlayerEngine.playbackForegroundChanged(false)
+        PlayerEngine.pause()
         notificationManager().cancel(NOTIFICATION_ID)
         super.onDestroy()
     }
@@ -126,7 +131,7 @@ class PlaybackService : Service() {
             .setContentIntent(open)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setOngoing(state.isPlaying)
+            .setOngoing(state.isPlaying || state.focusInterrupted)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(R.drawable.ic_notification, getString(R.string.notif_prev), action(ACTION_PREV))

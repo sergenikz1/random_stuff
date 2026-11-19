@@ -1,0 +1,51 @@
+{
+  "tag": "chitalka-v1.5.3",
+  "versionName": "1.5.3",
+  "versionCode": 9,
+  "sourceCommit": "f581dbcc9466130404da1503b175ab0107dfe538",
+  "signerSha256": "e5a71ce6b45499d8ded168b8649b8baae1d31a7af4d20695ffd760942e41f5f9",
+  "files": [
+    {
+      "name": "chitalka-vsluh-1.5.3-arm64-v8a.apk",
+      "abi": "arm64-v8a",
+      "parts": [
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part000",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part001",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part002",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part003",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part004",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part005",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part006",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part007",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part008",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part009",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part010",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part011",
+        "chitalka-vsluh-1.5.3-arm64-v8a.apk.part012"
+      ],
+      "size": 315467167,
+      "sha256": "b83164a03ffde4ac8ca23c28152e2497c0ab245fef2b6ffdbfa598b75be19444"
+    },
+    {
+      "name": "chitalka-vsluh-1.5.3-armeabi-v7a.apk",
+      "abi": "armeabi-v7a",
+      "parts": [
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part000",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part001",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part002",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part003",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part004",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part005",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part006",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part007",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part008",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part009",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part010",
+        "chitalka-vsluh-1.5.3-armeabi-v7a.apk.part011"
+      ],
+      "size": 307701293,
+      "sha256": "c411bbf7bf8b9605f2987d322d7a437960f613467f8dbe35086be5be0727ee52"
+    }
+  ],
+  "releaseId": 451686390
+}

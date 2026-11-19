@@ -1,0 +1,57 @@
+name: Читалка 1.5.3 — публикация подписанных APK
+on:
+  push:
+    branches: ['build-artifacts/chitalka-1.5.3']
+permissions:
+  contents: write
+concurrency:
+  group: chitalka-presigned-1.5.3
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: chitalka-v1.5.3
+      RELEASE_ID: '451686390'
+      SOURCE_COMMIT: 'f581dbcc9466130404da1503b175ab0107dfe538'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Verify merged source and signed APKs
+        run: |
+          set -euo pipefail
+          comparison=$(gh api "repos/$GITHUB_REPOSITORY/compare/$SOURCE_COMMIT...main" --jq .status)
+          case "$comparison" in identical|ahead) ;; *) exit 1 ;; esac
+          python3 verify_apks.py
+      - name: Upload APKs to the draft release
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --jq .draft)" = true
+          gh release upload "$RELEASE_TAG" out/*.apk out/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Verify uploaded files and publish
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > release.json
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest = json.loads(Path('manifest.json').read_text())
+          release = json.loads(Path('release.json').read_text())
+          assert release['draft'] and release['tag_name'] == manifest['tag']
+          assert release['target_commitish'] == manifest['sourceCommit']
+          assets = {a['name']: a for a in release['assets']}
+          for entry in manifest['files']:
+              asset = assets[entry['name']]
+              assert asset['state'] == 'uploaded' and asset['size'] == entry['size']
+              assert asset['digest'] == 'sha256:' + entry['sha256']
+          assert assets['SHA256SUMS.txt']['digest'] == 'sha256:' + hashlib.sha256(Path('out/SHA256SUMS.txt').read_bytes()).hexdigest()
+          PY
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
